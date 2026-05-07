@@ -1571,7 +1571,7 @@ function createWidgetDom(options) {
   };
 }
 
-// ../sdk-ui/dist/src/errors.js
+// ../cortex-sdk-ui/dist/src/errors.js
 var ControllerError = class extends Error {
   constructor(code, message, details) {
     super(message);
@@ -1601,7 +1601,7 @@ function errorFromUnknown(error, fallbackCode = "controller_error", source) {
   });
 }
 
-// ../sdk-ui/dist/src/utils.js
+// ../cortex-sdk-ui/dist/src/utils.js
 var TERMINAL_SESSION_STATES = /* @__PURE__ */ new Set([
   "COMPLETED",
   "FAILED",
@@ -1686,7 +1686,7 @@ function toEscalationActions(value) {
   return asStringArray(value).filter((action) => action === "continue" || action === "operator_input" || action === "reply_user");
 }
 
-// ../sdk-ui/dist/src/normalize.js
+// ../cortex-sdk-ui/dist/src/normalize.js
 function buildAttachmentMeta(payload) {
   return Array.isArray(payload["attachments"]) ? { attachments: payload["attachments"] } : {};
 }
@@ -1839,7 +1839,7 @@ function normalizeEscalationState(message) {
   };
 }
 
-// ../sdk-ui/dist/src/escalation-controller.js
+// ../cortex-sdk-ui/dist/src/escalation-controller.js
 function createEscalationController(options) {
   let state = cloneEscalation(options.initialState ?? null);
   function emit(event) {
@@ -1935,7 +1935,7 @@ function createEscalationController(options) {
   };
 }
 
-// ../sdk-ui/dist/src/transcript-store.js
+// ../cortex-sdk-ui/dist/src/transcript-store.js
 function createTranscriptStore(options = {}) {
   const transcript = (options.initialTranscript ?? []).map((message) => cloneMessage(message));
   const indexById = /* @__PURE__ */ new Map();
@@ -2068,7 +2068,7 @@ function createTranscriptStore(options = {}) {
   };
 }
 
-// ../sdk-ui/dist/src/chat-controller.js
+// ../cortex-sdk-ui/dist/src/chat-controller.js
 function createChatController(options) {
   const listeners = /* @__PURE__ */ new Set();
   const transcriptStore = createTranscriptStore();
