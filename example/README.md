@@ -25,6 +25,12 @@ npm run build
 Serve the package directory with any static server, for example:
 
 ```bash
+python -m http.server 8080
+```
+
+Or:
+
+```bash
 npx http-server .
 ```
 
