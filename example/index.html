@@ -117,8 +117,8 @@
         <span class="eyebrow">Mock Example</span>
         <h1>Cortex Chat Widget</h1>
         <p>
-          This page mounts the real widget bundle from <code>../dist/index.js</code> and wires it
-          to a mock client instead of a live Runtime.
+          This page mounts the real widget bundle from the GitHub-hosted repository build and wires
+          it to a mock client instead of a live Runtime.
         </p>
         <p>
           No real API key, Control Plane, Runtime, or Digital Worker is required. Text replies,
@@ -143,8 +143,8 @@
     </main>
 
     <script type="module">
-      import { mountCortexChat } from "../dist/index.js";
-      import { createMockCortexClient } from "./mock-client.js";
+      import { mountCortexChat } from "https://cdn.jsdelivr.net/gh/Cortex-Suite-Team/cortex-chat-widget@main/dist/index.js";
+      import { createMockCortexClient } from "https://cdn.jsdelivr.net/gh/Cortex-Suite-Team/cortex-chat-widget@main/example/mock-client.js";
 
       mountCortexChat("#chat-root", {
         apiKey: "mock-api-key",

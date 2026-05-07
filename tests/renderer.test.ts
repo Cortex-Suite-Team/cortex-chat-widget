@@ -216,7 +216,10 @@ describe('widget renderer behavior', () => {
         role: 'user',
         content: '',
         meta: {
-          attachments: ['mock_file_1_report.xlsx'],
+          attachments: [{
+            file_id: 'mock_file_1_report',
+            filename: 'report.xlsx',
+          }],
         },
       }],
     }));
@@ -226,7 +229,7 @@ describe('widget renderer behavior', () => {
 
     expect(bubble).toBeTruthy();
     expect(bubble.textContent).toContain('Attachment sent');
-    expect(attachments.textContent).toContain('mock_file_1_report.xlsx');
+    expect(attachments.textContent).toContain('report.xlsx');
     expect(transcript.textContent).not.toMatch(/^\s*user\s*$/);
   });
 
@@ -241,7 +244,10 @@ describe('widget renderer behavior', () => {
         role: 'user',
         content: 'Please review this file',
         meta: {
-          attachments: ['mock_file_2_contract.pdf'],
+          attachments: [{
+            file_id: 'mock_file_2_contract',
+            filename: 'contract.pdf',
+          }],
         },
       }],
     }));
@@ -250,7 +256,7 @@ describe('widget renderer behavior', () => {
     const attachments = shadow.querySelector('[data-testid="message-attachments"]') as HTMLElement;
 
     expect(bubble.textContent).toContain('Please review this file');
-    expect(attachments.textContent).toContain('mock_file_2_contract.pdf');
+    expect(attachments.textContent).toContain('contract.pdf');
   });
 
   it('renders assistant file attachments as download links when attachment url is available', () => {

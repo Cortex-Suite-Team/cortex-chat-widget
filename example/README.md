@@ -4,8 +4,8 @@ This example is a standalone mock browser demo for the widget package.
 
 It uses:
 
-- the real built widget bundle from `../dist/index.js`
-- a mock `client` from `./mock-client.js`
+- the GitHub-hosted widget bundle from the `cortex-chat-widget` repository
+- the GitHub-hosted mock `client` from the same repository
 
 It does not require:
 
@@ -16,7 +16,7 @@ It does not require:
 
 ## Run it
 
-Build the package first:
+Build the package if you want fresh local artifacts and tests, but the example page itself imports its runtime files from GitHub:
 
 ```bash
 npm run build
@@ -48,4 +48,4 @@ Then open:
 - emits a final `chat::answer`
 - returns mock attachment ids from `uploadAttachment()`
 
-Everything runs locally in the browser. No real backend connection is required.
+Everything runs in the browser with GitHub-hosted module files. No real backend connection is required.

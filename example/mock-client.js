@@ -18,6 +18,7 @@ function createEnvelope(type, sessionId, seq, payload) {
 export function createMockCortexClient() {
   const listeners = new Set();
   const timers = new Set();
+  const uploadedAttachments = new Map();
   let connected = false;
   let seq = 0;
   let turnNumber = 0;
@@ -51,29 +52,75 @@ export function createMockCortexClient() {
   }
 
   function buildAnswerContent(content, attachments) {
-    const normalizedContent = typeof content === 'string' && content.trim() !== ''
-      ? content.trim()
-      : '[attachment only message]';
+    const normalizedContent = typeof content === 'string' ? content.trim() : '';
 
-    if (!attachments?.length) {
+    if (normalizedContent !== '') {
       return `Echo: ${normalizedContent}`;
     }
 
-    const attachmentList = attachments.join(', ');
-    return `Echo: ${normalizedContent}\n\nMock attachments received: ${attachmentList}`;
+    if (attachments?.length) {
+      return 'I received your file.';
+    }
+
+    return 'Echo:';
   }
 
   function buildPartialChunks(content, attachments) {
-    const normalizedContent = typeof content === 'string' && content.trim() !== ''
-      ? content.trim()
-      : '[attachment only message]';
-    const chunks = ['Echo: ', normalizedContent];
+    const normalizedContent = typeof content === 'string' ? content.trim() : '';
+    const finalContent = normalizedContent !== ''
+      ? `Echo: ${normalizedContent}`
+      : (attachments?.length ? 'I received your file.' : 'Echo:');
 
-    if (attachments?.length) {
-      chunks.push(`\n\nMock attachments received: ${attachments.join(', ')}`);
+    if (finalContent.length <= 1) {
+      return [finalContent];
     }
 
-    return chunks;
+    const midpoint = Math.max(1, Math.ceil(finalContent.length / 2));
+    return [finalContent.slice(0, midpoint), finalContent.slice(midpoint)];
+  }
+
+  function toResolvedAttachment(id) {
+    const stored = uploadedAttachments.get(id);
+    if (!stored) {
+      return {
+        file_id: id,
+        filename: id,
+        content_type: 'application/octet-stream',
+        size: null,
+        download_url: null,
+      };
+    }
+
+    return {
+      file_id: id,
+      filename: stored.filename,
+      content_type: stored.content_type,
+      size: stored.size,
+      download_url: stored.download_url,
+    };
+  }
+
+  function resolveAttachments(attachments) {
+    if (!Array.isArray(attachments)) {
+      return [];
+    }
+
+    return attachments.map((attachment) => {
+      if (typeof attachment === 'string') {
+        return toResolvedAttachment(attachment);
+      }
+
+      if (attachment && typeof attachment === 'object') {
+        if (typeof attachment.file_id === 'string') {
+          return toResolvedAttachment(attachment.file_id);
+        }
+        if (typeof attachment.attachment_id === 'string') {
+          return toResolvedAttachment(attachment.attachment_id);
+        }
+      }
+
+      return null;
+    }).filter(Boolean);
   }
 
   return {
@@ -90,6 +137,12 @@ export function createMockCortexClient() {
     async disconnect() {
       connected = false;
       clearTimers();
+      for (const item of uploadedAttachments.values()) {
+        if (item.download_url) {
+          URL.revokeObjectURL(item.download_url);
+        }
+      }
+      uploadedAttachments.clear();
       this.channelState = 'CLOSED';
     },
 
@@ -105,7 +158,23 @@ export function createMockCortexClient() {
       const fileName = typeof file === 'string'
         ? file
         : (file && typeof file === 'object' && 'name' in file ? file.name : 'attachment');
-      return `mock_file_${uploadNumber}_${sanitizeFileName(fileName)}`;
+      const id = `mock_file_${uploadNumber}_${sanitizeFileName(fileName)}`;
+      const objectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function' && file instanceof Blob
+        ? URL.createObjectURL(file)
+        : null;
+
+      uploadedAttachments.set(id, {
+        file,
+        filename: fileName,
+        content_type: file && typeof file === 'object' && 'type' in file && typeof file.type === 'string' && file.type
+          ? file.type
+          : 'application/octet-stream',
+        size: file && typeof file === 'object' && 'size' in file && typeof file.size === 'number'
+          ? file.size
+          : 0,
+        download_url: objectUrl,
+      });
+      return id;
     },
 
     async sendMessage({ content, attachments }) {
@@ -116,13 +185,14 @@ export function createMockCortexClient() {
       turnNumber += 1;
       const turnId = `turn_${turnNumber}`;
       const attachmentIds = Array.isArray(attachments) ? attachments : [];
-      const finalContent = buildAnswerContent(content, attachmentIds);
-      const partialChunks = buildPartialChunks(content, attachmentIds);
+      const resolvedAttachments = resolveAttachments(attachmentIds);
+      const finalContent = buildAnswerContent(content, resolvedAttachments);
+      const partialChunks = buildPartialChunks(content, resolvedAttachments);
 
       emit(createEnvelope('chat::message', sessionId, nextSeq(), {
         role: 'user',
         content,
-        attachments: attachmentIds,
+        attachments: resolvedAttachments,
       }));
 
       schedule(180, () => {
@@ -145,26 +215,17 @@ export function createMockCortexClient() {
         }));
       });
 
-      if (partialChunks[2]) {
-        schedule(1180, () => {
-          emit(createEnvelope('chat::partial', sessionId, nextSeq(), {
-            role: 'assistant',
-            turn_id: turnId,
-            content: partialChunks[2],
-          }));
-        });
-      }
-
-      schedule(partialChunks[2] ? 1520 : 1280, () => {
+      schedule(1280, () => {
         emit(createEnvelope('chat::answer', sessionId, nextSeq(), {
           role: 'assistant',
           turn_id: turnId,
           answer_kind: 'final',
           content: finalContent,
+          attachments: resolvedAttachments,
         }));
       });
 
-      schedule(partialChunks[2] ? 1660 : 1420, () => {
+      schedule(1420, () => {
         emit(createEnvelope('typing::stop', sessionId, nextSeq(), {}));
       });
     },
