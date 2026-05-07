@@ -4,8 +4,10 @@ import {
   shouldHideTranscriptMessage,
 } from './message-flags.js';
 import type {
+  ChatMessageViewModel,
   CortexChatWidgetState,
   NormalizedWidgetOptions,
+  TranscriptAttachmentViewModel,
   WidgetDom,
 } from './types.js';
 
@@ -17,6 +19,72 @@ function formatFileSize(size: number): string {
     return `${(size / 1024).toFixed(1)} KB`;
   }
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toNonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function toAttachmentViewModel(attachment: unknown): TranscriptAttachmentViewModel | null {
+  if (typeof attachment === 'string') {
+    const label = attachment.trim();
+    if (!label) {
+      return null;
+    }
+    return {
+      id: label,
+      label,
+      url: null,
+      fileName: null,
+      contentType: null,
+      size: null,
+    };
+  }
+
+  if (!isRecord(attachment)) {
+    return null;
+  }
+
+  const id = toNonEmptyString(attachment.file_id) ?? toNonEmptyString(attachment.attachment_id);
+  const fileName = toNonEmptyString(attachment.filename) ?? toNonEmptyString(attachment.file_name) ?? toNonEmptyString(attachment.name);
+  const url = toNonEmptyString(attachment.download_url) ?? toNonEmptyString(attachment.url) ?? toNonEmptyString(attachment.href);
+  const contentType = toNonEmptyString(attachment.content_type) ?? toNonEmptyString(attachment.mime_type) ?? toNonEmptyString(attachment.type);
+  const size = typeof attachment.size === 'number'
+    ? attachment.size
+    : (typeof attachment.size_bytes === 'number' ? attachment.size_bytes : null);
+  const label = fileName ?? id ?? url;
+
+  if (!label) {
+    return null;
+  }
+
+  return {
+    id,
+    label,
+    url,
+    fileName,
+    contentType,
+    size,
+  };
+}
+
+function getMessageAttachments(message: ChatMessageViewModel): TranscriptAttachmentViewModel[] {
+  const attachments = message.meta?.attachments;
+  if (!Array.isArray(attachments)) {
+    return [];
+  }
+
+  return attachments
+    .map((attachment) => toAttachmentViewModel(attachment))
+    .filter((attachment): attachment is TranscriptAttachmentViewModel => attachment !== null);
 }
 
 function renderTranscript(
@@ -35,25 +103,97 @@ function renderTranscript(
   }
 
   for (const message of visibleMessages) {
+    const content = formatContent(message.content);
+    const attachments = getMessageAttachments(message);
+    const hasTextContent = content.contentText !== null
+      ? content.contentText.trim().length > 0
+      : (content.formattedContent ?? '').trim().length > 0;
+
+    if (!hasTextContent && attachments.length === 0) {
+      continue;
+    }
+
     const wrapper = document.createElement('article');
     wrapper.className = 'cortex-widget__message';
     wrapper.dataset.role = message.role;
     wrapper.dataset.type = message.type;
+    wrapper.setAttribute('data-testid', 'transcript-message');
 
     const bubble = document.createElement('div');
     bubble.className = 'cortex-widget__bubble';
+    bubble.setAttribute('data-testid', 'message-bubble');
     if (message.status) {
       bubble.dataset.status = message.status;
     }
 
-    const content = formatContent(message.content);
     if (content.contentText !== null) {
-      bubble.textContent = content.contentText;
+      const textContent = content.contentText.trim();
+      if (textContent.length > 0) {
+        const text = document.createElement('div');
+        text.className = 'cortex-widget__bubble-text';
+        text.textContent = textContent;
+        bubble.appendChild(text);
+      } else if (attachments.length > 0) {
+        const fallback = document.createElement('div');
+        fallback.className = 'cortex-widget__bubble-text';
+        fallback.textContent = 'Attachment sent';
+        bubble.appendChild(fallback);
+      }
     } else {
       const pre = document.createElement('pre');
       pre.className = 'cortex-widget__formatted';
       pre.textContent = content.formattedContent ?? '';
       bubble.appendChild(pre);
+    }
+
+    if (attachments.length > 0) {
+      const attachmentList = document.createElement('ul');
+      attachmentList.className = 'cortex-widget__message-attachments';
+      attachmentList.setAttribute('data-testid', 'message-attachments');
+      for (const attachment of attachments) {
+        const item = document.createElement('li');
+        item.className = 'cortex-widget__message-attachment';
+        const hasDownloadLink = message.role === 'assistant' && attachment.url;
+
+        if (hasDownloadLink) {
+          const link = document.createElement('a');
+          link.className = 'cortex-widget__message-attachment-link';
+          link.href = attachment.url ?? '#';
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          if (attachment.fileName) {
+            link.download = attachment.fileName;
+          }
+          link.setAttribute('data-testid', 'message-attachment-link');
+
+          const label = document.createElement('span');
+          label.className = 'cortex-widget__message-attachment-label';
+          label.textContent = attachment.label;
+
+          const detailsParts: string[] = [];
+          if (attachment.contentType) {
+            detailsParts.push(attachment.contentType);
+          }
+          if (attachment.size !== null) {
+            detailsParts.push(formatFileSize(attachment.size));
+          }
+
+          link.appendChild(label);
+
+          if (detailsParts.length > 0) {
+            const details = document.createElement('span');
+            details.className = 'cortex-widget__message-attachment-details';
+            details.textContent = detailsParts.join(' · ');
+            link.appendChild(details);
+          }
+
+          item.appendChild(link);
+        } else {
+          item.textContent = attachment.label;
+        }
+        attachmentList.appendChild(item);
+      }
+      bubble.appendChild(attachmentList);
     }
 
     const meta = document.createElement('div');
@@ -66,6 +206,14 @@ function renderTranscript(
 
     wrapper.append(bubble, meta);
     transcriptEl.appendChild(wrapper);
+  }
+
+  if (transcriptEl.childElementCount === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'cortex-widget__empty';
+    empty.textContent = 'Start the conversation when you are ready.';
+    transcriptEl.appendChild(empty);
+    return;
   }
 
   transcriptEl.scrollTop = transcriptEl.scrollHeight;

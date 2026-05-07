@@ -204,6 +204,128 @@ describe('widget renderer behavior', () => {
     expect(escalation.textContent).toContain('waiting for human/operator action');
   });
 
+  it('renders a visible user message for attachment-only backend echo without an empty bubble', () => {
+    mountWidget();
+    const shadow = getShadow();
+    const transcript = shadow.querySelector('[data-testid="transcript"]') as HTMLElement;
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_attachment_only',
+        type: 'chat::message',
+        role: 'user',
+        content: '',
+        meta: {
+          attachments: ['mock_file_1_report.xlsx'],
+        },
+      }],
+    }));
+
+    const bubble = shadow.querySelector('[data-testid="message-bubble"]') as HTMLElement;
+    const attachments = shadow.querySelector('[data-testid="message-attachments"]') as HTMLElement;
+
+    expect(bubble).toBeTruthy();
+    expect(bubble.textContent).toContain('Attachment sent');
+    expect(attachments.textContent).toContain('mock_file_1_report.xlsx');
+    expect(transcript.textContent).not.toMatch(/^\s*user\s*$/);
+  });
+
+  it('renders both text and attachment chip for backend echo with content and attachments', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_text_attachment',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Please review this file',
+        meta: {
+          attachments: ['mock_file_2_contract.pdf'],
+        },
+      }],
+    }));
+
+    const bubble = shadow.querySelector('[data-testid="message-bubble"]') as HTMLElement;
+    const attachments = shadow.querySelector('[data-testid="message-attachments"]') as HTMLElement;
+
+    expect(bubble.textContent).toContain('Please review this file');
+    expect(attachments.textContent).toContain('mock_file_2_contract.pdf');
+  });
+
+  it('renders assistant file attachments as download links when attachment url is available', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_assistant_file',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'Generated file is ready.',
+        meta: {
+          attachments: [{
+            file_id: 'file_123',
+            filename: 'summary.pdf',
+            content_type: 'application/pdf',
+            size: 2048,
+            download_url: 'https://example.test/download/summary.pdf',
+          }],
+        },
+      }],
+    }));
+
+    const link = shadow.querySelector('[data-testid="message-attachment-link"]') as HTMLAnchorElement;
+
+    expect(link).toBeTruthy();
+    expect(link.href).toBe('https://example.test/download/summary.pdf');
+    expect(link.download).toBe('summary.pdf');
+    expect(link.textContent).toContain('summary.pdf');
+    expect(link.textContent).toContain('application/pdf');
+  });
+
+  it('falls back to a visible chip for assistant attachments without download url', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_assistant_file_id_only',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'Attached result.',
+        meta: {
+          attachments: [{
+            file_id: 'file_456',
+            filename: 'artifact.txt',
+          }],
+        },
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="message-attachment-link"]')).toBeNull();
+    const attachments = shadow.querySelector('[data-testid="message-attachments"]') as HTMLElement;
+    expect(attachments.textContent).toContain('artifact.txt');
+  });
+
+  it('does not render an empty bubble when message content and attachments are both absent', () => {
+    mountWidget();
+    const shadow = getShadow();
+    const transcript = shadow.querySelector('[data-testid="transcript"]') as HTMLElement;
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_empty',
+        type: 'chat::message',
+        role: 'user',
+        content: '',
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="message-bubble"]')).toBeNull();
+    expect(transcript.textContent).toContain('Start the conversation when you are ready.');
+  });
+
   it('unlocks on terminal session state', async () => {
     mountWidget();
     const shadow = getShadow();

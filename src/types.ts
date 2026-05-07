@@ -18,6 +18,15 @@ export interface SelectedFileState {
   type: string;
 }
 
+export interface TranscriptAttachmentViewModel {
+  id: string | null;
+  label: string;
+  url: string | null;
+  fileName: string | null;
+  contentType: string | null;
+  size: number | null;
+}
+
 export interface CortexChatWidgetState {
   mode: 'embedded' | 'floating';
   isOpen: boolean;

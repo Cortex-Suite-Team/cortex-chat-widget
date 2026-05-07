@@ -166,6 +166,10 @@ export const widgetStyles = `
   word-break: break-word;
 }
 
+.cortex-widget__bubble-text {
+  white-space: pre-wrap;
+}
+
 .cortex-widget__message[data-role="user"] .cortex-widget__bubble {
   background: linear-gradient(135deg, var(--cortex-accent-color), #1d4ed8);
   color: #ffffff;
@@ -198,6 +202,55 @@ export const widgetStyles = `
   white-space: pre-wrap;
   font-size: 12px;
   font-family: Consolas, "Courier New", monospace;
+}
+
+.cortex-widget__message-attachments {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.cortex-widget__message-attachment {
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  font-size: 12px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cortex-widget__message-attachment-link {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.cortex-widget__message-attachment-link:hover {
+  text-decoration: underline;
+}
+
+.cortex-widget__message-attachment-label {
+  font-weight: 600;
+}
+
+.cortex-widget__message-attachment-details {
+  font-size: 11px;
+  opacity: 0.82;
+}
+
+.cortex-widget__message[data-role="user"] .cortex-widget__message-attachment {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
 }
 
 .cortex-widget__typing,
