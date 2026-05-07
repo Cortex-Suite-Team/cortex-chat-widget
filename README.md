@@ -65,6 +65,8 @@ widget.open();
 </script>
 ```
 
+The MVP loader auto-mounts immediately when the script is loaded.
+
 ## Theme Example
 
 ```ts

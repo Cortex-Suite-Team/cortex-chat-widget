@@ -14,6 +14,10 @@ function callOnError(options: Partial<CortexChatWidgetOptions>, error: unknown) 
   options.onError?.(error);
 }
 
+function isHTMLElement(value: unknown): value is HTMLElement {
+  return typeof HTMLElement !== 'undefined' && value instanceof HTMLElement;
+}
+
 function assertBrowserEnvironment(options: Partial<CortexChatWidgetOptions>) {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     const error = createWidgetError('browser_unsupported', 'Cortex Chat Widget requires a browser environment.');
@@ -34,7 +38,7 @@ function resolveOptions(
 ): NormalizedWidgetOptions {
   const baseOptions = (
     typeof targetOrOptions === 'string'
-    || (typeof HTMLElement !== 'undefined' && targetOrOptions instanceof HTMLElement)
+    || isHTMLElement(targetOrOptions)
   )
     ? { ...maybeOptions, target: targetOrOptions }
     : { ...(targetOrOptions ?? {}) } as Partial<CortexChatWidgetOptions>;
@@ -74,7 +78,7 @@ function resolveMountTarget(options: NormalizedWidgetOptions): MountTargetResolu
 
   if (typeof options.target === 'string') {
     const targetElement = document.querySelector(options.target);
-    if (!(targetElement instanceof HTMLElement)) {
+    if (!isHTMLElement(targetElement)) {
       throw createWidgetError('target_not_found', `Target selector not found: ${options.target}`);
     }
     return {
@@ -83,7 +87,7 @@ function resolveMountTarget(options: NormalizedWidgetOptions): MountTargetResolu
     };
   }
 
-  if (options.target instanceof HTMLElement) {
+  if (isHTMLElement(options.target)) {
     return {
       mountTarget: options.target,
       targetElement: options.target,
@@ -114,14 +118,16 @@ export function mountCortexChat(
   const partialOptions = (
     typeof targetOrOptions === 'object'
     && targetOrOptions !== null
-    && !(targetOrOptions instanceof HTMLElement)
+    && !isHTMLElement(targetOrOptions)
   ) ? targetOrOptions : maybeOptions ?? {};
 
   assertBrowserEnvironment(partialOptions);
   const options = resolveOptions(targetOrOptions, maybeOptions);
   const { mountTarget } = resolveMountTarget(options);
 
-  if (typeof mountTarget.attachShadow !== 'function') {
+  void mountTarget;
+
+  if (typeof HTMLElement.prototype.attachShadow !== 'function') {
     const error = createWidgetError('shadow_dom_unsupported', 'Cortex Chat Widget requires Shadow DOM support.');
     callOnError(options, error);
     throw error;

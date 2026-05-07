@@ -148,4 +148,67 @@ describe('mountCortexChat', () => {
 
     expect(banner.textContent).toContain('Runtime failed');
   });
+
+  it('throws browser_unsupported instead of ReferenceError in non-browser environments', () => {
+    const originalHTMLElement = globalThis.HTMLElement;
+    Object.defineProperty(globalThis, 'HTMLElement', {
+      configurable: true,
+      value: undefined,
+    });
+
+    try {
+      let thrown: unknown;
+      try {
+        mountCortexChat({
+          apiKey: 'test-key',
+        });
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect((thrown as { code?: string }).code).toBe('browser_unsupported');
+      expect(thrown).not.toBeInstanceOf(ReferenceError);
+    } finally {
+      Object.defineProperty(globalThis, 'HTMLElement', {
+        configurable: true,
+        value: originalHTMLElement,
+      });
+    }
+  });
+
+  it('throws shadow_dom_unsupported when attachShadow is unavailable on HTMLElement.prototype', () => {
+    const originalAttachShadow = HTMLElement.prototype.attachShadow;
+    const OriginalHTMLElement = globalThis.HTMLElement;
+    function FakeHTMLElement() {}
+    FakeHTMLElement.prototype = {};
+
+    Object.defineProperty(globalThis, 'HTMLElement', {
+      configurable: true,
+      value: FakeHTMLElement,
+    });
+
+    try {
+      let thrown: unknown;
+      try {
+        mountCortexChat({
+          apiKey: 'test-key',
+        });
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect((thrown as { code?: string }).code).toBe('shadow_dom_unsupported');
+    } finally {
+      Object.defineProperty(globalThis, 'HTMLElement', {
+        configurable: true,
+        value: OriginalHTMLElement,
+      });
+      Object.defineProperty(HTMLElement.prototype, 'attachShadow', {
+        configurable: true,
+        value: originalAttachShadow,
+      });
+    }
+  });
 });
