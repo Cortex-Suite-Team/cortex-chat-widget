@@ -40,11 +40,10 @@ jobs:
         with:
           node-version: 24
 
-      - name: Build SDK
-        working-directory: cortex-sdk/js
+      - name: Verify SDK dist
         run: |
-          npm install
-          npm run build
+          test -f cortex-sdk/js/dist/browser/index.js
+          test -f cortex-sdk/js/dist/browser/index.d.ts
 
       - name: Build SDK UI
         working-directory: cortex-sdk-ui
