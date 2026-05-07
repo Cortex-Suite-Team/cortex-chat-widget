@@ -1,0 +1,78 @@
+{
+  "name": "@cortex-suite/chat-widget",
+  "version": "0.1.0",
+  "description": "Cortex Chat Widget — embeddable end-user chat UI for Cortex Digital Workers",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cortex-Suite-Team/cortex-chat-widget.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./loader": {
+      "types": "./dist/loader.d.ts",
+      "default": "./dist/loader.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "npm run clean && npm run build:types && npm run build:bundle",
+    "build:bundle": "node ./scripts/build.mjs",
+    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('dist', { recursive: true, force: true }))\"",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@cortex-suite/sdk": "file:../cortex-sdk/js",
+    "@cortex-suite/sdk-ui": "file:../sdk-ui"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.2",
+    "esbuild": "^0.25.3",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "ts-jest": "^29.1.4",
+    "typescript": "^5.4.5"
+  },
+  "jest": {
+    "preset": "ts-jest/presets/default-esm",
+    "testEnvironment": "jsdom",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
+    "moduleNameMapper": {
+      "^@cortex-suite/sdk/browser$": "<rootDir>/tests/mocks/sdk-browser.ts",
+      "^@cortex-suite/sdk-ui$": "<rootDir>/tests/mocks/sdk-ui.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
+    "transform": {
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ]
+    },
+    "testMatch": [
+      "**/tests/**/*.test.ts"
+    ],
+    "testTimeout": 10000
+  }
+}
