@@ -394,11 +394,15 @@
       }
       return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
     }
-    function buildMessagePayload(content, attachments) {
+    function buildMessagePayload(content, attachments, meta) {
       const payload = { content, role: "user" };
-      if (attachments && attachments.length > 0) {
-        payload["meta"] = { attachments };
-      }
+      const combinedMeta = {};
+      if (meta)
+        Object.assign(combinedMeta, meta);
+      if (attachments && attachments.length > 0)
+        combinedMeta["attachments"] = attachments;
+      if (Object.keys(combinedMeta).length > 0)
+        payload["meta"] = combinedMeta;
       return payload;
     }
     function isPlainObject(value) {
@@ -487,8 +491,8 @@
       sendStop() {
         return send(buildEnvelope("sandbox::stop", {}));
       },
-      sendChatMessage(content, attachments) {
-        return send(buildEnvelope("chat::message", buildMessagePayload(content, attachments)));
+      sendChatMessage(content, attachments, meta) {
+        return send(buildEnvelope("chat::message", buildMessagePayload(content, attachments, meta)));
       },
       sendEscalationReply(escalationId, waitToken, action, content, meta) {
         return send(buildEnvelope("escalation::reply", buildEscalationReplyPayload(escalationId, waitToken, action, content, meta)));
@@ -673,7 +677,7 @@
       this._transport.close();
     }
     async sendMessage(options) {
-      await this._session.sendChatMessage(options.content, options.attachments);
+      await this._session.sendChatMessage(options.content, options.attachments, options.meta);
     }
     async replyEscalation(options) {
       this._requireSessionId();
@@ -1446,6 +1450,67 @@
   color: #64748b;
 }
 
+.cortex-widget__actor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.cortex-widget__actor-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #e2e8f0;
+}
+
+.cortex-widget__actor-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cortex-widget__actor-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.cortex-widget__actor-title {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.cortex-widget__question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cortex-widget__question-option {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.45);
+  background: #eff6ff;
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cortex-widget__question-option:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: rgba(37, 99, 235, 0.65);
+}
+
+.cortex-widget__question-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 @media (max-width: 520px) {
   .cortex-widget[data-mode="floating"] {
     left: 12px;
@@ -1793,6 +1858,20 @@
             code: asNonEmptyString(payload["code"]) ?? void 0
           }
         };
+      case "chat::question":
+        return {
+          id: buildMessageId(message, "question"),
+          seq: message.seq ?? null,
+          type: message.type,
+          role: mapRole(payload["role"], "assistant"),
+          content: payload["content"],
+          status: "final",
+          ts: message.ts ?? null,
+          meta: {
+            ...mergedMeta,
+            ...asNonEmptyString(payload["turn_id"]) ? { turnId: asNonEmptyString(payload["turn_id"]) } : {}
+          }
+        };
       case "sandbox::snapshot":
       case "sandbox::lifecycle":
         return {
@@ -2077,6 +2156,7 @@
     let unsubscribeFromClient = null;
     let destroyed = false;
     let lastError = null;
+    let activeQuestion = null;
     const escalationController = createEscalationController({
       client: options.client,
       replyRequestBuilder: options.replyRequestBuilder,
@@ -2131,7 +2211,8 @@
         transcript: transcriptStore.getSnapshot().map((message) => cloneMessage(message)),
         input,
         escalation: cloneEscalation(escalation),
-        lastError
+        lastError,
+        activeQuestion: activeQuestion ? { ...activeQuestion, options: [...activeQuestion.options] } : null
       };
     }
     function emit(event) {
@@ -2177,6 +2258,24 @@
       const escalation = escalationController.ingest(message);
       if (message.type === "escalation::request" && escalation) {
         emit({ type: "escalation_opened", escalation: cloneEscalation(escalation) });
+      }
+      if (message.type === "chat::question") {
+        const payload = asPayload(message);
+        const meta = isRecord(payload["meta"]) ? payload["meta"] : null;
+        const questionId = meta ? asNonEmptyString(meta["question_id"]) : null;
+        if (questionId) {
+          const rawOptions = Array.isArray(meta?.["options"]) ? meta["options"] : [];
+          activeQuestion = {
+            question_id: questionId,
+            input_type: asNonEmptyString(meta?.["input_type"]) ?? "radio",
+            allow_reply: meta?.["allow_reply"] === true,
+            options: rawOptions.filter((o) => isRecord(o)).map((o) => ({ id: String(o["id"] ?? ""), label: String(o["label"] ?? "") })).filter((o) => o.id !== "" && o.label !== ""),
+            turn_id: asNonEmptyString(payload["turn_id"]) ?? null
+          };
+        }
+      }
+      if (message.type === "chat::answer" || message.type === "system::error") {
+        activeQuestion = null;
       }
       if (message.type === "system::error") {
         const payload = asPayload(message);
@@ -2265,7 +2364,8 @@
     return {
       startTyping: type === "chat::typing" || type === "typing::start",
       stopTyping: type === "typing::stop",
-      finalAnswer: type === "chat::answer" && answerKind === "final"
+      finalAnswer: type === "chat::answer" && answerKind === "final",
+      isQuestion: type === "chat::question"
     };
   }
   function isTypingMessageType(type) {
@@ -2404,7 +2504,8 @@
       const content = formatContent(message.content);
       const attachments = getMessageAttachments(message);
       const hasTextContent = content.contentText !== null ? content.contentText.trim().length > 0 : (content.formattedContent ?? "").trim().length > 0;
-      if (!hasTextContent && attachments.length === 0) {
+      const hasQuestionOptions = message.type === "chat::question" && Array.isArray(message.meta?.["options"]) && message.meta["options"].length > 0;
+      if (!hasTextContent && attachments.length === 0 && !hasQuestionOptions) {
         continue;
       }
       const wrapper = document.createElement("article");
@@ -2412,6 +2513,39 @@
       wrapper.dataset.role = message.role;
       wrapper.dataset.type = message.type;
       wrapper.setAttribute("data-testid", "transcript-message");
+      const actor = isRecord2(message.meta?.["actor"]) ? message.meta["actor"] : null;
+      const hasActorHeader = actor !== null && message.role !== "user" && message.role !== "error";
+      if (hasActorHeader) {
+        const actorHeader = document.createElement("div");
+        actorHeader.className = "cortex-widget__actor";
+        actorHeader.setAttribute("data-testid", "actor-header");
+        const avatarUrl = toNonEmptyString(actor["avatar_url"]);
+        if (avatarUrl) {
+          const img = document.createElement("img");
+          img.className = "cortex-widget__actor-avatar";
+          img.src = avatarUrl;
+          img.alt = "";
+          img.setAttribute("aria-hidden", "true");
+          img.setAttribute("data-testid", "actor-avatar");
+          actorHeader.appendChild(img);
+        }
+        const actorInfo = document.createElement("div");
+        actorInfo.className = "cortex-widget__actor-info";
+        const nameEl = document.createElement("span");
+        nameEl.className = "cortex-widget__actor-name";
+        nameEl.textContent = toNonEmptyString(actor["name"]) ?? "Assistant";
+        nameEl.setAttribute("data-testid", "actor-name");
+        actorInfo.appendChild(nameEl);
+        const actorTitle = toNonEmptyString(actor["title"]);
+        if (actorTitle) {
+          const titleEl = document.createElement("span");
+          titleEl.className = "cortex-widget__actor-title";
+          titleEl.textContent = actorTitle;
+          actorInfo.appendChild(titleEl);
+        }
+        actorHeader.appendChild(actorInfo);
+        wrapper.appendChild(actorHeader);
+      }
       const bubble = document.createElement("div");
       bubble.className = "cortex-widget__bubble";
       bubble.setAttribute("data-testid", "message-bubble");
@@ -2480,13 +2614,47 @@
         }
         bubble.appendChild(attachmentList);
       }
+      if (message.type === "chat::question" && Array.isArray(message.meta?.["options"])) {
+        const questionId = toNonEmptyString(message.meta?.["question_id"]);
+        const inputType = toNonEmptyString(message.meta?.["input_type"]) ?? "radio";
+        if (inputType === "checkbox") {
+          console.warn('[cortex-chat-widget] chat::question input_type="checkbox" is not supported');
+        }
+        if (questionId && inputType !== "checkbox") {
+          const isActive = state.chat.activeQuestion?.question_id === questionId;
+          const optionsDisabled = !isActive || state.isAwaitingAnswer;
+          const optionsContainer = document.createElement("div");
+          optionsContainer.className = "cortex-widget__question-options";
+          optionsContainer.setAttribute("data-testid", "question-options");
+          for (const option of message.meta["options"]) {
+            const optionId = toNonEmptyString(option["id"]);
+            const optionLabel = toNonEmptyString(option["label"]);
+            if (!optionId || !optionLabel) continue;
+            const btn = document.createElement("button");
+            btn.className = "cortex-widget__question-option";
+            btn.type = "button";
+            btn.textContent = optionLabel;
+            btn.dataset.questionId = questionId;
+            btn.dataset.optionId = optionId;
+            btn.disabled = optionsDisabled;
+            btn.setAttribute("data-testid", "question-option");
+            optionsContainer.appendChild(btn);
+          }
+          bubble.appendChild(optionsContainer);
+        }
+      }
       const meta = document.createElement("div");
       meta.className = "cortex-widget__meta";
-      const metaParts = [message.role];
-      if (message.status === "streaming") {
-        metaParts.push("streaming");
+      if (hasActorHeader) {
+        meta.textContent = message.status === "streaming" ? "streaming" : "";
+      } else {
+        const displayName = message.role === "user" ? "You" : message.role === "assistant" ? "Assistant" : message.role;
+        const metaParts = [displayName];
+        if (message.status === "streaming") {
+          metaParts.push("streaming");
+        }
+        meta.textContent = metaParts.join(" \xB7 ");
       }
-      meta.textContent = metaParts.join(" \xB7 ");
       wrapper.append(bubble, meta);
       transcriptEl.appendChild(wrapper);
     }
@@ -2524,8 +2692,9 @@
       dom.escalation.textContent = "";
     }
     dom.textarea.value = state.isDestroyed ? "" : dom.textarea.value;
-    dom.textarea.disabled = state.chat.input.locked || state.isAwaitingAnswer || isUploading;
-    const canSend = !state.chat.input.locked && !state.isAwaitingAnswer && !isUploading && (dom.textarea.value.trim().length > 0 || state.selectedFile !== null);
+    const questionLocksInput = !!state.chat.activeQuestion && !state.chat.activeQuestion.allow_reply;
+    dom.textarea.disabled = state.chat.input.locked || state.isAwaitingAnswer || isUploading || questionLocksInput;
+    const canSend = !state.chat.input.locked && !state.isAwaitingAnswer && !isUploading && !questionLocksInput && (dom.textarea.value.trim().length > 0 || state.selectedFile !== null);
     dom.sendButton.disabled = !canSend;
     dom.attachButton.disabled = !attachmentsAvailable || state.chat.input.locked || state.isAwaitingAnswer || isUploading;
     dom.fileInput.disabled = dom.attachButton.disabled;
@@ -2669,6 +2838,10 @@
       const hasContent = content.length > 0;
       const hasFile = internal.selectedFileValue !== null;
       const inputLocked = chatState.input.locked;
+      const activeQuestion = chatState.activeQuestion;
+      if (activeQuestion && !activeQuestion.allow_reply) {
+        return;
+      }
       if (inputLocked || internal.isAwaitingAnswer || internal.isUploading || !hasContent && !hasFile) {
         return;
       }
@@ -2680,10 +2853,12 @@
           return;
         }
       }
+      const questionMeta = activeQuestion ? { question_id: activeQuestion.question_id, selected_option: "reply" } : void 0;
       try {
         await controller.sendMessage({
-          content,
-          attachments: attachmentId ? [attachmentId] : void 0
+          content: [content],
+          attachments: attachmentId ? [attachmentId] : void 0,
+          meta: questionMeta
         });
         internal.draftText = "";
         clearSelectedFile();
@@ -2695,6 +2870,26 @@
       } catch (error) {
         internal.isAwaitingAnswer = false;
         internal.isUploading = false;
+        internal.error = toWidgetError(error, "send_failed", "Message send failed");
+        options.onError?.(error);
+        notifyAndRender();
+      }
+    }
+    async function handleOptionSelect(questionId, optionId, optionLabel) {
+      if (internal.isDestroyed || internal.isAwaitingAnswer) {
+        return;
+      }
+      try {
+        await controller.sendMessage({
+          content: [optionLabel],
+          meta: { question_id: questionId, selected_option: optionId }
+        });
+        internal.draftText = "";
+        internal.error = null;
+        internal.isAwaitingAnswer = true;
+        notifyAndRender();
+      } catch (error) {
+        internal.isAwaitingAnswer = false;
         internal.error = toWidgetError(error, "send_failed", "Message send failed");
         options.onError?.(error);
         notifyAndRender();
@@ -2750,6 +2945,10 @@
         internal.isUploading = false;
         internal.error = null;
       }
+      if (flags.isQuestion) {
+        internal.isAwaitingAnswer = false;
+        internal.isTyping = false;
+      }
       notifyAndRender();
     });
     const onTextareaInput = () => {
@@ -2792,6 +2991,15 @@
       internal.isOpen = !internal.isOpen;
       notifyAndRender();
     };
+    const onTranscriptClick = (event) => {
+      const btn = event.target.closest(".cortex-widget__question-option");
+      if (!btn || btn.disabled) return;
+      const { questionId, optionId } = btn.dataset;
+      const optionLabel = btn.textContent ?? "";
+      if (questionId && optionId) {
+        void handleOptionSelect(questionId, optionId, optionLabel);
+      }
+    };
     dom.textarea.addEventListener("input", onTextareaInput);
     dom.textarea.addEventListener("keydown", onTextareaKeyDown);
     dom.composer.addEventListener("submit", onComposerSubmit);
@@ -2799,6 +3007,7 @@
     dom.fileInput.addEventListener("change", onFileChange);
     dom.fileChipRemove.addEventListener("click", onRemoveFile);
     dom.launcher.addEventListener("click", onLauncherClick);
+    dom.transcript.addEventListener("click", onTranscriptClick);
     domCleanup.add(() => dom.textarea.removeEventListener("input", onTextareaInput));
     domCleanup.add(() => dom.textarea.removeEventListener("keydown", onTextareaKeyDown));
     domCleanup.add(() => dom.composer.removeEventListener("submit", onComposerSubmit));
@@ -2806,6 +3015,7 @@
     domCleanup.add(() => dom.fileInput.removeEventListener("change", onFileChange));
     domCleanup.add(() => dom.fileChipRemove.removeEventListener("click", onRemoveFile));
     domCleanup.add(() => dom.launcher.removeEventListener("click", onLauncherClick));
+    domCleanup.add(() => dom.transcript.removeEventListener("click", onTranscriptClick));
     mountTarget.appendChild(dom.host);
     internal.isReady = true;
     notifyAndRender();

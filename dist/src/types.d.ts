@@ -124,6 +124,7 @@ export interface MessageFlags {
     startTyping: boolean;
     stopTyping: boolean;
     finalAnswer: boolean;
+    isQuestion: boolean;
 }
 export interface MountTargetResolution {
     mountTarget: HTMLElement;
