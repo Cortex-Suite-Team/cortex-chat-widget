@@ -47,29 +47,21 @@ export function isTerminalSessionState(sessionState: string): boolean {
 
 export function formatContent(value: unknown): { contentText: string | null; formattedContent: string | null } {
   if (typeof value === 'string') {
-    return {
-      contentText: value,
-      formattedContent: null,
-    };
+    return { contentText: value, formattedContent: null };
+  }
+
+  if (Array.isArray(value) && value.every((item) => typeof item === 'string')) {
+    return { contentText: (value as string[]).join('\n'), formattedContent: null };
   }
 
   if (value === null || value === undefined) {
-    return {
-      contentText: '',
-      formattedContent: null,
-    };
+    return { contentText: '', formattedContent: null };
   }
 
   try {
-    return {
-      contentText: null,
-      formattedContent: JSON.stringify(value, null, 2),
-    };
+    return { contentText: null, formattedContent: JSON.stringify(value, null, 2) };
   } catch {
-    return {
-      contentText: null,
-      formattedContent: String(value),
-    };
+    return { contentText: null, formattedContent: String(value) };
   }
 }
 
