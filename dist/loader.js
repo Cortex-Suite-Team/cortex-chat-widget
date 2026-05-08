@@ -2379,27 +2379,18 @@
   }
   function formatContent(value) {
     if (typeof value === "string") {
-      return {
-        contentText: value,
-        formattedContent: null
-      };
+      return { contentText: value, formattedContent: null };
+    }
+    if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+      return { contentText: value.join("\n"), formattedContent: null };
     }
     if (value === null || value === void 0) {
-      return {
-        contentText: "",
-        formattedContent: null
-      };
+      return { contentText: "", formattedContent: null };
     }
     try {
-      return {
-        contentText: null,
-        formattedContent: JSON.stringify(value, null, 2)
-      };
+      return { contentText: null, formattedContent: JSON.stringify(value, null, 2) };
     } catch {
-      return {
-        contentText: null,
-        formattedContent: String(value)
-      };
+      return { contentText: null, formattedContent: String(value) };
     }
   }
   function buildStatusText(state, isAwaitingAnswer, isTyping) {
