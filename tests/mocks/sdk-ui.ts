@@ -28,6 +28,19 @@ export interface EscalationState {
   status: 'pending' | 'replied' | 'expired' | 'cancelled';
 }
 
+export interface QuestionOption {
+  id: string;
+  label: string;
+}
+
+export interface QuestionState {
+  question_id: string;
+  input_type: string;
+  allow_reply: boolean;
+  options: QuestionOption[];
+  turn_id?: string | null;
+}
+
 export interface ChatState {
   connection: {
     channelState: string;
@@ -42,12 +55,13 @@ export interface ChatState {
   };
   escalation: EscalationState | null;
   lastError: ChatErrorViewModel | null;
+  activeQuestion: QuestionState | null;
 }
 
 export interface CortexClientLike {
   connect(): Promise<void>;
   disconnect?(): Promise<void>;
-  sendMessage(options: { content: unknown; attachments?: unknown[] }): Promise<void>;
+  sendMessage(options: { content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }): Promise<void>;
   onMessage(handler: (message: Record<string, unknown>) => void): () => void;
   sessionId?: string | null;
   sessionState?: string;
@@ -64,7 +78,7 @@ const controllers = globalThis.__cortexChatWidgetSdkUiControllers__ ??= [];
 export class MockChatController {
   state: ChatState = createMockChatState();
   readonly subscribers = new Set<Listener>();
-  readonly sendCalls: Array<{ content: unknown; attachments?: unknown[] }> = [];
+  readonly sendCalls: Array<{ content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }> = [];
   connectCalls = 0;
   disconnectCalls = 0;
   destroyCalls = 0;
@@ -89,7 +103,7 @@ export class MockChatController {
     this.disconnectCalls += 1;
   }
 
-  async sendMessage(options: { content: unknown; attachments?: unknown[] }): Promise<void> {
+  async sendMessage(options: { content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }): Promise<void> {
     this.sendCalls.push(options);
     if (this.nextSendError) {
       const error = this.nextSendError;
@@ -139,6 +153,7 @@ export function createMockChatState(
     },
     escalation: overrides.escalation ?? null,
     lastError: overrides.lastError ?? null,
+    activeQuestion: overrides.activeQuestion ?? null,
   };
 }
 

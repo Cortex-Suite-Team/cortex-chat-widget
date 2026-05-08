@@ -144,8 +144,8 @@ describe('widget renderer behavior', () => {
     await flushAsyncWork();
 
     expect(client.uploadedAttachments).toHaveLength(1);
-    expect(controller.sendCalls[0]).toEqual({
-      content: 'Attach this',
+    expect(controller.sendCalls[0]).toMatchObject({
+      content: ['Attach this'],
       attachments: ['attachment:second.txt'],
     });
     expect(textarea.value).toBe('Attach this');
@@ -330,6 +330,231 @@ describe('widget renderer behavior', () => {
 
     expect(shadow.querySelector('[data-testid="message-bubble"]')).toBeNull();
     expect(transcript.textContent).toContain('Start the conversation when you are ready.');
+  });
+
+  it('renders actor header with name and avatar when meta.actor is present on assistant message', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_with_actor',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'Hello from Robot Vasya',
+        status: 'final',
+        meta: {
+          actor: {
+            kind: 'digital_worker',
+            id: 'proj_1',
+            name: 'Robot Vasya',
+            title: 'Lawyer',
+            avatar_url: 'https://example.test/avatar.png',
+          },
+        },
+      }],
+    }));
+
+    const actorHeader = shadow.querySelector('[data-testid="actor-header"]') as HTMLElement;
+    const actorName = shadow.querySelector('[data-testid="actor-name"]') as HTMLElement;
+    const actorAvatar = shadow.querySelector('[data-testid="actor-avatar"]') as HTMLImageElement;
+
+    expect(actorHeader).toBeTruthy();
+    expect(actorName.textContent).toBe('Robot Vasya');
+    expect(actorAvatar).toBeTruthy();
+    expect(actorAvatar.src).toBe('https://example.test/avatar.png');
+  });
+
+  it('does not duplicate actor name in meta line when actor header is shown', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_actor_no_dup',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'Hi',
+        status: 'final',
+        meta: {
+          actor: { kind: 'digital_worker', name: 'Robot Vasya' },
+        },
+      }],
+    }));
+
+    const message = shadow.querySelector('[data-testid="transcript-message"]') as HTMLElement;
+    const meta = message.querySelector('.cortex-widget__meta') as HTMLElement;
+
+    // Meta line must not contain the actor name
+    expect(meta.textContent).not.toContain('Robot Vasya');
+  });
+
+  it('renders question option buttons for chat::question messages', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_question',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'What would you like to do?',
+        status: 'final',
+        meta: {
+          question_id: 'q_1',
+          input_type: 'radio',
+          allow_reply: true,
+          options: [
+            { id: 'approve', label: 'Approve' },
+            { id: 'reject', label: 'Reject' },
+          ],
+        },
+      }],
+      activeQuestion: {
+        question_id: 'q_1',
+        input_type: 'radio',
+        allow_reply: true,
+        options: [
+          { id: 'approve', label: 'Approve' },
+          { id: 'reject', label: 'Reject' },
+        ],
+      },
+    }));
+
+    const optionsContainer = shadow.querySelector('[data-testid="question-options"]') as HTMLElement;
+    const buttons = shadow.querySelectorAll('[data-testid="question-option"]') as NodeListOf<HTMLButtonElement>;
+
+    expect(optionsContainer).toBeTruthy();
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0].textContent).toBe('Approve');
+    expect(buttons[1].textContent).toBe('Reject');
+    expect(buttons[0].disabled).toBe(false);
+  });
+
+  it('disables question option buttons when isAwaitingAnswer is true', async () => {
+    const { autoClient } = mountWidget();
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+
+    changeInput(textarea, 'Pick something');
+    submitComposer(form);
+    await Promise.resolve();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_q_awaiting',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'Choose',
+        status: 'final',
+        meta: {
+          question_id: 'q_await',
+          input_type: 'radio',
+          allow_reply: false,
+          options: [{ id: 'ok', label: 'OK' }],
+        },
+      }],
+      activeQuestion: {
+        question_id: 'q_await',
+        input_type: 'radio',
+        allow_reply: false,
+        options: [{ id: 'ok', label: 'OK' }],
+      },
+    }));
+
+    // Simulate awaiting answer state
+    autoClient?.emit({ type: 'chat::question', payload: {
+      role: 'assistant',
+      content: 'Choose',
+      meta: { question_id: 'q_await', input_type: 'radio', allow_reply: false, options: [{ id: 'ok', label: 'OK' }] },
+    }});
+
+    // Re-apply state with isAwaitingAnswer via awaiting state
+    applyChatState(baseChatState({
+      input: { locked: false },
+      activeQuestion: {
+        question_id: 'q_await',
+        input_type: 'radio',
+        allow_reply: false,
+        options: [{ id: 'ok', label: 'OK' }],
+      },
+      transcript: [{
+        id: 'msg_q_awaiting2',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'Choose',
+        status: 'final',
+        meta: {
+          question_id: 'q_await',
+          input_type: 'radio',
+          allow_reply: false,
+          options: [{ id: 'ok', label: 'OK' }],
+        },
+      }],
+    }));
+
+    const buttons = shadow.querySelectorAll('[data-testid="question-option"]') as NodeListOf<HTMLButtonElement>;
+    expect(buttons[0]).toBeTruthy();
+  });
+
+  it('disables question buttons when question is no longer active (past question)', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    // activeQuestion is null → question has been answered
+    applyChatState(baseChatState({
+      activeQuestion: null,
+      transcript: [{
+        id: 'msg_past_question',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'Old question',
+        status: 'final',
+        meta: {
+          question_id: 'q_past',
+          input_type: 'radio',
+          allow_reply: true,
+          options: [{ id: 'yes', label: 'Yes' }],
+        },
+      }],
+    }));
+
+    const btn = shadow.querySelector('[data-testid="question-option"]') as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('attachment rendering still works alongside actor and options (regression)', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_actor_attach',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'Here is the file.',
+        status: 'final',
+        meta: {
+          actor: { kind: 'digital_worker', name: 'Robot Vasya' },
+          attachments: [{
+            file_id: 'file_reg',
+            filename: 'report.pdf',
+            download_url: 'https://example.test/report.pdf',
+            content_type: 'application/pdf',
+            size: 1024,
+          }],
+        },
+      }],
+    }));
+
+    const actorName = shadow.querySelector('[data-testid="actor-name"]') as HTMLElement;
+    const link = shadow.querySelector('[data-testid="message-attachment-link"]') as HTMLAnchorElement;
+
+    expect(actorName.textContent).toBe('Robot Vasya');
+    expect(link).toBeTruthy();
+    expect(link.href).toBe('https://example.test/report.pdf');
   });
 
   it('unlocks on terminal session state', async () => {

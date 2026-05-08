@@ -397,6 +397,67 @@ export const widgetStyles = `
   color: #64748b;
 }
 
+.cortex-widget__actor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.cortex-widget__actor-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #e2e8f0;
+}
+
+.cortex-widget__actor-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cortex-widget__actor-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.cortex-widget__actor-title {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.cortex-widget__question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cortex-widget__question-option {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.45);
+  background: #eff6ff;
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cortex-widget__question-option:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: rgba(37, 99, 235, 0.65);
+}
+
+.cortex-widget__question-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 @media (max-width: 520px) {
   .cortex-widget[data-mode="floating"] {
     left: 12px;

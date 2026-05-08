@@ -29,6 +29,7 @@ export function getMessageFlags(message: WidgetRawMessage): MessageFlags {
     startTyping: type === 'chat::typing' || type === 'typing::start',
     stopTyping: type === 'typing::stop',
     finalAnswer: type === 'chat::answer' && answerKind === 'final',
+    isQuestion: type === 'chat::question',
   };
 }
 

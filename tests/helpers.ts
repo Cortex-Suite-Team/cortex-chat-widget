@@ -7,7 +7,7 @@ import { mountCortexChat } from '../src/index.js';
 
 export class CustomClient implements WidgetClientLike {
   readonly listeners = new Set<(message: CortexTransportMessage) => void>();
-  readonly sentMessages: Array<{ content: unknown; attachments?: unknown[] }> = [];
+  readonly sentMessages: Array<{ content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }> = [];
   readonly uploadedAttachments: File[] = [];
   readonly uploadedFiles: File[] = [];
   sessionState = 'ACTIVE';
@@ -19,7 +19,7 @@ export class CustomClient implements WidgetClientLike {
   async connect(): Promise<void> {}
   async disconnect(): Promise<void> {}
 
-  async sendMessage(options: { content: unknown; attachments?: unknown[] }): Promise<void> {
+  async sendMessage(options: { content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }): Promise<void> {
     this.sentMessages.push(options);
   }
 

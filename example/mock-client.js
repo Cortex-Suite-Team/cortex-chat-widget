@@ -1,3 +1,13 @@
+const DEMO_ACTOR = {
+  kind: 'digital_worker',
+  id: 'project_demo',
+  name: 'Robot Vasya',
+  title: 'Demo Assistant',
+  subtitle: 'Demo digital worker',
+  // Inline SVG avatar — no external file required
+  avatar_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="14" fill="%234f46e5"/><text x="14" y="19" text-anchor="middle" fill="white" font-size="11" font-family="sans-serif">RV</text></svg>',
+};
+
 function sanitizeFileName(name) {
   const trimmed = String(name ?? '').trim().toLowerCase();
   const normalized = trimmed.replace(/[^a-z0-9._-]+/g, '-').replace(/-+/g, '-');
@@ -186,8 +196,14 @@ export function createMockCortexClient() {
       const turnId = `turn_${turnNumber}`;
       const attachmentIds = Array.isArray(attachments) ? attachments : [];
       const resolvedAttachments = resolveAttachments(attachmentIds);
-      const finalContent = buildAnswerContent(content, resolvedAttachments);
-      const partialChunks = buildPartialChunks(content, resolvedAttachments);
+
+      // Normalize content — may be string or string[]
+      const contentStr = Array.isArray(content)
+        ? content.filter(Boolean).join(' ')
+        : (typeof content === 'string' ? content : '');
+
+      const finalContent = buildAnswerContent(contentStr, resolvedAttachments);
+      const partialChunks = buildPartialChunks(contentStr, resolvedAttachments);
 
       emit(createEnvelope('chat::message', sessionId, nextSeq(), {
         role: 'user',
@@ -199,11 +215,39 @@ export function createMockCortexClient() {
         emit(createEnvelope('typing::start', sessionId, nextSeq(), {}));
       });
 
+      // Question demo: if message contains the word "question", emit chat::question instead
+      if (contentStr.toLowerCase().includes('question')) {
+        schedule(800, () => {
+          emit(createEnvelope('chat::question', sessionId, nextSeq(), {
+            role: 'assistant',
+            turn_id: turnId,
+            content: ['What would you like to do with this?'],
+            meta: {
+              actor: DEMO_ACTOR,
+              question_id: `q_${turnId}`,
+              input_type: 'radio',
+              allow_reply: true,
+              options: [
+                { id: 'approve', label: 'Approve' },
+                { id: 'reject', label: 'Reject' },
+              ],
+            },
+          }));
+        });
+
+        schedule(900, () => {
+          emit(createEnvelope('typing::stop', sessionId, nextSeq(), {}));
+        });
+
+        return;
+      }
+
       schedule(520, () => {
         emit(createEnvelope('chat::partial', sessionId, nextSeq(), {
           role: 'assistant',
           turn_id: turnId,
           content: partialChunks[0],
+          meta: { actor: DEMO_ACTOR },
         }));
       });
 
@@ -212,6 +256,7 @@ export function createMockCortexClient() {
           role: 'assistant',
           turn_id: turnId,
           content: partialChunks[1],
+          meta: { actor: DEMO_ACTOR },
         }));
       });
 
@@ -222,6 +267,7 @@ export function createMockCortexClient() {
           answer_kind: 'final',
           content: finalContent,
           attachments: resolvedAttachments,
+          meta: { actor: DEMO_ACTOR },
         }));
       });
 

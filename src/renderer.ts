@@ -108,8 +108,11 @@ function renderTranscript(
     const hasTextContent = content.contentText !== null
       ? content.contentText.trim().length > 0
       : (content.formattedContent ?? '').trim().length > 0;
+    const hasQuestionOptions = message.type === 'chat::question'
+      && Array.isArray(message.meta?.['options'])
+      && (message.meta['options'] as unknown[]).length > 0;
 
-    if (!hasTextContent && attachments.length === 0) {
+    if (!hasTextContent && attachments.length === 0 && !hasQuestionOptions) {
       continue;
     }
 
@@ -118,6 +121,47 @@ function renderTranscript(
     wrapper.dataset.role = message.role;
     wrapper.dataset.type = message.type;
     wrapper.setAttribute('data-testid', 'transcript-message');
+
+    // Actor header for non-user, non-error messages
+    const actor = isRecord(message.meta?.['actor']) ? message.meta!['actor'] as Record<string, unknown> : null;
+    const hasActorHeader = actor !== null && message.role !== 'user' && message.role !== 'error';
+
+    if (hasActorHeader) {
+      const actorHeader = document.createElement('div');
+      actorHeader.className = 'cortex-widget__actor';
+      actorHeader.setAttribute('data-testid', 'actor-header');
+
+      const avatarUrl = toNonEmptyString(actor!['avatar_url']);
+      if (avatarUrl) {
+        const img = document.createElement('img');
+        img.className = 'cortex-widget__actor-avatar';
+        img.src = avatarUrl;
+        img.alt = '';
+        img.setAttribute('aria-hidden', 'true');
+        img.setAttribute('data-testid', 'actor-avatar');
+        actorHeader.appendChild(img);
+      }
+
+      const actorInfo = document.createElement('div');
+      actorInfo.className = 'cortex-widget__actor-info';
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'cortex-widget__actor-name';
+      nameEl.textContent = toNonEmptyString(actor!['name']) ?? 'Assistant';
+      nameEl.setAttribute('data-testid', 'actor-name');
+      actorInfo.appendChild(nameEl);
+
+      const actorTitle = toNonEmptyString(actor!['title']);
+      if (actorTitle) {
+        const titleEl = document.createElement('span');
+        titleEl.className = 'cortex-widget__actor-title';
+        titleEl.textContent = actorTitle;
+        actorInfo.appendChild(titleEl);
+      }
+
+      actorHeader.appendChild(actorInfo);
+      wrapper.appendChild(actorHeader);
+    }
 
     const bubble = document.createElement('div');
     bubble.className = 'cortex-widget__bubble';
@@ -196,13 +240,58 @@ function renderTranscript(
       bubble.appendChild(attachmentList);
     }
 
+    // Question options for chat::question messages
+    if (message.type === 'chat::question' && Array.isArray(message.meta?.['options'])) {
+      const questionId = toNonEmptyString(message.meta?.['question_id']);
+      const inputType = toNonEmptyString(message.meta?.['input_type']) ?? 'radio';
+
+      if (inputType === 'checkbox') {
+        console.warn('[cortex-chat-widget] chat::question input_type="checkbox" is not supported');
+      }
+
+      if (questionId && inputType !== 'checkbox') {
+        const isActive = state.chat.activeQuestion?.question_id === questionId;
+        const optionsDisabled = !isActive || state.isAwaitingAnswer;
+
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = 'cortex-widget__question-options';
+        optionsContainer.setAttribute('data-testid', 'question-options');
+
+        for (const option of message.meta['options'] as Array<Record<string, unknown>>) {
+          const optionId = toNonEmptyString(option['id']);
+          const optionLabel = toNonEmptyString(option['label']);
+          if (!optionId || !optionLabel) continue;
+
+          const btn = document.createElement('button');
+          btn.className = 'cortex-widget__question-option';
+          btn.type = 'button';
+          btn.textContent = optionLabel;
+          btn.dataset.questionId = questionId;
+          btn.dataset.optionId = optionId;
+          btn.disabled = optionsDisabled;
+          btn.setAttribute('data-testid', 'question-option');
+          optionsContainer.appendChild(btn);
+        }
+
+        bubble.appendChild(optionsContainer);
+      }
+    }
+
     const meta = document.createElement('div');
     meta.className = 'cortex-widget__meta';
-    const metaParts: string[] = [message.role];
-    if (message.status === 'streaming') {
-      metaParts.push('streaming');
+    if (hasActorHeader) {
+      // Actor header already shows name; only show streaming indicator here
+      meta.textContent = message.status === 'streaming' ? 'streaming' : '';
+    } else {
+      const displayName = message.role === 'user' ? 'You'
+        : message.role === 'assistant' ? 'Assistant'
+        : message.role;
+      const metaParts: string[] = [displayName];
+      if (message.status === 'streaming') {
+        metaParts.push('streaming');
+      }
+      meta.textContent = metaParts.join(' · ');
     }
-    meta.textContent = metaParts.join(' · ');
 
     wrapper.append(bubble, meta);
     transcriptEl.appendChild(wrapper);
@@ -256,11 +345,13 @@ export function renderWidget(
   }
 
   dom.textarea.value = state.isDestroyed ? '' : dom.textarea.value;
-  dom.textarea.disabled = state.chat.input.locked || state.isAwaitingAnswer || isUploading;
+  const questionLocksInput = !!state.chat.activeQuestion && !state.chat.activeQuestion.allow_reply;
+  dom.textarea.disabled = state.chat.input.locked || state.isAwaitingAnswer || isUploading || questionLocksInput;
 
   const canSend = !state.chat.input.locked
     && !state.isAwaitingAnswer
     && !isUploading
+    && !questionLocksInput
     && (dom.textarea.value.trim().length > 0 || state.selectedFile !== null);
 
   dom.sendButton.disabled = !canSend;

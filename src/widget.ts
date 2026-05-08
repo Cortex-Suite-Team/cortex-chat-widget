@@ -28,6 +28,7 @@ const EMPTY_CHAT_STATE: ChatState = {
   },
   escalation: null,
   lastError: null,
+  activeQuestion: null,
 };
 
 function clonePublicState(
@@ -190,6 +191,13 @@ export function createWidgetHandle(args: {
     const hasContent = content.length > 0;
     const hasFile = internal.selectedFileValue !== null;
     const inputLocked = chatState.input.locked;
+
+    const activeQuestion = chatState.activeQuestion;
+    // Block free-text when question is active but allow_reply=false
+    if (activeQuestion && !activeQuestion.allow_reply) {
+      return;
+    }
+
     if (inputLocked || internal.isAwaitingAnswer || internal.isUploading || (!hasContent && !hasFile)) {
       return;
     }
@@ -203,10 +211,16 @@ export function createWidgetHandle(args: {
       }
     }
 
+    // Build question meta for custom reply
+    const questionMeta = activeQuestion
+      ? { question_id: activeQuestion.question_id, selected_option: 'reply' }
+      : undefined;
+
     try {
       await controller.sendMessage({
-        content,
+        content: [content],
         attachments: attachmentId ? [attachmentId] : undefined,
+        meta: questionMeta,
       });
 
       internal.draftText = '';
@@ -219,6 +233,27 @@ export function createWidgetHandle(args: {
     } catch (error) {
       internal.isAwaitingAnswer = false;
       internal.isUploading = false;
+      internal.error = toWidgetError(error, 'send_failed', 'Message send failed');
+      options.onError?.(error);
+      notifyAndRender();
+    }
+  }
+
+  async function handleOptionSelect(questionId: string, optionId: string, optionLabel: string) {
+    if (internal.isDestroyed || internal.isAwaitingAnswer) {
+      return;
+    }
+    try {
+      await controller.sendMessage({
+        content: [optionLabel],
+        meta: { question_id: questionId, selected_option: optionId },
+      });
+      internal.draftText = '';
+      internal.error = null;
+      internal.isAwaitingAnswer = true;
+      notifyAndRender();
+    } catch (error) {
+      internal.isAwaitingAnswer = false;
       internal.error = toWidgetError(error, 'send_failed', 'Message send failed');
       options.onError?.(error);
       notifyAndRender();
@@ -278,6 +313,10 @@ export function createWidgetHandle(args: {
       internal.isUploading = false;
       internal.error = null;
     }
+    if (flags.isQuestion) {
+      internal.isAwaitingAnswer = false;
+      internal.isTyping = false;
+    }
     notifyAndRender();
   });
 
@@ -328,6 +367,16 @@ export function createWidgetHandle(args: {
     notifyAndRender();
   };
 
+  const onTranscriptClick = (event: MouseEvent) => {
+    const btn = (event.target as Element).closest('.cortex-widget__question-option') as HTMLButtonElement | null;
+    if (!btn || btn.disabled) return;
+    const { questionId, optionId } = btn.dataset;
+    const optionLabel = btn.textContent ?? '';
+    if (questionId && optionId) {
+      void handleOptionSelect(questionId, optionId, optionLabel);
+    }
+  };
+
   dom.textarea.addEventListener('input', onTextareaInput);
   dom.textarea.addEventListener('keydown', onTextareaKeyDown);
   dom.composer.addEventListener('submit', onComposerSubmit);
@@ -335,6 +384,7 @@ export function createWidgetHandle(args: {
   dom.fileInput.addEventListener('change', onFileChange);
   dom.fileChipRemove.addEventListener('click', onRemoveFile);
   dom.launcher.addEventListener('click', onLauncherClick);
+  dom.transcript.addEventListener('click', onTranscriptClick);
 
   domCleanup.add(() => dom.textarea.removeEventListener('input', onTextareaInput));
   domCleanup.add(() => dom.textarea.removeEventListener('keydown', onTextareaKeyDown));
@@ -343,6 +393,7 @@ export function createWidgetHandle(args: {
   domCleanup.add(() => dom.fileInput.removeEventListener('change', onFileChange));
   domCleanup.add(() => dom.fileChipRemove.removeEventListener('click', onRemoveFile));
   domCleanup.add(() => dom.launcher.removeEventListener('click', onLauncherClick));
+  domCleanup.add(() => dom.transcript.removeEventListener('click', onTranscriptClick));
 
   mountTarget.appendChild(dom.host);
   internal.isReady = true;
