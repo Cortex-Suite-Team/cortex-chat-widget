@@ -2542,17 +2542,21 @@
         try {
           await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
           transcriptStore.upsertLocalMessage({ ...optimistic, deliveryStatus: "sent", retryable: false });
+          emitStateChanged();
+          return { ok: true, messageId: id, clientMsgId };
         } catch (err) {
           const sendError = err instanceof Error ? err.message : "Message was not sent";
           transcriptStore.upsertLocalMessage({ ...optimistic, deliveryStatus: "failed", retryable: true, sendError });
+          emitStateChanged();
+          return { ok: false, messageId: id, clientMsgId, error: sendError };
         }
-        emitStateChanged();
       },
       async retryMessage(messageId) {
         const snapshot = transcriptStore.getSnapshot();
         const msg = snapshot.find((m) => m.id === messageId && m.role === "user" && m.retryable === true && m.originalPayload !== void 0);
-        if (!msg?.originalPayload)
-          return;
+        if (!msg?.originalPayload || !msg.clientMsgId)
+          return null;
+        const clientMsgId = msg.clientMsgId;
         const updated = {
           ...msg,
           deliveryStatus: "sending",
@@ -2564,11 +2568,14 @@
         try {
           await withTimeout(options.client.sendMessage(msg.originalPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
           transcriptStore.upsertLocalMessage({ ...updated, deliveryStatus: "sent", retryable: false });
+          emitStateChanged();
+          return { ok: true, messageId, clientMsgId };
         } catch (err) {
           const sendError = err instanceof Error ? err.message : "Message was not sent";
           transcriptStore.upsertLocalMessage({ ...updated, deliveryStatus: "failed", retryable: true, sendError });
+          emitStateChanged();
+          return { ok: false, messageId, clientMsgId, error: sendError };
         }
-        emitStateChanged();
       },
       async replyToUser(content) {
         ensureClientSubscription();
@@ -3142,46 +3149,44 @@
         }
       }
       const questionMeta = activeQuestion ? { question_id: activeQuestion.question_id, selected_option: "reply" } : void 0;
-      try {
-        await controller.sendMessage({
-          content: [content],
-          attachments: attachmentId ? [attachmentId] : void 0,
-          meta: questionMeta
-        });
-        internal.draftText = "";
-        clearSelectedFile();
-        internal.cachedUploadedAttachmentId = null;
-        internal.cachedUploadedFile = null;
-        internal.error = null;
-        internal.isAwaitingAnswer = true;
-        notifyAndRender();
-      } catch (error) {
+      const result = await controller.sendMessage({
+        content: [content],
+        attachments: attachmentId ? [attachmentId] : void 0,
+        meta: questionMeta
+      });
+      if (!result.ok) {
         internal.isAwaitingAnswer = false;
         internal.isUploading = false;
-        internal.error = toWidgetError(error, "send_failed", "Message send failed");
-        options.onError?.(error);
+        internal.error = null;
         notifyAndRender();
+        return;
       }
+      internal.draftText = "";
+      clearSelectedFile();
+      internal.cachedUploadedAttachmentId = null;
+      internal.cachedUploadedFile = null;
+      internal.error = null;
+      internal.isAwaitingAnswer = true;
+      notifyAndRender();
     }
     async function handleOptionSelect(questionId, optionId, optionLabel) {
       if (internal.isDestroyed || internal.isAwaitingAnswer) {
         return;
       }
-      try {
-        await controller.sendMessage({
-          content: [optionLabel],
-          meta: { question_id: questionId, selected_option: optionId }
-        });
-        internal.draftText = "";
-        internal.error = null;
-        internal.isAwaitingAnswer = true;
-        notifyAndRender();
-      } catch (error) {
+      const result = await controller.sendMessage({
+        content: [optionLabel],
+        meta: { question_id: questionId, selected_option: optionId }
+      });
+      if (!result.ok) {
         internal.isAwaitingAnswer = false;
-        internal.error = toWidgetError(error, "send_failed", "Message send failed");
-        options.onError?.(error);
+        internal.error = null;
         notifyAndRender();
+        return;
       }
+      internal.draftText = "";
+      internal.error = null;
+      internal.isAwaitingAnswer = true;
+      notifyAndRender();
     }
     function setOpen(nextOpen) {
       if (options.mode === "embedded" || internal.isDestroyed) {
@@ -3283,7 +3288,17 @@
       const retryBtn = event.target.closest("[data-retry-msg-id]");
       if (retryBtn) {
         const msgId = retryBtn.dataset.retryMsgId;
-        if (msgId) void controller.retryMessage(msgId);
+        if (msgId) {
+          void controller.retryMessage(msgId).then((result) => {
+            if (result?.ok) {
+              internal.isAwaitingAnswer = true;
+            } else {
+              internal.isAwaitingAnswer = false;
+            }
+            internal.error = null;
+            notifyAndRender();
+          });
+        }
         return;
       }
       const btn = event.target.closest(".cortex-widget__question-option");
