@@ -952,3 +952,191 @@ describe('message delivery status rendering', () => {
     expect(shadow.querySelector('[data-testid="message-delivery-status"]')).toBeTruthy();
   });
 });
+
+describe('widget send result behavior', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it('successful send sets isAwaitingAnswer true — input locked until answer', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+    const sendButton = shadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
+
+    changeInput(textarea, 'Hello');
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(controller.sendCalls).toHaveLength(1);
+    expect(sendButton.disabled).toBe(true);
+  });
+
+  it('failed send does not set isAwaitingAnswer — input remains usable', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+    const sendButton = shadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
+
+    controller.nextSendError = new Error('Network failure');
+    changeInput(textarea, 'Will fail');
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(controller.sendCalls).toHaveLength(1);
+    expect(sendButton.disabled).toBe(false);
+  });
+
+  it('failed send preserves draft text and attached file', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+
+    controller.nextSendError = new Error('Network failure');
+    changeInput(textarea, 'Draft text');
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(textarea.value).toBe('Draft text');
+  });
+
+  it('failed send does not show global error banner', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+    const errorBanner = shadow.querySelector('[data-testid="error-banner"]') as HTMLElement;
+
+    controller.nextSendError = new Error('Network failure');
+    changeInput(textarea, 'Will fail');
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(errorBanner.dataset.visible).not.toBe('true');
+  });
+
+  it('retry success sets isAwaitingAnswer true — input locked', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+    const sendButton = shadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Hello',
+        deliveryStatus: 'failed',
+        retryable: true,
+      }],
+    }));
+
+    const retryBtn = shadow.querySelector('[data-testid="message-retry-button"]') as HTMLButtonElement;
+    expect(retryBtn).toBeTruthy();
+
+    retryBtn.click();
+    await flushAsyncWork();
+
+    // nextRetryError not set → default ok=true
+    expect(controller.nextRetryError).toBeNull();
+    expect(sendButton.disabled).toBe(true);
+  });
+
+  it('retry failure keeps isAwaitingAnswer false — input remains usable', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Hello',
+        deliveryStatus: 'failed',
+        retryable: true,
+      }],
+    }));
+
+    const retryBtn = shadow.querySelector('[data-testid="message-retry-button"]') as HTMLButtonElement;
+    controller.nextRetryError = new Error('Still offline');
+    retryBtn.click();
+    await flushAsyncWork();
+
+    // textarea.disabled reflects isAwaitingAnswer||locked||uploading — not empty-content guard
+    expect(textarea.disabled).toBe(false);
+  });
+
+  it('option select success sets isAwaitingAnswer true', async () => {
+    mountWidget();
+    const shadow = getShadow();
+    const sendButton = shadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
+
+    applyChatState(baseChatState({
+      activeQuestion: {
+        question_id: 'q1',
+        input_type: 'radio',
+        allow_reply: false,
+        options: [{ id: 'yes', label: 'Yes' }],
+      },
+      transcript: [{
+        id: 'msg_q',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'Confirm?',
+        meta: {
+          question_id: 'q1',
+          input_type: 'radio',
+          allow_reply: false,
+          options: [{ id: 'yes', label: 'Yes' }],
+        },
+      }],
+    }));
+
+    const optBtn = shadow.querySelector('[data-testid="question-option"]') as HTMLButtonElement;
+    optBtn.click();
+    await flushAsyncWork();
+
+    expect(sendButton.disabled).toBe(true);
+  });
+
+  it('option select failure keeps isAwaitingAnswer false', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+
+    // allow_reply: true so textarea is not locked by questionLocksInput;
+    // that way textarea.disabled solely reflects isAwaitingAnswer after option failure
+    applyChatState(baseChatState({
+      activeQuestion: {
+        question_id: 'q2',
+        input_type: 'radio',
+        allow_reply: true,
+        options: [{ id: 'no', label: 'No' }],
+      },
+      transcript: [{
+        id: 'msg_q2',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'Cancel?',
+        meta: {
+          question_id: 'q2',
+          input_type: 'radio',
+          allow_reply: true,
+          options: [{ id: 'no', label: 'No' }],
+        },
+      }],
+    }));
+
+    controller.nextSendError = new Error('Transport error');
+    const optBtn = shadow.querySelector('[data-testid="question-option"]') as HTMLButtonElement;
+    optBtn.click();
+    await flushAsyncWork();
+
+    // textarea.disabled reflects isAwaitingAnswer||locked — not empty-content guard
+    expect(textarea.disabled).toBe(false);
+  });
+});

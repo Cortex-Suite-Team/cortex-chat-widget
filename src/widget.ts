@@ -217,48 +217,49 @@ export function createWidgetHandle(args: {
       ? { question_id: activeQuestion.question_id, selected_option: 'reply' }
       : undefined;
 
-    try {
-      await controller.sendMessage({
-        content: [content],
-        attachments: attachmentId ? [attachmentId] : undefined,
-        meta: questionMeta,
-      });
+    const result = await controller.sendMessage({
+      content: [content],
+      attachments: attachmentId ? [attachmentId] : undefined,
+      meta: questionMeta,
+    });
 
-      internal.draftText = '';
-      clearSelectedFile();
-      internal.cachedUploadedAttachmentId = null;
-      internal.cachedUploadedFile = null;
-      internal.error = null;
-      internal.isAwaitingAnswer = true;
-      notifyAndRender();
-    } catch (error) {
+    if (!result.ok) {
       internal.isAwaitingAnswer = false;
       internal.isUploading = false;
-      internal.error = toWidgetError(error, 'send_failed', 'Message send failed');
-      options.onError?.(error);
+      internal.error = null;
       notifyAndRender();
+      return;
     }
+
+    internal.draftText = '';
+    clearSelectedFile();
+    internal.cachedUploadedAttachmentId = null;
+    internal.cachedUploadedFile = null;
+    internal.error = null;
+    internal.isAwaitingAnswer = true;
+    notifyAndRender();
   }
 
   async function handleOptionSelect(questionId: string, optionId: string, optionLabel: string) {
     if (internal.isDestroyed || internal.isAwaitingAnswer) {
       return;
     }
-    try {
-      await controller.sendMessage({
-        content: [optionLabel],
-        meta: { question_id: questionId, selected_option: optionId },
-      });
-      internal.draftText = '';
-      internal.error = null;
-      internal.isAwaitingAnswer = true;
-      notifyAndRender();
-    } catch (error) {
+    const result = await controller.sendMessage({
+      content: [optionLabel],
+      meta: { question_id: questionId, selected_option: optionId },
+    });
+
+    if (!result.ok) {
       internal.isAwaitingAnswer = false;
-      internal.error = toWidgetError(error, 'send_failed', 'Message send failed');
-      options.onError?.(error);
+      internal.error = null;
       notifyAndRender();
+      return;
     }
+
+    internal.draftText = '';
+    internal.error = null;
+    internal.isAwaitingAnswer = true;
+    notifyAndRender();
   }
 
   function setOpen(nextOpen: boolean) {
@@ -372,7 +373,17 @@ export function createWidgetHandle(args: {
     const retryBtn = (event.target as Element).closest('[data-retry-msg-id]') as HTMLButtonElement | null;
     if (retryBtn) {
       const msgId = retryBtn.dataset.retryMsgId;
-      if (msgId) void controller.retryMessage(msgId);
+      if (msgId) {
+        void controller.retryMessage(msgId).then((result) => {
+          if (result?.ok) {
+            internal.isAwaitingAnswer = true;
+          } else {
+            internal.isAwaitingAnswer = false;
+          }
+          internal.error = null;
+          notifyAndRender();
+        });
+      }
       return;
     }
 

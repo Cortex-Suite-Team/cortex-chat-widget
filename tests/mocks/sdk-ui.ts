@@ -2,6 +2,10 @@ type Listener = (state: ChatState) => void;
 
 export type ChatMessageDeliveryStatus = 'sending' | 'sent' | 'failed';
 
+export type SendMessageResult =
+  | { ok: true; messageId: string; clientMsgId: string }
+  | { ok: false; messageId: string; clientMsgId: string; error: string };
+
 export interface ChatMessageViewModel {
   id: string;
   seq?: number | null;
@@ -103,6 +107,7 @@ export class MockChatController {
   disconnectCalls = 0;
   destroyCalls = 0;
   nextSendError: Error | null = null;
+  nextRetryError: Error | null = null;
 
   getState(): ChatState {
     return this.state;
@@ -123,16 +128,24 @@ export class MockChatController {
     this.disconnectCalls += 1;
   }
 
-  async sendMessage(options: { content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }): Promise<void> {
+  async sendMessage(options: { content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }): Promise<SendMessageResult> {
     this.sendCalls.push(options);
     if (this.nextSendError) {
       const error = this.nextSendError;
       this.nextSendError = null;
-      throw error;
+      return { ok: false, messageId: 'client:mock', clientMsgId: 'mock', error: error.message };
     }
+    return { ok: true, messageId: 'client:mock', clientMsgId: 'mock' };
   }
 
-  async retryMessage(_messageId: string): Promise<void> {}
+  async retryMessage(_messageId: string): Promise<SendMessageResult | null> {
+    if (this.nextRetryError) {
+      const error = this.nextRetryError;
+      this.nextRetryError = null;
+      return { ok: false, messageId: _messageId, clientMsgId: 'mock', error: error.message };
+    }
+    return { ok: true, messageId: _messageId, clientMsgId: 'mock' };
+  }
   async replyToUser(): Promise<void> {}
   async returnToWorker(): Promise<void> {}
   async continueWorker(): Promise<void> {}
