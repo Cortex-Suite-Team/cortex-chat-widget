@@ -1048,6 +1048,17 @@ function toWidgetError(error, fallbackCode = "widget_error", fallbackMessage = "
   };
 }
 
+// src/icons.ts
+var ICONS = {
+  "paperclip": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z"/></svg>`,
+  "send-fill": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.964.686a.5.5 0 0 0-.65-.65L.767 5.855H.766l-.452.18a.5.5 0 0 0-.082.887l.41.26.001.002 4.995 3.178 3.178 4.995.002.002.26.41a.5.5 0 0 0 .886-.083zm-1.833 1.89L6.637 10.07l-.215-.338a.5.5 0 0 0-.154-.154l-.338-.215 7.494-7.494 1.178-.471z"/></svg>`,
+  "reply-fill": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.921 11.9 1.353 8.62a.719.719 0 0 1 0-1.238L5.921 4.1A.716.716 0 0 1 7 4.719V6c1.5 0 6 0 7 8-2.5-4.5-7-4-7-4v1.281c0 .56-.606.898-1.079.62z"/></svg>`,
+  "arrow-clockwise": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>`
+};
+function getIconSvg(name) {
+  return ICONS[name];
+}
+
 // src/styles.ts
 var widgetStyles = `
 :host {
@@ -1549,6 +1560,94 @@ var widgetStyles = `
     width: 100%;
   }
 }
+
+.cortex-widget__attach,
+.cortex-widget__send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.cortex-widget__attach {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.cortex-widget__attach:hover:not(:disabled) {
+  background: #cbd5e1;
+}
+
+.cortex-widget__send {
+  background: var(--cortex-accent-color);
+  color: #ffffff;
+}
+
+.cortex-widget__send:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.cortex-widget__attach:disabled,
+.cortex-widget__send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.cortex-widget__attach svg,
+.cortex-widget__send svg {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.cortex-widget__message-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72em;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.cortex-widget__message-status[data-status="failed"] {
+  color: #dc2626;
+}
+
+.cortex-widget__message-status[data-status="sending"] {
+  opacity: 0.7;
+}
+
+.cortex-widget__message-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cortex-widget__message-retry:hover {
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.cortex-widget__message-retry svg {
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
 `;
 
 // src/dom.ts
@@ -1611,14 +1710,20 @@ function createWidgetDom(options) {
   const fileInput = createElement("input", "cortex-widget__file-input");
   fileInput.type = "file";
   fileInput.setAttribute("data-testid", "file-input");
-  const attachButton = createElement("button", "cortex-widget__attach", "Attach file");
+  const attachButton = createElement("button", "cortex-widget__attach");
   attachButton.type = "button";
+  attachButton.setAttribute("aria-label", "Attach file");
+  attachButton.setAttribute("title", "Attach file");
   attachButton.setAttribute("data-testid", "attach-button");
+  attachButton.innerHTML = getIconSvg("paperclip");
   const fileHint = createElement("span", "cortex-widget__file-hint");
   fileHint.setAttribute("data-testid", "file-hint");
-  const sendButton = createElement("button", "cortex-widget__send", "Send");
+  const sendButton = createElement("button", "cortex-widget__send");
   sendButton.type = "submit";
+  sendButton.setAttribute("aria-label", "Send message");
+  sendButton.setAttribute("title", "Send message");
   sendButton.setAttribute("data-testid", "send-button");
+  sendButton.innerHTML = getIconSvg("send-fill");
   attachWrap.append(fileInput, attachButton, fileHint);
   actions.append(attachWrap, sendButton);
   composer.append(textarea, fileChip, actions);
@@ -2164,11 +2269,39 @@ function createTranscriptStore(options = {}) {
       transcript.length = 0;
       indexById.clear();
       notify();
+    },
+    upsertLocalMessage(message) {
+      const existingIndex = indexById.get(message.id);
+      if (existingIndex !== void 0) {
+        return updateMessage(existingIndex, message);
+      }
+      return addMessage(message);
     }
   };
 }
 
 // ../cortex-sdk-ui/dist/src/chat-controller.js
+var MESSAGE_SEND_TIMEOUT_MS = 15e3;
+async function withTimeout(promise, timeoutMs, msg) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(msg)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer !== void 0)
+      clearTimeout(timer);
+  }
+}
+function generateClientMsgId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
 function createChatController(options) {
   const listeners = /* @__PURE__ */ new Set();
   const transcriptStore = createTranscriptStore();
@@ -2379,7 +2512,60 @@ function createChatController(options) {
     },
     async sendMessage(message) {
       ensureClientSubscription();
-      await options.client.sendMessage(message);
+      const clientMsgId = generateClientMsgId();
+      const id = `client:${clientMsgId}`;
+      const sendPayload = {
+        content: message.content,
+        attachments: message.attachments,
+        meta: {
+          ...message.meta ?? {},
+          client_msg_id: clientMsgId
+        }
+      };
+      const optimistic = {
+        id,
+        type: "chat::message",
+        role: "user",
+        content: message.content,
+        status: "final",
+        deliveryStatus: "sending",
+        ts: (/* @__PURE__ */ new Date()).toISOString(),
+        clientMsgId,
+        retryable: false,
+        meta: { attachments: message.attachments ?? [] },
+        originalPayload: sendPayload
+      };
+      transcriptStore.upsertLocalMessage(optimistic);
+      emitStateChanged();
+      try {
+        await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
+        transcriptStore.upsertLocalMessage({ ...optimistic, deliveryStatus: "sent", retryable: false });
+      } catch (err) {
+        const sendError = err instanceof Error ? err.message : "Message was not sent";
+        transcriptStore.upsertLocalMessage({ ...optimistic, deliveryStatus: "failed", retryable: true, sendError });
+      }
+      emitStateChanged();
+    },
+    async retryMessage(messageId) {
+      const snapshot = transcriptStore.getSnapshot();
+      const msg = snapshot.find((m) => m.id === messageId && m.role === "user" && m.retryable === true && m.originalPayload !== void 0);
+      if (!msg?.originalPayload)
+        return;
+      const updated = {
+        ...msg,
+        deliveryStatus: "sending",
+        retryable: false,
+        sendError: void 0
+      };
+      transcriptStore.upsertLocalMessage(updated);
+      emitStateChanged();
+      try {
+        await withTimeout(options.client.sendMessage(msg.originalPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
+        transcriptStore.upsertLocalMessage({ ...updated, deliveryStatus: "sent", retryable: false });
+      } catch (err) {
+        const sendError = err instanceof Error ? err.message : "Message was not sent";
+        transcriptStore.upsertLocalMessage({ ...updated, deliveryStatus: "failed", retryable: true, sendError });
+      }
       emitStateChanged();
     },
     async replyToUser(content) {
@@ -2709,7 +2895,37 @@ function renderTranscript(transcriptEl, state) {
       }
       meta.textContent = metaParts.join(" \xB7 ");
     }
-    wrapper.append(bubble, meta);
+    let statusEl = null;
+    if (message.role === "user" && message.deliveryStatus !== void 0 && message.deliveryStatus !== "sent") {
+      statusEl = document.createElement("div");
+      statusEl.className = "cortex-widget__message-status";
+      statusEl.dataset.status = message.deliveryStatus;
+      statusEl.setAttribute("data-testid", "message-delivery-status");
+      if (message.deliveryStatus === "sending") {
+        statusEl.textContent = "Sending\u2026";
+      } else if (message.deliveryStatus === "failed") {
+        const text = document.createElement("span");
+        text.className = "cortex-widget__message-status-text";
+        text.textContent = "Not sent";
+        statusEl.appendChild(text);
+        if (message.retryable) {
+          const retryBtn = document.createElement("button");
+          retryBtn.className = "cortex-widget__message-retry";
+          retryBtn.type = "button";
+          retryBtn.setAttribute("aria-label", "Retry message");
+          retryBtn.setAttribute("title", "Retry message");
+          retryBtn.setAttribute("data-testid", "message-retry-button");
+          retryBtn.dataset.retryMsgId = message.id;
+          retryBtn.innerHTML = getIconSvg("arrow-clockwise");
+          statusEl.appendChild(retryBtn);
+        }
+      }
+    }
+    if (statusEl) {
+      wrapper.append(bubble, statusEl, meta);
+    } else {
+      wrapper.append(bubble, meta);
+    }
     transcriptEl.appendChild(wrapper);
   }
   if (transcriptEl.childElementCount === 0) {
@@ -2762,6 +2978,10 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
   dom.textarea.disabled = state.chat.input.locked || state.isAwaitingAnswer || isUploading || questionLocksInput;
   const canSend = !state.chat.input.locked && !state.isAwaitingAnswer && !isUploading && !questionLocksInput && (dom.textarea.value.trim().length > 0 || state.selectedFile !== null);
   dom.sendButton.disabled = !canSend;
+  const isReplyMode = state.chat.activeQuestion !== null;
+  dom.sendButton.innerHTML = getIconSvg(isReplyMode ? "reply-fill" : "send-fill");
+  dom.sendButton.setAttribute("aria-label", isReplyMode ? "Reply" : "Send message");
+  dom.sendButton.setAttribute("title", isReplyMode ? "Reply" : "Send message");
   dom.attachButton.disabled = !attachmentsAvailable || state.chat.input.locked || state.isAwaitingAnswer || isUploading;
   dom.fileInput.disabled = dom.attachButton.disabled;
   dom.fileHint.textContent = attachmentsAvailable ? "" : "Attachments unavailable";
@@ -3058,6 +3278,12 @@ function createWidgetHandle(args) {
     notifyAndRender();
   };
   const onTranscriptClick = (event) => {
+    const retryBtn = event.target.closest("[data-retry-msg-id]");
+    if (retryBtn) {
+      const msgId = retryBtn.dataset.retryMsgId;
+      if (msgId) void controller.retryMessage(msgId);
+      return;
+    }
     const btn = event.target.closest(".cortex-widget__question-option");
     if (!btn || btn.disabled) return;
     const { questionId, optionId } = btn.dataset;
