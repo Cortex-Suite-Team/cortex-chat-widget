@@ -3147,44 +3147,54 @@ function createWidgetHandle(args) {
       }
     }
     const questionMeta = activeQuestion ? { question_id: activeQuestion.question_id, selected_option: "reply" } : void 0;
-    const result = await controller.sendMessage({
-      content: [content],
-      attachments: attachmentId ? [attachmentId] : void 0,
-      meta: questionMeta
-    });
-    if (!result.ok) {
-      internal.isAwaitingAnswer = false;
-      internal.isUploading = false;
+    try {
+      const result = await controller.sendMessage({
+        content: [content],
+        attachments: attachmentId ? [attachmentId] : void 0,
+        meta: questionMeta
+      });
+      if (!result.ok) {
+        internal.isAwaitingAnswer = false;
+        internal.isUploading = false;
+        internal.error = null;
+        notifyAndRender();
+        return;
+      }
+      internal.draftText = "";
+      clearSelectedFile();
+      internal.cachedUploadedAttachmentId = null;
+      internal.cachedUploadedFile = null;
       internal.error = null;
+      internal.isAwaitingAnswer = true;
       notifyAndRender();
-      return;
+    } catch (error) {
+      resolveRuntimeError(error, options, internal);
+      notifyAndRender();
     }
-    internal.draftText = "";
-    clearSelectedFile();
-    internal.cachedUploadedAttachmentId = null;
-    internal.cachedUploadedFile = null;
-    internal.error = null;
-    internal.isAwaitingAnswer = true;
-    notifyAndRender();
   }
   async function handleOptionSelect(questionId, optionId, optionLabel) {
     if (internal.isDestroyed || internal.isAwaitingAnswer) {
       return;
     }
-    const result = await controller.sendMessage({
-      content: [optionLabel],
-      meta: { question_id: questionId, selected_option: optionId }
-    });
-    if (!result.ok) {
-      internal.isAwaitingAnswer = false;
+    try {
+      const result = await controller.sendMessage({
+        content: [optionLabel],
+        meta: { question_id: questionId, selected_option: optionId }
+      });
+      if (!result.ok) {
+        internal.isAwaitingAnswer = false;
+        internal.error = null;
+        notifyAndRender();
+        return;
+      }
+      internal.draftText = "";
       internal.error = null;
+      internal.isAwaitingAnswer = true;
       notifyAndRender();
-      return;
+    } catch (error) {
+      resolveRuntimeError(error, options, internal);
+      notifyAndRender();
     }
-    internal.draftText = "";
-    internal.error = null;
-    internal.isAwaitingAnswer = true;
-    notifyAndRender();
   }
   function setOpen(nextOpen) {
     if (options.mode === "embedded" || internal.isDestroyed) {
