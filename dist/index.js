@@ -1304,6 +1304,24 @@ var widgetStyles = `
   color: #ffffff;
 }
 
+.cortex-widget__worker-status {
+  display: none;
+  margin: 0 18px 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--cortex-text-color);
+  opacity: 0.65;
+}
+
+.cortex-widget__worker-status[data-visible="true"] {
+  display: block;
+}
+
+.cortex-widget__worker-status[data-state="error"] {
+  color: #dc2626;
+  opacity: 1;
+}
+
 .cortex-widget__typing,
 .cortex-widget__escalation {
   display: none;
@@ -1567,6 +1585,8 @@ function createWidgetDom(options) {
   errorBanner.setAttribute("data-testid", "error-banner");
   const transcript = createElement("div", "cortex-widget__transcript");
   transcript.setAttribute("data-testid", "transcript");
+  const workerStatus = createElement("div", "cortex-widget__worker-status");
+  workerStatus.setAttribute("data-testid", "worker-status");
   const typing = createElement("div", "cortex-widget__typing");
   typing.setAttribute("data-testid", "typing-indicator");
   const escalation = createElement("div", "cortex-widget__escalation");
@@ -1603,7 +1623,7 @@ function createWidgetDom(options) {
   actions.append(attachWrap, sendButton);
   composer.append(textarea, fileChip, actions);
   header.append(title, subtitle, status);
-  body.append(errorBanner, transcript, typing, escalation, composer);
+  body.append(errorBanner, transcript, workerStatus, typing, escalation, composer);
   panel.append(header, body);
   if (options.mode === "floating") {
     root.append(panel, launcher);
@@ -1621,6 +1641,7 @@ function createWidgetDom(options) {
     status,
     errorBanner,
     transcript,
+    workerStatus,
     typing,
     escalation,
     composer,
@@ -2155,6 +2176,8 @@ function createChatController(options) {
   let destroyed = false;
   let lastError = null;
   let activeQuestion = null;
+  let workerState = { state: "idle" };
+  let workerStateTtlTimer = null;
   const escalationController = createEscalationController({
     client: options.client,
     replyRequestBuilder: options.replyRequestBuilder,
@@ -2210,7 +2233,8 @@ function createChatController(options) {
       input,
       escalation: cloneEscalation(escalation),
       lastError,
-      activeQuestion: activeQuestion ? { ...activeQuestion, options: [...activeQuestion.options] } : null
+      activeQuestion: activeQuestion ? { ...activeQuestion, options: [...activeQuestion.options] } : null,
+      workerState: { ...workerState }
     };
   }
   function emit(event) {
@@ -2228,6 +2252,32 @@ function createChatController(options) {
     lastError = error;
     emit({ type: "error", error });
   }
+  function clearWorkerStateTtl() {
+    if (workerStateTtlTimer !== null) {
+      clearTimeout(workerStateTtlTimer);
+      workerStateTtlTimer = null;
+    }
+  }
+  function applyWorkerState(next) {
+    clearWorkerStateTtl();
+    workerState = next;
+    if (next.expiresAt !== void 0) {
+      const remaining = next.expiresAt - Date.now();
+      if (remaining <= 0) {
+        workerState = { state: "idle" };
+        return;
+      }
+      workerStateTtlTimer = setTimeout(() => {
+        workerState = { state: "idle" };
+        workerStateTtlTimer = null;
+        emitStateChanged();
+      }, remaining);
+    }
+  }
+  function resetWorkerStateToIdle() {
+    clearWorkerStateTtl();
+    workerState = { state: "idle" };
+  }
   function ensureClientSubscription() {
     if (destroyed || unsubscribeFromClient) {
       return;
@@ -2242,6 +2292,18 @@ function createChatController(options) {
     unsubscribeFromClient = null;
   }
   function handleMessage(message) {
+    if (message.type === "system::state") {
+      const payload = asPayload(message);
+      const meta = isRecord(payload["meta"]) ? payload["meta"] : null;
+      const stateName = asNonEmptyString(meta?.["state"]) ?? "idle";
+      const label = asNonEmptyString(meta?.["label"]) ?? void 0;
+      const ttlMs = typeof meta?.["ttl_ms"] === "number" ? meta["ttl_ms"] : void 0;
+      const correlationId = asNonEmptyString(meta?.["correlation_id"]) ?? void 0;
+      const expiresAt = ttlMs !== void 0 ? Date.now() + ttlMs : void 0;
+      applyWorkerState({ state: stateName, label, expiresAt, correlation_id: correlationId });
+      emitStateChanged();
+      return;
+    }
     const result = transcriptStore.ingest(message);
     if (result.mutation) {
       emit({
@@ -2258,6 +2320,7 @@ function createChatController(options) {
       emit({ type: "escalation_opened", escalation: cloneEscalation(escalation) });
     }
     if (message.type === "chat::question") {
+      resetWorkerStateToIdle();
       const payload = asPayload(message);
       const meta = isRecord(payload["meta"]) ? payload["meta"] : null;
       const questionId = meta ? asNonEmptyString(meta["question_id"]) : null;
@@ -2274,6 +2337,7 @@ function createChatController(options) {
     }
     if (message.type === "chat::answer" || message.type === "system::error") {
       activeQuestion = null;
+      resetWorkerStateToIdle();
     }
     if (message.type === "system::error") {
       const payload = asPayload(message);
@@ -2335,6 +2399,7 @@ function createChatController(options) {
         return;
       }
       destroyed = true;
+      clearWorkerStateTtl();
       teardownClientSubscription();
       listeners.clear();
     }
@@ -2671,6 +2736,18 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
   const visibleError = state.error?.message ?? state.chat.lastError?.message ?? "";
   dom.errorBanner.textContent = visibleError;
   dom.errorBanner.dataset.visible = visibleError ? "true" : "false";
+  const workerState = state.chat.workerState;
+  const workerStateVisible = workerState.state !== "idle" && (workerState.expiresAt === void 0 || workerState.expiresAt > Date.now());
+  if (workerStateVisible) {
+    const label = workerState.label ?? (workerState.state === "working" ? "Digital worker is working\u2026" : workerState.state === "waiting" ? "Still working\u2026" : workerState.state === "error" ? "Something went wrong" : "");
+    dom.workerStatus.textContent = label;
+    dom.workerStatus.dataset.visible = "true";
+    dom.workerStatus.dataset.state = workerState.state;
+  } else {
+    dom.workerStatus.textContent = "";
+    dom.workerStatus.dataset.visible = "false";
+    dom.workerStatus.dataset.state = "idle";
+  }
   dom.typing.textContent = "Digital Worker is typing...";
   dom.typing.dataset.visible = state.isTyping ? "true" : "false";
   if (state.chat.escalation?.status === "pending") {
