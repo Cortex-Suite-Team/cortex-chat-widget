@@ -369,6 +369,13 @@ export function createWidgetHandle(args: {
   };
 
   const onTranscriptClick = (event: MouseEvent) => {
+    const retryBtn = (event.target as Element).closest('[data-retry-msg-id]') as HTMLButtonElement | null;
+    if (retryBtn) {
+      const msgId = retryBtn.dataset.retryMsgId;
+      if (msgId) void controller.retryMessage(msgId);
+      return;
+    }
+
     const btn = (event.target as Element).closest('.cortex-widget__question-option') as HTMLButtonElement | null;
     if (!btn || btn.disabled) return;
     const { questionId, optionId } = btn.dataset;

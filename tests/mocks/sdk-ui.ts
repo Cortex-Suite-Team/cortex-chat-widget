@@ -1,5 +1,7 @@
 type Listener = (state: ChatState) => void;
 
+export type ChatMessageDeliveryStatus = 'sending' | 'sent' | 'failed';
+
 export interface ChatMessageViewModel {
   id: string;
   seq?: number | null;
@@ -9,6 +11,15 @@ export interface ChatMessageViewModel {
   status?: 'streaming' | 'final' | 'error';
   ts?: string | null;
   meta?: Record<string, unknown>;
+  clientMsgId?: string;
+  deliveryStatus?: ChatMessageDeliveryStatus;
+  retryable?: boolean;
+  sendError?: string;
+  originalPayload?: {
+    content: unknown;
+    attachments?: unknown[];
+    meta?: Record<string, unknown>;
+  };
 }
 
 export interface ChatErrorViewModel {
@@ -121,6 +132,7 @@ export class MockChatController {
     }
   }
 
+  async retryMessage(_messageId: string): Promise<void> {}
   async replyToUser(): Promise<void> {}
   async returnToWorker(): Promise<void> {}
   async continueWorker(): Promise<void> {}

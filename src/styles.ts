@@ -498,4 +498,92 @@ export const widgetStyles = `
     width: 100%;
   }
 }
+
+.cortex-widget__attach,
+.cortex-widget__send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.cortex-widget__attach {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.cortex-widget__attach:hover:not(:disabled) {
+  background: #cbd5e1;
+}
+
+.cortex-widget__send {
+  background: var(--cortex-accent-color);
+  color: #ffffff;
+}
+
+.cortex-widget__send:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.cortex-widget__attach:disabled,
+.cortex-widget__send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.cortex-widget__attach svg,
+.cortex-widget__send svg {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.cortex-widget__message-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72em;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.cortex-widget__message-status[data-status="failed"] {
+  color: #dc2626;
+}
+
+.cortex-widget__message-status[data-status="sending"] {
+  opacity: 0.7;
+}
+
+.cortex-widget__message-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cortex-widget__message-retry:hover {
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.cortex-widget__message-retry svg {
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
 `;

@@ -1,3 +1,4 @@
+import { getIconSvg } from './icons.js';
 import { widgetStyles } from './styles.js';
 import type { NormalizedWidgetOptions, WidgetDom } from './types.js';
 
@@ -73,14 +74,20 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   const fileInput = createElement('input', 'cortex-widget__file-input') as HTMLInputElement;
   fileInput.type = 'file';
   fileInput.setAttribute('data-testid', 'file-input');
-  const attachButton = createElement('button', 'cortex-widget__attach', 'Attach file') as HTMLButtonElement;
+  const attachButton = createElement('button', 'cortex-widget__attach') as HTMLButtonElement;
   attachButton.type = 'button';
+  attachButton.setAttribute('aria-label', 'Attach file');
+  attachButton.setAttribute('title', 'Attach file');
   attachButton.setAttribute('data-testid', 'attach-button');
+  attachButton.innerHTML = getIconSvg('paperclip');
   const fileHint = createElement('span', 'cortex-widget__file-hint');
   fileHint.setAttribute('data-testid', 'file-hint');
-  const sendButton = createElement('button', 'cortex-widget__send', 'Send') as HTMLButtonElement;
+  const sendButton = createElement('button', 'cortex-widget__send') as HTMLButtonElement;
   sendButton.type = 'submit';
+  sendButton.setAttribute('aria-label', 'Send message');
+  sendButton.setAttribute('title', 'Send message');
   sendButton.setAttribute('data-testid', 'send-button');
+  sendButton.innerHTML = getIconSvg('send-fill');
 
   attachWrap.append(fileInput, attachButton, fileHint);
   actions.append(attachWrap, sendButton);

@@ -1,3 +1,4 @@
+import { getIconSvg } from './icons.js';
 import {
   buildStatusText,
   formatContent,
@@ -293,7 +294,41 @@ function renderTranscript(
       meta.textContent = metaParts.join(' · ');
     }
 
-    wrapper.append(bubble, meta);
+    // Delivery status for user messages (sending / failed only — sent is silent)
+    let statusEl: HTMLElement | null = null;
+    if (message.role === 'user' && message.deliveryStatus !== undefined && message.deliveryStatus !== 'sent') {
+      statusEl = document.createElement('div');
+      statusEl.className = 'cortex-widget__message-status';
+      statusEl.dataset.status = message.deliveryStatus;
+      statusEl.setAttribute('data-testid', 'message-delivery-status');
+
+      if (message.deliveryStatus === 'sending') {
+        statusEl.textContent = 'Sending…';
+      } else if (message.deliveryStatus === 'failed') {
+        const text = document.createElement('span');
+        text.className = 'cortex-widget__message-status-text';
+        text.textContent = 'Not sent';
+        statusEl.appendChild(text);
+
+        if (message.retryable) {
+          const retryBtn = document.createElement('button');
+          retryBtn.className = 'cortex-widget__message-retry';
+          retryBtn.type = 'button';
+          retryBtn.setAttribute('aria-label', 'Retry message');
+          retryBtn.setAttribute('title', 'Retry message');
+          retryBtn.setAttribute('data-testid', 'message-retry-button');
+          retryBtn.dataset.retryMsgId = message.id;
+          retryBtn.innerHTML = getIconSvg('arrow-clockwise');
+          statusEl.appendChild(retryBtn);
+        }
+      }
+    }
+
+    if (statusEl) {
+      wrapper.append(bubble, statusEl, meta);
+    } else {
+      wrapper.append(bubble, meta);
+    }
     transcriptEl.appendChild(wrapper);
   }
 
@@ -374,6 +409,12 @@ export function renderWidget(
     && (dom.textarea.value.trim().length > 0 || state.selectedFile !== null);
 
   dom.sendButton.disabled = !canSend;
+
+  const isReplyMode = state.chat.activeQuestion !== null;
+  dom.sendButton.innerHTML = getIconSvg(isReplyMode ? 'reply-fill' : 'send-fill');
+  dom.sendButton.setAttribute('aria-label', isReplyMode ? 'Reply' : 'Send message');
+  dom.sendButton.setAttribute('title', isReplyMode ? 'Reply' : 'Send message');
+
   dom.attachButton.disabled = !attachmentsAvailable || state.chat.input.locked || state.isAwaitingAnswer || isUploading;
   dom.fileInput.disabled = dom.attachButton.disabled;
   dom.fileHint.textContent = attachmentsAvailable ? '' : 'Attachments unavailable';

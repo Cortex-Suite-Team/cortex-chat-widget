@@ -742,3 +742,213 @@ describe('worker status rendering', () => {
     expect(transcript.textContent).toContain('Hello world');
   });
 });
+
+describe('composer icon controls', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it('composer renders circular attach button with aria-label Attach file', () => {
+    mountWidget();
+    const shadow = getShadow();
+    const btn = shadow.querySelector('[data-testid="attach-button"]') as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    expect(btn.getAttribute('aria-label')).toBe('Attach file');
+    expect(btn.textContent?.trim()).toBe('');
+    expect(btn.querySelector('svg')).toBeTruthy();
+  });
+
+  it('composer renders circular send button with aria-label Send message', () => {
+    mountWidget();
+    const shadow = getShadow();
+    const btn = shadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    expect(btn.getAttribute('aria-label')).toBe('Send message');
+    expect(btn.textContent?.trim()).toBe('');
+    expect(btn.querySelector('svg')).toBeTruthy();
+  });
+
+  it('activeQuestion changes send button aria-label to Reply', () => {
+    mountWidget();
+    const shadow = getShadow();
+    const btn = shadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
+
+    applyChatState(baseChatState({
+      activeQuestion: {
+        question_id: 'q1',
+        input_type: 'radio',
+        allow_reply: true,
+        options: [],
+      },
+    }));
+
+    expect(btn.getAttribute('aria-label')).toBe('Reply');
+    expect(btn.querySelector('svg')).toBeTruthy();
+  });
+
+  it('send button reverts to Send message when activeQuestion clears', () => {
+    mountWidget();
+    const shadow = getShadow();
+    const btn = shadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
+
+    applyChatState(baseChatState({
+      activeQuestion: {
+        question_id: 'q1',
+        input_type: 'radio',
+        allow_reply: true,
+        options: [],
+      },
+    }));
+    expect(btn.getAttribute('aria-label')).toBe('Reply');
+
+    applyChatState(baseChatState({ activeQuestion: null }));
+    expect(btn.getAttribute('aria-label')).toBe('Send message');
+  });
+});
+
+describe('message delivery status rendering', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it('user message with deliveryStatus=sending renders Sending… status', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Hello',
+        deliveryStatus: 'sending',
+      }],
+    }));
+
+    const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
+    expect(statusEl).toBeTruthy();
+    expect(statusEl.dataset.status).toBe('sending');
+    expect(statusEl.textContent).toContain('Sending');
+  });
+
+  it('user message with deliveryStatus=sent renders no delivery status element', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Hello',
+        deliveryStatus: 'sent',
+      }],
+    }));
+
+    const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]');
+    expect(statusEl).toBeNull();
+  });
+
+  it('user message with deliveryStatus=failed renders Not sent text', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Hello',
+        deliveryStatus: 'failed',
+        retryable: true,
+      }],
+    }));
+
+    const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
+    expect(statusEl).toBeTruthy();
+    expect(statusEl.dataset.status).toBe('failed');
+    expect(statusEl.textContent).toContain('Not sent');
+  });
+
+  it('failed retryable user message renders retry button with correct attributes', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Hello',
+        deliveryStatus: 'failed',
+        retryable: true,
+      }],
+    }));
+
+    const retryBtn = shadow.querySelector('[data-testid="message-retry-button"]') as HTMLButtonElement;
+    expect(retryBtn).toBeTruthy();
+    expect(retryBtn.getAttribute('aria-label')).toBe('Retry message');
+    expect(retryBtn.dataset.retryMsgId).toBe('client:msg_1');
+    expect(retryBtn.querySelector('svg')).toBeTruthy();
+  });
+
+  it('failed non-retryable user message renders no retry button', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Hello',
+        deliveryStatus: 'failed',
+        retryable: false,
+      }],
+    }));
+
+    const retryBtn = shadow.querySelector('[data-testid="message-retry-button"]');
+    expect(retryBtn).toBeNull();
+  });
+
+  it('assistant message never renders delivery status or retry button', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_assistant',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'Hi there',
+        deliveryStatus: 'failed' as const,
+        retryable: true,
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="message-delivery-status"]')).toBeNull();
+    expect(shadow.querySelector('[data-testid="message-retry-button"]')).toBeNull();
+  });
+
+  it('workerStatus renders independently from user message deliveryStatus', () => {
+    mountWidget();
+    const shadow = getShadow();
+    const workerStatus = shadow.querySelector('[data-testid="worker-status"]') as HTMLElement;
+
+    applyChatState(baseChatState({
+      workerState: { state: 'working', label: 'Processing…' },
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Hello',
+        deliveryStatus: 'failed',
+        retryable: true,
+      }],
+    }));
+
+    expect(workerStatus.dataset.visible).toBe('true');
+    expect(workerStatus.textContent).toBe('Processing…');
+    expect(shadow.querySelector('[data-testid="message-delivery-status"]')).toBeTruthy();
+  });
+});
