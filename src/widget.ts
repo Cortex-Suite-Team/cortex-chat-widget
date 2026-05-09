@@ -29,6 +29,7 @@ const EMPTY_CHAT_STATE: ChatState = {
   escalation: null,
   lastError: null,
   activeQuestion: null,
+  workerState: { state: 'idle' },
 };
 
 function clonePublicState(

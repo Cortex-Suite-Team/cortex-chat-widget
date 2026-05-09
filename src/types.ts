@@ -122,6 +122,7 @@ export interface WidgetDom {
   status: HTMLElement;
   errorBanner: HTMLElement;
   transcript: HTMLElement;
+  workerStatus: HTMLElement;
   typing: HTMLElement;
   escalation: HTMLElement;
   composer: HTMLFormElement;

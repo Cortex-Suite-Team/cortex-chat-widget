@@ -41,6 +41,14 @@ export interface QuestionState {
   turn_id?: string | null;
 }
 
+export interface WorkerState {
+  state: 'idle' | 'working' | 'waiting' | 'error';
+  label?: string;
+  expiresAt?: number;
+  canRetry?: boolean;
+  correlation_id?: string;
+}
+
 export interface ChatState {
   connection: {
     channelState: string;
@@ -56,6 +64,7 @@ export interface ChatState {
   escalation: EscalationState | null;
   lastError: ChatErrorViewModel | null;
   activeQuestion: QuestionState | null;
+  workerState: WorkerState;
 }
 
 export interface CortexClientLike {
@@ -154,6 +163,7 @@ export function createMockChatState(
     escalation: overrides.escalation ?? null,
     lastError: overrides.lastError ?? null,
     activeQuestion: overrides.activeQuestion ?? null,
+    workerState: overrides.workerState ?? { state: 'idle' },
   };
 }
 

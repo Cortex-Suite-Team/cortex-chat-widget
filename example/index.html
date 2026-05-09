@@ -143,8 +143,10 @@
     </main>
 
     <script type="module">
-      import { mountCortexChat } from "https://cdn.jsdelivr.net/gh/Cortex-Suite-Team/cortex-chat-widget@main/dist/index.js";
-      import { createMockCortexClient } from "https://cdn.jsdelivr.net/gh/Cortex-Suite-Team/cortex-chat-widget@main/example/mock-client.js";
+      //import { mountCortexChat } from "https://cdn.jsdelivr.net/gh/Cortex-Suite-Team/cortex-chat-widget@main/dist/index.js";
+      //import { createMockCortexClient } from "https://cdn.jsdelivr.net/gh/Cortex-Suite-Team/cortex-chat-widget@main/example/mock-client.js";
+      import { mountCortexChat } from "../dist/index.js";
+      import { createMockCortexClient } from "./mock-client.js";
 
       mountCortexChat("#chat-root", {
         apiKey: "mock-api-key",

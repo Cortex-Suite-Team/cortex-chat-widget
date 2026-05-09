@@ -253,6 +253,24 @@ export const widgetStyles = `
   color: #ffffff;
 }
 
+.cortex-widget__worker-status {
+  display: none;
+  margin: 0 18px 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--cortex-text-color);
+  opacity: 0.65;
+}
+
+.cortex-widget__worker-status[data-visible="true"] {
+  display: block;
+}
+
+.cortex-widget__worker-status[data-state="error"] {
+  color: #dc2626;
+  opacity: 1;
+}
+
 .cortex-widget__typing,
 .cortex-widget__escalation {
   display: none;

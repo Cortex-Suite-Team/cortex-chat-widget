@@ -333,6 +333,25 @@ export function renderWidget(
   dom.errorBanner.textContent = visibleError;
   dom.errorBanner.dataset.visible = visibleError ? 'true' : 'false';
 
+  const workerState = state.chat.workerState;
+  const workerStateVisible = workerState.state !== 'idle'
+    && (workerState.expiresAt === undefined || workerState.expiresAt > Date.now());
+  if (workerStateVisible) {
+    const label = workerState.label ?? (
+      workerState.state === 'working' ? 'Digital worker is working…'
+        : workerState.state === 'waiting' ? 'Still working…'
+          : workerState.state === 'error' ? 'Something went wrong'
+            : ''
+    );
+    dom.workerStatus.textContent = label;
+    dom.workerStatus.dataset.visible = 'true';
+    dom.workerStatus.dataset.state = workerState.state;
+  } else {
+    dom.workerStatus.textContent = '';
+    dom.workerStatus.dataset.visible = 'false';
+    dom.workerStatus.dataset.state = 'idle';
+  }
+
   dom.typing.textContent = 'Digital Worker is typing...';
   dom.typing.dataset.visible = state.isTyping ? 'true' : 'false';
 

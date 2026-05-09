@@ -44,6 +44,8 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   errorBanner.setAttribute('data-testid', 'error-banner');
   const transcript = createElement('div', 'cortex-widget__transcript');
   transcript.setAttribute('data-testid', 'transcript');
+  const workerStatus = createElement('div', 'cortex-widget__worker-status');
+  workerStatus.setAttribute('data-testid', 'worker-status');
   const typing = createElement('div', 'cortex-widget__typing');
   typing.setAttribute('data-testid', 'typing-indicator');
   const escalation = createElement('div', 'cortex-widget__escalation');
@@ -85,7 +87,7 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
 
   composer.append(textarea, fileChip, actions);
   header.append(title, subtitle, status);
-  body.append(errorBanner, transcript, typing, escalation, composer);
+  body.append(errorBanner, transcript, workerStatus, typing, escalation, composer);
   panel.append(header, body);
 
   if (options.mode === 'floating') {
@@ -106,6 +108,7 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
     status,
     errorBanner,
     transcript,
+    workerStatus,
     typing,
     escalation,
     composer,

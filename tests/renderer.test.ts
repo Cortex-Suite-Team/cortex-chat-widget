@@ -582,3 +582,163 @@ describe('widget renderer behavior', () => {
     expect(textarea.disabled).toBe(false);
   });
 });
+
+describe('worker status rendering', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  function getWorkerStatus(shadow: ShadowRoot): HTMLElement {
+    return shadow.querySelector('[data-testid="worker-status"]') as HTMLElement;
+  }
+
+  it('worker status is hidden when workerState is idle', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({ workerState: { state: 'idle' } }));
+
+    expect(getWorkerStatus(shadow).dataset['visible']).toBe('false');
+    expect(getWorkerStatus(shadow).textContent).toBe('');
+  });
+
+  it('shows working state with label', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      workerState: { state: 'working', label: 'Digital worker is working…' },
+    }));
+
+    const el = getWorkerStatus(shadow);
+    expect(el.dataset['visible']).toBe('true');
+    expect(el.dataset['state']).toBe('working');
+    expect(el.textContent).toBe('Digital worker is working…');
+  });
+
+  it('shows working default label when no label provided', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({ workerState: { state: 'working' } }));
+
+    expect(getWorkerStatus(shadow).textContent).toBe('Digital worker is working…');
+  });
+
+  it('shows waiting state with label', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      workerState: { state: 'waiting', label: 'Still working…' },
+    }));
+
+    const el = getWorkerStatus(shadow);
+    expect(el.dataset['visible']).toBe('true');
+    expect(el.dataset['state']).toBe('waiting');
+    expect(el.textContent).toBe('Still working…');
+  });
+
+  it('shows error state with label', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      workerState: { state: 'error', label: 'Something went wrong' },
+    }));
+
+    const el = getWorkerStatus(shadow);
+    expect(el.dataset['visible']).toBe('true');
+    expect(el.dataset['state']).toBe('error');
+    expect(el.textContent).toBe('Something went wrong');
+  });
+
+  it('hides worker status when expiresAt is in the past', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      workerState: { state: 'working', expiresAt: Date.now() - 1000 },
+    }));
+
+    expect(getWorkerStatus(shadow).dataset['visible']).toBe('false');
+  });
+
+  it('shows worker status when expiresAt is in the future', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      workerState: { state: 'working', expiresAt: Date.now() + 60000 },
+    }));
+
+    expect(getWorkerStatus(shadow).dataset['visible']).toBe('true');
+  });
+
+  it('actor header still renders when workerState is working', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      workerState: { state: 'working' },
+      transcript: [{
+        id: 'msg_1',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'Hello!',
+        meta: {
+          actor: { name: 'TestBot', kind: 'digital_worker', id: 'proj_1' },
+        },
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeTruthy();
+    expect(getWorkerStatus(shadow).dataset['visible']).toBe('true');
+  });
+
+  it('chat::question options still render when workerState is idle', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      workerState: { state: 'idle' },
+      activeQuestion: {
+        question_id: 'q1',
+        input_type: 'radio',
+        allow_reply: false,
+        options: [{ id: 'a', label: 'Option A' }],
+      },
+      transcript: [{
+        id: 'msg_q',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'Choose:',
+        meta: {
+          question_id: 'q1',
+          input_type: 'radio',
+          options: [{ id: 'a', label: 'Option A' }],
+        },
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="question-options"]')).toBeTruthy();
+  });
+
+  it('string array content still renders as plain text', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      workerState: { state: 'idle' },
+      transcript: [{
+        id: 'msg_str',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: ['Hello world'],
+      }],
+    }));
+
+    const transcript = shadow.querySelector('[data-testid="transcript"]') as HTMLElement;
+    expect(transcript.textContent).toContain('Hello world');
+  });
+});
