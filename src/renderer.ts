@@ -12,6 +12,53 @@ import type {
   WidgetDom,
 } from './types.js';
 
+function getAvatarInitials(label: string): string {
+  const normalized = label.trim();
+  if (!normalized) {
+    return 'CX';
+  }
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
+  return initials || normalized.slice(0, 2).toUpperCase();
+}
+
+function parseHexColor(value: string): { r: number; g: number; b: number } | null {
+  const hex = value.trim();
+  const short = /^#([\da-f]{3})$/i.exec(hex);
+  if (short) {
+    const [, raw] = short;
+    return {
+      r: parseInt(`${raw[0]}${raw[0]}`, 16),
+      g: parseInt(`${raw[1]}${raw[1]}`, 16),
+      b: parseInt(`${raw[2]}${raw[2]}`, 16),
+    };
+  }
+
+  const full = /^#([\da-f]{6})$/i.exec(hex);
+  if (!full) {
+    return null;
+  }
+
+  const [, raw] = full;
+  return {
+    r: parseInt(raw.slice(0, 2), 16),
+    g: parseInt(raw.slice(2, 4), 16),
+    b: parseInt(raw.slice(4, 6), 16),
+  };
+}
+
+function isDarkColor(value: string | undefined, fallbackDark: boolean): boolean {
+  if (!value) {
+    return fallbackDark;
+  }
+  const rgb = parseHexColor(value);
+  if (!rgb) {
+    return fallbackDark;
+  }
+  const luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+  return luminance < 0.45;
+}
+
 function formatFileSize(size: number): string {
   if (size < 1024) {
     return `${size} B`;
@@ -350,16 +397,33 @@ export function renderWidget(
   attachmentsAvailable: boolean,
   isUploading: boolean,
 ): void {
-  dom.host.style.setProperty('--cortex-accent-color', options.theme?.accentColor ?? '#2563eb');
-  dom.host.style.setProperty('--cortex-background-color', options.theme?.backgroundColor ?? '#ffffff');
-  dom.host.style.setProperty('--cortex-text-color', options.theme?.textColor ?? '#172033');
-  dom.host.style.setProperty('--cortex-border-radius', options.theme?.borderRadius ?? '18px');
+  const accentColor = options.theme?.accentColor ?? '#2563eb';
+  const backgroundColor = options.theme?.backgroundColor ?? '#ffffff';
+  const textColor = options.theme?.textColor ?? '#172033';
+  const borderRadius = options.theme?.borderRadius ?? '18px';
+  const darkTheme = isDarkColor(backgroundColor, false) || (isDarkColor(textColor, false) && !options.theme?.backgroundColor);
+
+  dom.host.style.setProperty('--cortex-accent-color', accentColor);
+  dom.host.style.setProperty('--cortex-background-color', backgroundColor);
+  dom.host.style.setProperty('--cortex-text-color', textColor);
+  dom.host.style.setProperty('--cortex-border-radius', borderRadius);
+  dom.host.style.setProperty('color-scheme', darkTheme ? 'dark' : 'light');
+  dom.root.classList.toggle('cortex-widget--dark', darkTheme);
+  dom.root.classList.toggle('cortex-widget--light', !darkTheme);
 
   dom.title.textContent = options.title;
   dom.subtitle.textContent = options.subtitle;
   dom.status.textContent = state.isHistoricalView
     ? 'Viewing chat history'
     : buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
+  dom.avatar.textContent = getAvatarInitials(options.title);
+  dom.statusDot.dataset.state = state.isHistoricalView
+    ? 'history'
+    : state.chat.connection.isConnected
+      ? 'online'
+      : (state.isAwaitingAnswer || state.isTyping || state.chat.workerState.state === 'working' || state.chat.workerState.state === 'waiting')
+        ? 'active'
+        : 'idle';
 
   const isPanelVisible = state.mode === 'embedded' || state.isOpen;
   dom.panel.hidden = !isPanelVisible;

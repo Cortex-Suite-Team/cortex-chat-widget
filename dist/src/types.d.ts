@@ -103,11 +103,14 @@ export interface InternalWidgetState {
 export interface WidgetDom {
     host: HTMLElement;
     shadowRoot: ShadowRoot;
+    root: HTMLElement;
     launcher: HTMLButtonElement;
     panel: HTMLElement;
     title: HTMLElement;
     subtitle: HTMLElement;
     status: HTMLElement;
+    avatar: HTMLElement;
+    statusDot: HTMLElement;
     errorBanner: HTMLElement;
     transcript: HTMLElement;
     workerStatus: HTMLElement;

@@ -389,6 +389,18 @@ describe('widget renderer behavior', () => {
     expect(meta.textContent).not.toContain('Robot Vasya');
   });
 
+  it('renders header avatar initials from widget title', () => {
+    mountWidget({
+      title: 'Sarah Chen',
+      subtitle: 'Head of Finance',
+    });
+    const shadow = getShadow();
+    const avatar = shadow.querySelector('[data-testid="header-avatar"]') as HTMLElement;
+
+    expect(avatar).toBeTruthy();
+    expect(avatar.textContent).toBe('SC');
+  });
+
   it('renders question option buttons for chat::question messages', () => {
     mountWidget();
     const shadow = getShadow();
@@ -580,6 +592,26 @@ describe('widget renderer behavior', () => {
     }));
 
     expect(textarea.disabled).toBe(false);
+  });
+
+  it('fills the mount target in embedded mode', () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+
+    mountWidget({
+      mode: 'embedded',
+      target,
+    });
+
+    const host = target.firstElementChild as HTMLElement;
+    const shadow = host.shadowRoot as ShadowRoot;
+    const root = shadow.querySelector('.cortex-widget') as HTMLElement;
+    const panel = shadow.querySelector('[data-testid="panel"]') as HTMLElement;
+
+    expect(host.style.width).toBe('100%');
+    expect(host.style.height).toBe('100%');
+    expect(root.dataset.mode).toBe('embedded');
+    expect(panel).toBeTruthy();
   });
 });
 

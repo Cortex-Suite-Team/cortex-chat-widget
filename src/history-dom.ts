@@ -19,11 +19,15 @@ function createElement<K extends keyof HTMLElementTagNameMap>(
 
 export function createHistoryDom(): HistoryDom {
   const host = createElement('div');
+  host.style.width = '100%';
+  host.style.height = '100%';
+  host.style.display = 'block';
   const shadowRoot = host.attachShadow({ mode: 'open' });
   const style = createElement('style');
   style.textContent = widgetStyles;
 
   const root = createElement('section', 'cortex-widget-history');
+  root.classList.add('cortex-widget-history--light');
   const panel = createElement('div', 'cortex-widget-history__panel');
   const header = createElement('div', 'cortex-widget-history__header');
   const status = createElement('div', 'cortex-widget-history__status', '');

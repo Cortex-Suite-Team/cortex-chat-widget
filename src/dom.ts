@@ -19,6 +19,11 @@ function createElement<K extends keyof HTMLElementTagNameMap>(
 
 export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   const host = createElement('div');
+  if (options.mode === 'embedded') {
+    host.style.width = '100%';
+    host.style.height = '100%';
+    host.style.display = 'block';
+  }
   const shadowRoot = host.attachShadow({ mode: 'open' });
   const style = createElement('style');
   style.textContent = widgetStyles;
@@ -26,6 +31,7 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   const root = createElement('div', 'cortex-widget');
   root.dataset.mode = options.mode;
   root.dataset.position = options.position;
+  root.classList.add('cortex-widget--light');
 
   const launcher = createElement('button', 'cortex-widget__launcher', options.launcherLabel);
   launcher.type = 'button';
@@ -35,9 +41,18 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   panel.setAttribute('data-testid', 'panel');
 
   const header = createElement('header', 'cortex-widget__header');
+  const headerMain = createElement('div', 'cortex-widget__header-main');
+  const avatar = createElement('div', 'cortex-widget__avatar');
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.setAttribute('data-testid', 'header-avatar');
+  const headerText = createElement('div', 'cortex-widget__header-text');
   const title = createElement('h2', 'cortex-widget__title', options.title);
   const subtitle = createElement('p', 'cortex-widget__subtitle', options.subtitle);
   const status = createElement('p', 'cortex-widget__status', '');
+  const statusWrap = createElement('div', 'cortex-widget__status-wrap');
+  const statusDot = createElement('span', 'cortex-widget__status-dot');
+  statusDot.setAttribute('aria-hidden', 'true');
+  statusWrap.append(statusDot, status);
 
   const body = createElement('div', 'cortex-widget__body');
   const errorBanner = createElement('div', 'cortex-widget__error');
@@ -54,6 +69,8 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
 
   const composer = createElement('form', 'cortex-widget__composer') as HTMLFormElement;
   composer.setAttribute('data-testid', 'composer');
+  const composerRow = createElement('div', 'cortex-widget__composer-row');
+  const attachWrap = createElement('div', 'cortex-widget__attach-wrap');
   const textarea = createElement('textarea', 'cortex-widget__textarea') as HTMLTextAreaElement;
   textarea.placeholder = options.placeholder;
   textarea.setAttribute('data-testid', 'composer-textarea');
@@ -70,7 +87,6 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   fileChip.append(fileChipMain, fileChipRemove);
 
   const actions = createElement('div', 'cortex-widget__actions');
-  const attachWrap = createElement('div', 'cortex-widget__attach-wrap');
   const fileInput = createElement('input', 'cortex-widget__file-input') as HTMLInputElement;
   fileInput.type = 'file';
   fileInput.setAttribute('data-testid', 'file-input');
@@ -89,11 +105,14 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   sendButton.setAttribute('data-testid', 'send-button');
   sendButton.innerHTML = getIconSvg('send-fill');
 
-  attachWrap.append(fileInput, attachButton, fileHint);
-  actions.append(attachWrap, sendButton);
+  attachWrap.append(fileInput, attachButton);
+  actions.append(fileHint);
+  composerRow.append(attachWrap, textarea, sendButton);
 
-  composer.append(textarea, fileChip, actions);
-  header.append(title, subtitle, status);
+  composer.append(fileChip, composerRow, actions);
+  headerText.append(title, subtitle, statusWrap);
+  headerMain.append(avatar, headerText);
+  header.append(headerMain);
   body.append(errorBanner, transcript, workerStatus, typing, escalation, composer);
   panel.append(header, body);
 
@@ -108,11 +127,14 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   return {
     host,
     shadowRoot,
+    root,
     launcher,
     panel,
     title,
     subtitle,
     status,
+    avatar,
+    statusDot,
     errorBanner,
     transcript,
     workerStatus,

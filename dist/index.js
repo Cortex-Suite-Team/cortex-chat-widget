@@ -1061,26 +1061,269 @@ function getIconSvg(name) {
   return ICONS[name];
 }
 
-// src/styles.ts
-var widgetStyles = `
-:host {
-  color-scheme: light;
+// src/styles/history.ts
+var historyStyles = `
+.cortex-widget__error {
+  background: color-mix(in srgb, #fff1f2 88%, var(--cortex-background-color) 12%);
+  border: 1px solid color-mix(in srgb, #e11d48 22%, transparent);
+  color: #9f1239;
+  font-size: 12px;
 }
 
-.cortex-widget {
+.cortex-widget__message[data-role="assistant"] .cortex-widget__bubble[data-status="streaming"]::after {
+  content: " \xB7\xB7\xB7";
+  opacity: 0.75;
+}
+
+.cortex-widget__message[data-role="assistant"] .cortex-widget__bubble,
+.cortex-widget__message[data-role="system"] .cortex-widget__bubble,
+.cortex-widget__message[data-role="operator"] .cortex-widget__bubble {
+  background: var(--cortex-bubble-in-bg);
+  border: 1px solid var(--cortex-bubble-in-border);
+  color: var(--cortex-text-color);
+}
+
+.cortex-widget__message[data-role="user"] .cortex-widget__bubble {
+  background: linear-gradient(135deg, var(--cortex-bubble-out-bg), color-mix(in srgb, var(--cortex-bubble-out-bg) 72%, #0f172a 28%));
+  color: var(--cortex-bubble-out-text);
+}
+
+.cortex-widget__message[data-role="error"] .cortex-widget__bubble {
+  border: 1px solid color-mix(in srgb, #e11d48 20%, transparent);
+  background: color-mix(in srgb, #fff1f2 88%, var(--cortex-background-color) 12%);
+  color: #9f1239;
+}
+
+.cortex-widget__message[data-role="escalation"] .cortex-widget__bubble {
+  border: 1px solid color-mix(in srgb, #f59e0b 25%, transparent);
+  background: color-mix(in srgb, #fffbeb 88%, var(--cortex-background-color) 12%);
+  color: #92400e;
+}
+
+.cortex-widget__message-attachment {
+  background: color-mix(in srgb, var(--cortex-background-color) 82%, #dfe8f8 18%);
+  border: 1px solid var(--cortex-bubble-in-border);
+}
+
+.cortex-widget__message[data-role="user"] .cortex-widget__message-attachment {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.cortex-widget__worker-status {
+  background: color-mix(in srgb, var(--cortex-background-color) 88%, #eef2ff 12%);
+  color: var(--cortex-subtle-text);
+  font-size: 12px;
+}
+
+.cortex-widget__worker-status[data-state="error"] {
+  background: color-mix(in srgb, #fff1f2 88%, var(--cortex-background-color) 12%);
+  color: #dc2626;
+}
+
+.cortex-widget__typing {
+  background: color-mix(in srgb, var(--cortex-background-color) 88%, #eff6ff 12%);
+  color: color-mix(in srgb, var(--cortex-accent-color) 84%, #1d4ed8 16%);
+  font-size: 12px;
+}
+
+.cortex-widget__escalation {
+  background: color-mix(in srgb, #fffbeb 88%, var(--cortex-background-color) 12%);
+  border: 1px solid color-mix(in srgb, #f59e0b 22%, transparent);
+  color: #92400e;
+  font-size: 12px;
+}
+
+.cortex-widget-history {
   --cortex-accent-color: #2563eb;
   --cortex-background-color: #ffffff;
   --cortex-text-color: #172033;
-  --cortex-border-radius: 18px;
+  display: block;
   color: var(--cortex-text-color);
-  font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
   line-height: 1.4;
 }
 
+.cortex-widget-history__panel {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--cortex-accent-color) 10%, transparent), transparent 40%),
+    linear-gradient(180deg, color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%), var(--cortex-surface-color));
+  border: 1px solid var(--cortex-border-color);
+  border-radius: 18px;
+  box-shadow: var(--cortex-shadow-md);
+  padding: 16px;
+}
+
+.cortex-widget-history__header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cortex-widget-history__status {
+  min-height: 18px;
+  font-size: 12px;
+  color: var(--cortex-muted-text);
+}
+
+.cortex-widget-history__search {
+  border: 1px dashed var(--cortex-border-color);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: var(--cortex-muted-text);
+  font-size: 13px;
+}
+
+.cortex-widget-history__new-chat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--cortex-accent-color), color-mix(in srgb, var(--cortex-accent-color) 78%, #0f172a 22%));
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.cortex-widget-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cortex-widget-history__empty,
+.cortex-widget-history__error {
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.cortex-widget-history__empty {
+  color: var(--cortex-muted-text);
+  background: color-mix(in srgb, var(--cortex-background-color) 92%, #ffffff 8%);
+}
+
+.cortex-widget-history__error {
+  color: #9f1239;
+  background: color-mix(in srgb, #fff1f2 88%, var(--cortex-background-color) 12%);
+  border: 1px solid color-mix(in srgb, #e11d48 22%, transparent);
+}
+
+.cortex-widget-history__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cortex-background-color) 92%, #ffffff 8%);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cortex-widget-history__row[data-active="true"] {
+  border-color: color-mix(in srgb, var(--cortex-accent-color) 22%, transparent);
+  background: color-mix(in srgb, var(--cortex-accent-color) 10%, var(--cortex-background-color) 90%);
+}
+
+.cortex-widget-history__row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cortex-widget-history__menu-toggle {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--cortex-muted-text);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.cortex-widget-history__row:hover .cortex-widget-history__menu-toggle,
+.cortex-widget-history__row[data-menu-open="true"] .cortex-widget-history__menu-toggle {
+  opacity: 1;
+}
+
+.cortex-widget-history__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 10px;
+  z-index: 2;
+  min-width: 140px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--cortex-border-color);
+  background: var(--cortex-background-color);
+  box-shadow: var(--cortex-shadow-md);
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cortex-widget-history__row[data-menu-open="true"] .cortex-widget-history__menu {
+  display: flex;
+}
+
+.cortex-widget-history__menu-action {
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.cortex-widget-history__menu-action:hover {
+  background: color-mix(in srgb, var(--cortex-background-color) 80%, #e2e8f0 20%);
+}
+`;
+
+// src/styles/layout.ts
+var layoutStyles = `
 .cortex-widget *,
 .cortex-widget *::before,
-.cortex-widget *::after {
+.cortex-widget *::after,
+.cortex-widget-history,
+.cortex-widget-history *,
+.cortex-widget-history *::before,
+.cortex-widget-history *::after {
   box-sizing: border-box;
+}
+
+.cortex-widget {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  line-height: 1.4;
+}
+
+.cortex-widget[data-mode="embedded"] {
+  width: 100%;
+  height: 100%;
 }
 
 .cortex-widget[data-mode="floating"] {
@@ -1105,9 +1348,9 @@ var widgetStyles = `
   height: 56px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--cortex-accent-color), #0f172a);
+  background: linear-gradient(135deg, var(--cortex-accent-color), color-mix(in srgb, var(--cortex-accent-color) 52%, #0f172a 48%));
   color: #ffffff;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.28);
+  box-shadow: var(--cortex-shadow-md);
   cursor: pointer;
   font: inherit;
   font-weight: 600;
@@ -1115,50 +1358,95 @@ var widgetStyles = `
 }
 
 .cortex-widget__panel {
-  width: min(380px, calc(100vw - 24px));
-  height: min(680px, calc(100vh - 96px));
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 38%),
-    linear-gradient(180deg, rgba(248, 250, 252, 0.98), var(--cortex-background-color));
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: var(--cortex-border-radius);
+  min-height: 0;
   overflow: hidden;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  border-radius: var(--cortex-border-radius);
+  border: 1px solid var(--cortex-border-color);
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--cortex-accent-color) 12%, transparent), transparent 38%),
+    linear-gradient(180deg, color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%), var(--cortex-surface-color));
+  box-shadow: var(--cortex-shadow-lg);
+  container-type: inline-size;
+}
+
+.cortex-widget[data-mode="embedded"] .cortex-widget__panel {
+  width: 100%;
+  height: 100%;
+}
+
+.cortex-widget[data-mode="floating"] .cortex-widget__panel {
+  width: min(400px, calc(100vw - 24px));
+  height: min(680px, calc(100vh - 96px));
+  margin-bottom: 12px;
 }
 
 .cortex-widget__panel[hidden] {
   display: none;
 }
 
-.cortex-widget[data-mode="floating"] .cortex-widget__panel {
-  margin-bottom: 12px;
-}
-
 .cortex-widget__header {
-  padding: 18px 18px 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(255, 255, 255, 0.78);
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--cortex-border-color);
+  background: color-mix(in srgb, var(--cortex-background-color) 92%, #ffffff 8%);
   backdrop-filter: blur(12px);
 }
 
-.cortex-widget__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+.cortex-widget__header-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
-.cortex-widget__subtitle {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: #475569;
+.cortex-widget__avatar {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cortex-avatar-bg);
+  color: var(--cortex-avatar-text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #ffffff 12%, transparent);
 }
 
-.cortex-widget__status {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: #334155;
+.cortex-widget__header-text {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cortex-widget__status-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cortex-widget__status-dot {
+  width: 7px;
+  height: 7px;
+  min-width: 7px;
+  border-radius: 999px;
+  background: var(--cortex-status-idle);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cortex-background-color) 92%, transparent);
+}
+
+.cortex-widget__status-dot[data-state="online"] {
+  background: var(--cortex-status-online);
+}
+
+.cortex-widget__status-dot[data-state="active"] {
+  background: var(--cortex-status-active);
+}
+
+.cortex-widget__status-dot[data-state="history"] {
+  background: var(--cortex-status-history);
 }
 
 .cortex-widget__body {
@@ -1170,13 +1458,9 @@ var widgetStyles = `
 
 .cortex-widget__error {
   display: none;
-  margin: 12px 18px 0;
-  padding: 10px 12px;
+  margin: 10px 14px 0;
+  padding: 9px 12px;
   border-radius: 12px;
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
-  color: #9f1239;
-  font-size: 13px;
 }
 
 .cortex-widget__error[data-visible="true"] {
@@ -1187,23 +1471,17 @@ var widgetStyles = `
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 18px;
+  overflow-x: hidden;
+  padding: 14px 14px 10px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.cortex-widget__empty {
-  color: #64748b;
-  font-size: 13px;
-  text-align: center;
-  padding: 24px 12px;
+  gap: 8px;
 }
 
 .cortex-widget__message {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .cortex-widget__message[data-role="user"] {
@@ -1219,75 +1497,328 @@ var widgetStyles = `
 }
 
 .cortex-widget__bubble {
-  max-width: 88%;
-  padding: 12px 14px;
+  max-width: min(82%, 560px);
+  padding: 9px 12px;
   border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--cortex-text-color);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.cortex-widget__bubble-text {
-  white-space: pre-wrap;
+.cortex-widget__message[data-role="assistant"] .cortex-widget__bubble,
+.cortex-widget__message[data-role="system"] .cortex-widget__bubble,
+.cortex-widget__message[data-role="operator"] .cortex-widget__bubble {
+  border-bottom-left-radius: 4px;
 }
 
 .cortex-widget__message[data-role="user"] .cortex-widget__bubble {
-  background: linear-gradient(135deg, var(--cortex-accent-color), #1d4ed8);
-  color: #ffffff;
+  border-bottom-right-radius: 4px;
 }
 
-.cortex-widget__message[data-role="assistant"] .cortex-widget__bubble[data-status="streaming"]::after {
-  content: " \xB7\xB7\xB7";
-  opacity: 0.75;
+.cortex-widget__meta,
+.cortex-widget__message-status {
+  padding: 0 4px;
 }
 
-.cortex-widget__message[data-role="error"] .cortex-widget__bubble {
-  border-color: #fecdd3;
-  background: #fff1f2;
-  color: #9f1239;
+.cortex-widget__worker-status,
+.cortex-widget__typing,
+.cortex-widget__escalation {
+  display: none;
+  margin: 0 14px 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
 }
 
-.cortex-widget__message[data-role="escalation"] .cortex-widget__bubble {
-  border-color: #fde68a;
-  background: #fffbeb;
-  color: #92400e;
+.cortex-widget__worker-status[data-visible="true"],
+.cortex-widget__typing[data-visible="true"],
+.cortex-widget__escalation[data-visible="true"] {
+  display: block;
+}
+
+.cortex-widget__composer {
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--cortex-border-color);
+  background: color-mix(in srgb, var(--cortex-composer-bg) 92%, #ffffff 8%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cortex-widget__composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.cortex-widget__textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 38px;
+  max-height: 112px;
+}
+
+.cortex-widget__actions {
+  min-height: 14px;
+}
+
+.cortex-widget__attach-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.cortex-widget__attach,
+.cortex-widget__send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, transform 0.1s ease, background-color 0.15s ease;
+}
+
+.cortex-widget__attach:active:not(:disabled),
+.cortex-widget__send:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.cortex-widget__file-input {
+  display: none;
+}
+
+.cortex-widget__file-chip {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 14px;
+}
+
+.cortex-widget__file-chip[data-visible="true"] {
+  display: flex;
+}
+
+.cortex-widget__file-chip-main {
+  min-width: 0;
+}
+
+.cortex-widget__question-options,
+.cortex-widget__message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+@container (max-width: 339px) {
+  .cortex-widget__header {
+    padding: 12px 12px 10px;
+  }
+
+  .cortex-widget__transcript {
+    padding: 12px 10px 8px;
+  }
+
+  .cortex-widget__bubble {
+    max-width: 92%;
+    padding: 8px 10px;
+  }
+
+  .cortex-widget__composer {
+    padding: 9px 10px 10px;
+  }
+
+  .cortex-widget__composer-row {
+    gap: 6px;
+  }
+
+  .cortex-widget__avatar {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+  }
+}
+
+@container (min-width: 560px) {
+  .cortex-widget__header {
+    padding: 16px 18px 12px;
+  }
+
+  .cortex-widget__transcript {
+    padding: 16px 18px 12px;
+  }
+
+  .cortex-widget__bubble {
+    max-width: min(74%, 620px);
+  }
+
+  .cortex-widget__composer {
+    padding: 12px 16px 14px;
+  }
+}
+
+@media (max-width: 520px) {
+  .cortex-widget[data-mode="floating"] {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .cortex-widget[data-mode="floating"][data-position="bottom-left"],
+  .cortex-widget[data-mode="floating"][data-position="bottom-right"] {
+    left: 12px;
+    right: 12px;
+  }
+
+  .cortex-widget[data-mode="floating"] .cortex-widget__panel {
+    width: 100%;
+    height: min(74vh, 640px);
+  }
+
+  .cortex-widget__launcher {
+    width: 100%;
+  }
+}
+`;
+
+// src/styles/theme.ts
+var themeStyles = `
+:host {
+  color-scheme: light;
+}
+
+.cortex-widget,
+.cortex-widget-history {
+  --cortex-accent-color: #2563eb;
+  --cortex-background-color: #ffffff;
+  --cortex-text-color: #172033;
+  --cortex-border-radius: 18px;
+  --cortex-surface-color: color-mix(in srgb, var(--cortex-background-color) 94%, #ffffff 6%);
+  --cortex-surface-muted: color-mix(in srgb, var(--cortex-background-color) 82%, #eef2ff 18%);
+  --cortex-border-color: color-mix(in srgb, var(--cortex-text-color) 12%, transparent);
+  --cortex-subtle-text: color-mix(in srgb, var(--cortex-text-color) 68%, transparent);
+  --cortex-muted-text: color-mix(in srgb, var(--cortex-text-color) 48%, transparent);
+  --cortex-bubble-in-bg: color-mix(in srgb, var(--cortex-background-color) 88%, #e9eef8 12%);
+  --cortex-bubble-in-border: color-mix(in srgb, var(--cortex-text-color) 10%, transparent);
+  --cortex-bubble-out-bg: var(--cortex-accent-color);
+  --cortex-bubble-out-text: #ffffff;
+  --cortex-avatar-bg: color-mix(in srgb, var(--cortex-accent-color) 86%, #0f172a 14%);
+  --cortex-avatar-text: #ffffff;
+  --cortex-composer-bg: color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%);
+  --cortex-control-bg: color-mix(in srgb, var(--cortex-background-color) 90%, #eff4fb 10%);
+  --cortex-shadow-lg: 0 24px 60px rgba(15, 23, 42, 0.18);
+  --cortex-shadow-md: 0 12px 28px rgba(15, 23, 42, 0.08);
+  --cortex-status-online: #22c55e;
+  --cortex-status-active: color-mix(in srgb, var(--cortex-accent-color) 74%, #34d399 26%);
+  --cortex-status-idle: color-mix(in srgb, var(--cortex-text-color) 22%, transparent);
+  --cortex-status-history: #f59e0b;
+  color: var(--cortex-text-color);
+  font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.cortex-widget--dark,
+.cortex-widget-history--dark {
+  --cortex-surface-color: color-mix(in srgb, var(--cortex-background-color) 92%, #111827 8%);
+  --cortex-surface-muted: color-mix(in srgb, var(--cortex-background-color) 82%, #0f172a 18%);
+  --cortex-border-color: color-mix(in srgb, #ffffff 10%, transparent);
+  --cortex-subtle-text: color-mix(in srgb, #ffffff 74%, transparent);
+  --cortex-muted-text: color-mix(in srgb, #ffffff 54%, transparent);
+  --cortex-bubble-in-bg: color-mix(in srgb, var(--cortex-background-color) 80%, #1e293b 20%);
+  --cortex-bubble-in-border: color-mix(in srgb, #ffffff 7%, transparent);
+  --cortex-control-bg: color-mix(in srgb, var(--cortex-background-color) 78%, #1e293b 22%);
+  --cortex-shadow-lg: 0 24px 60px rgba(2, 6, 23, 0.45);
+  --cortex-shadow-md: 0 14px 30px rgba(2, 6, 23, 0.24);
+}
+`;
+
+// src/styles/typography.ts
+var typographyStyles = `
+.cortex-widget__title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cortex-widget__subtitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--cortex-subtle-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cortex-widget__status {
+  margin: 0;
+  min-width: 0;
+  font-size: 10.5px;
+  line-height: 1.25;
+  color: var(--cortex-muted-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cortex-widget__avatar {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.cortex-widget__empty {
+  color: var(--cortex-muted-text);
+  font-size: 13px;
+  text-align: center;
+  padding: 28px 16px;
+}
+
+.cortex-widget__bubble {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cortex-widget__bubble-text {
+  white-space: pre-wrap;
+  text-wrap: pretty;
 }
 
 .cortex-widget__meta {
-  font-size: 11px;
-  color: #64748b;
+  font-size: 10.5px;
+  color: var(--cortex-muted-text);
 }
 
 .cortex-widget__formatted {
   margin: 0;
   white-space: pre-wrap;
   font-size: 12px;
+  line-height: 1.5;
   font-family: Consolas, "Courier New", monospace;
 }
 
 .cortex-widget__message-attachments {
   list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 10px 0 0;
+  margin-bottom: 0;
   padding: 0;
 }
 
 .cortex-widget__message-attachment {
   max-width: 100%;
   padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.14);
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 12px;
   font-size: 12px;
-  line-height: 1.3;
+  line-height: 1.35;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .cortex-widget__message-attachment-link {
@@ -1311,295 +1842,105 @@ var widgetStyles = `
   opacity: 0.82;
 }
 
-.cortex-widget__message[data-role="user"] .cortex-widget__message-attachment {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.28);
-  color: #ffffff;
-}
-
-.cortex-widget__worker-status {
-  display: none;
-  margin: 0 18px 8px;
-  padding: 6px 12px;
-  font-size: 12px;
-  color: var(--cortex-text-color);
-  opacity: 0.65;
-}
-
-.cortex-widget__worker-status[data-visible="true"] {
-  display: block;
-}
-
-.cortex-widget__worker-status[data-state="error"] {
-  color: #dc2626;
-  opacity: 1;
-}
-
-.cortex-widget__typing,
-.cortex-widget__escalation {
-  display: none;
-  margin: 0 18px 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-size: 13px;
-}
-
-.cortex-widget__typing[data-visible="true"] {
-  display: block;
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.cortex-widget__escalation[data-visible="true"] {
-  display: block;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #92400e;
-}
-
-.cortex-widget__composer {
-  padding: 14px 18px 18px;
-  border-top: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(255, 255, 255, 0.94);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.cortex-widget__textarea {
-  width: 100%;
-  min-height: 92px;
-  resize: vertical;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.38);
-  background: #ffffff;
-  color: var(--cortex-text-color);
-  font: inherit;
-  outline: none;
-}
-
-.cortex-widget__textarea:focus {
-  border-color: rgba(37, 99, 235, 0.55);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
-}
-
-.cortex-widget__textarea:disabled {
-  background: #f8fafc;
-  color: #94a3b8;
-}
-
-.cortex-widget__actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.cortex-widget__attach-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.cortex-widget__attach,
-.cortex-widget__send,
-.cortex-widget__file-remove {
-  border: 0;
-  border-radius: 12px;
-  font: inherit;
-  cursor: pointer;
-}
-
-.cortex-widget__attach,
-.cortex-widget__file-remove {
-  background: #eff6ff;
-  color: #1d4ed8;
-  padding: 9px 12px;
-}
-
-.cortex-widget__send {
-  background: linear-gradient(135deg, var(--cortex-accent-color), #1d4ed8);
-  color: #ffffff;
-  padding: 10px 16px;
-  font-weight: 600;
-  min-width: 92px;
-}
-
-.cortex-widget__attach:disabled,
-.cortex-widget__send:disabled,
-.cortex-widget__file-remove:disabled,
-.cortex-widget__launcher:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.cortex-widget__file-input {
-  display: none;
-}
-
-.cortex-widget__file-hint {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.cortex-widget__file-chip {
-  display: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: #f8fafc;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-.cortex-widget__file-chip[data-visible="true"] {
-  display: flex;
-}
-
-.cortex-widget__file-chip-main {
-  min-width: 0;
-}
-
-.cortex-widget__file-chip-name {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: #0f172a;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cortex-widget__file-chip-meta {
-  display: block;
-  font-size: 12px;
-  color: #64748b;
-}
-
 .cortex-widget__actor {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .cortex-widget__actor-avatar {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: #e2e8f0;
 }
 
 .cortex-widget__actor-info {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  min-width: 0;
 }
 
 .cortex-widget__actor-name {
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 600;
-  color: #334155;
+  color: var(--cortex-subtle-text);
 }
 
 .cortex-widget__actor-title {
-  font-size: 11px;
-  color: #64748b;
+  font-size: 10px;
+  color: var(--cortex-muted-text);
 }
 
-.cortex-widget__question-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.cortex-widget__question-option {
-  padding: 7px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(37, 99, 235, 0.45);
-  background: #eff6ff;
-  color: #1d4ed8;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.cortex-widget__question-option:hover:not(:disabled) {
-  background: #dbeafe;
-  border-color: rgba(37, 99, 235, 0.65);
-}
-
-.cortex-widget__question-option:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-@media (max-width: 520px) {
-  .cortex-widget[data-mode="floating"] {
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
-  }
-
-  .cortex-widget[data-mode="floating"][data-position="bottom-left"],
-  .cortex-widget[data-mode="floating"][data-position="bottom-right"] {
-    left: 12px;
-    right: 12px;
-  }
-
-  .cortex-widget__panel {
-    width: 100%;
-    height: min(74vh, 640px);
-  }
-
-  .cortex-widget__launcher {
-    width: 100%;
-  }
-}
-
+.cortex-widget__error,
+.cortex-widget__worker-status,
+.cortex-widget__typing,
+.cortex-widget__escalation,
+.cortex-widget__textarea,
+.cortex-widget__question-option,
+.cortex-widget__file-chip,
+.cortex-widget__file-remove,
 .cortex-widget__attach,
-.cortex-widget__send {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: opacity 0.15s, background 0.15s;
+.cortex-widget__send,
+.cortex-widget__launcher {
+  font: inherit;
+}
+
+.cortex-widget__textarea {
+  resize: none;
+  padding: 8px 12px;
+  border-radius: 18px;
+  border: 1px solid var(--cortex-border-color);
+  outline: none;
+  overflow-y: auto;
+  background: var(--cortex-background-color);
+  color: var(--cortex-text-color);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cortex-widget__textarea::placeholder {
+  color: var(--cortex-muted-text);
+}
+
+.cortex-widget__textarea:focus {
+  border-color: color-mix(in srgb, var(--cortex-accent-color) 56%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--cortex-accent-color) 14%, transparent);
+}
+
+.cortex-widget__textarea:disabled {
+  background: color-mix(in srgb, var(--cortex-background-color) 86%, #e2e8f0 14%);
+  color: var(--cortex-muted-text);
 }
 
 .cortex-widget__attach {
-  background: #e2e8f0;
-  color: #475569;
+  background: var(--cortex-control-bg);
+  color: var(--cortex-subtle-text);
 }
 
 .cortex-widget__attach:hover:not(:disabled) {
-  background: #cbd5e1;
+  background: color-mix(in srgb, var(--cortex-control-bg) 72%, #cbd5e1 28%);
 }
 
 .cortex-widget__send {
-  background: var(--cortex-accent-color);
+  background: linear-gradient(135deg, var(--cortex-accent-color), color-mix(in srgb, var(--cortex-accent-color) 78%, #0f172a 22%));
   color: #ffffff;
 }
 
 .cortex-widget__send:hover:not(:disabled) {
-  opacity: 0.88;
+  opacity: 0.9;
 }
 
 .cortex-widget__attach:disabled,
-.cortex-widget__send:disabled {
-  opacity: 0.4;
+.cortex-widget__send:disabled,
+.cortex-widget__file-remove:disabled,
+.cortex-widget__launcher:disabled,
+.cortex-widget__question-option:disabled {
   cursor: not-allowed;
+  opacity: 0.42;
   pointer-events: none;
 }
 
@@ -1610,13 +1951,60 @@ var widgetStyles = `
   pointer-events: none;
 }
 
+.cortex-widget__file-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--cortex-muted-text);
+}
+
+.cortex-widget__file-chip {
+  border: 1px solid var(--cortex-border-color);
+  background: color-mix(in srgb, var(--cortex-background-color) 84%, #eef2ff 16%);
+}
+
+.cortex-widget__file-chip-name {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cortex-widget__file-chip-meta {
+  display: block;
+  font-size: 11px;
+  color: var(--cortex-muted-text);
+}
+
+.cortex-widget__file-remove {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cortex-subtle-text);
+  cursor: pointer;
+}
+
+.cortex-widget__question-option {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--cortex-accent-color) 36%, transparent);
+  background: color-mix(in srgb, var(--cortex-accent-color) 9%, var(--cortex-background-color) 91%);
+  color: var(--cortex-accent-color);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cortex-widget__question-option:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--cortex-accent-color) 15%, var(--cortex-background-color) 85%);
+}
+
 .cortex-widget__message-status {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.72em;
-  color: #64748b;
-  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--cortex-muted-text);
 }
 
 .cortex-widget__message-status[data-status="failed"] {
@@ -1624,7 +2012,7 @@ var widgetStyles = `
 }
 
 .cortex-widget__message-status[data-status="sending"] {
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 .cortex-widget__message-retry {
@@ -1650,183 +2038,15 @@ var widgetStyles = `
   height: 12px;
   pointer-events: none;
 }
-
-.cortex-widget-history {
-  --cortex-accent-color: #2563eb;
-  --cortex-background-color: #ffffff;
-  --cortex-text-color: #172033;
-  color: var(--cortex-text-color);
-  font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  line-height: 1.4;
-}
-
-.cortex-widget-history,
-.cortex-widget-history *,
-.cortex-widget-history *::before,
-.cortex-widget-history *::after {
-  box-sizing: border-box;
-}
-
-.cortex-widget-history__panel {
-  min-height: 100%;
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 40%),
-    linear-gradient(180deg, rgba(248, 250, 252, 0.98), var(--cortex-background-color));
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 18px;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
-  padding: 16px;
-}
-
-.cortex-widget-history__header {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.cortex-widget-history__status {
-  min-height: 18px;
-  font-size: 12px;
-  color: #64748b;
-}
-
-.cortex-widget-history__search {
-  border: 1px dashed rgba(148, 163, 184, 0.4);
-  border-radius: 14px;
-  padding: 12px 14px;
-  color: #94a3b8;
-  font-size: 13px;
-}
-
-.cortex-widget-history__new-chat {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: center;
-  border: 0;
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--cortex-accent-color), #1d4ed8);
-  color: #ffffff;
-  font: inherit;
-  font-weight: 600;
-  padding: 10px 16px;
-  cursor: pointer;
-}
-
-.cortex-widget-history__list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.cortex-widget-history__empty,
-.cortex-widget-history__error {
-  border-radius: 14px;
-  padding: 14px;
-  font-size: 13px;
-  text-align: center;
-}
-
-.cortex-widget-history__empty {
-  color: #64748b;
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.cortex-widget-history__error {
-  color: #9f1239;
-  background: #fff1f2;
-  border: 1px solid #fecdd3;
-}
-
-.cortex-widget-history__row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 12px 44px 12px 14px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.88);
-  color: var(--cortex-text-color);
-  cursor: pointer;
-  text-align: left;
-}
-
-.cortex-widget-history__row[data-active="true"] {
-  border-color: rgba(37, 99, 235, 0.35);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
-}
-
-.cortex-widget-history__row-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.cortex-widget-history__menu-toggle {
-  position: absolute;
-  top: 50%;
-  right: 10px;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.12);
-  color: #334155;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.cortex-widget-history__row:hover .cortex-widget-history__menu-toggle,
-.cortex-widget-history__row[data-menu-open="true"] .cortex-widget-history__menu-toggle {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.cortex-widget-history__menu {
-  position: absolute;
-  right: 8px;
-  top: calc(100% + 4px);
-  min-width: 132px;
-  display: none;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px;
-  border-radius: 12px;
-  background: #ffffff;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
-  z-index: 3;
-}
-
-.cortex-widget-history__row[data-menu-open="true"] .cortex-widget-history__menu {
-  display: flex;
-}
-
-.cortex-widget-history__menu-action {
-  border: 0;
-  background: transparent;
-  color: var(--cortex-text-color);
-  font: inherit;
-  text-align: left;
-  border-radius: 10px;
-  padding: 8px 10px;
-  cursor: pointer;
-}
-
-.cortex-widget-history__menu-action:hover {
-  background: #eff6ff;
-}
 `;
+
+// src/styles/index.ts
+var widgetStyles = [
+  themeStyles,
+  layoutStyles,
+  typographyStyles,
+  historyStyles
+].join("\n");
 
 // src/dom.ts
 function createElement(tagName, className, textContent) {
@@ -1841,21 +2061,36 @@ function createElement(tagName, className, textContent) {
 }
 function createWidgetDom(options) {
   const host = createElement("div");
+  if (options.mode === "embedded") {
+    host.style.width = "100%";
+    host.style.height = "100%";
+    host.style.display = "block";
+  }
   const shadowRoot = host.attachShadow({ mode: "open" });
   const style = createElement("style");
   style.textContent = widgetStyles;
   const root = createElement("div", "cortex-widget");
   root.dataset.mode = options.mode;
   root.dataset.position = options.position;
+  root.classList.add("cortex-widget--light");
   const launcher = createElement("button", "cortex-widget__launcher", options.launcherLabel);
   launcher.type = "button";
   launcher.setAttribute("data-testid", "launcher");
   const panel = createElement("section", "cortex-widget__panel");
   panel.setAttribute("data-testid", "panel");
   const header = createElement("header", "cortex-widget__header");
+  const headerMain = createElement("div", "cortex-widget__header-main");
+  const avatar = createElement("div", "cortex-widget__avatar");
+  avatar.setAttribute("aria-hidden", "true");
+  avatar.setAttribute("data-testid", "header-avatar");
+  const headerText = createElement("div", "cortex-widget__header-text");
   const title = createElement("h2", "cortex-widget__title", options.title);
   const subtitle = createElement("p", "cortex-widget__subtitle", options.subtitle);
   const status = createElement("p", "cortex-widget__status", "");
+  const statusWrap = createElement("div", "cortex-widget__status-wrap");
+  const statusDot = createElement("span", "cortex-widget__status-dot");
+  statusDot.setAttribute("aria-hidden", "true");
+  statusWrap.append(statusDot, status);
   const body = createElement("div", "cortex-widget__body");
   const errorBanner = createElement("div", "cortex-widget__error");
   errorBanner.setAttribute("role", "alert");
@@ -1870,6 +2105,8 @@ function createWidgetDom(options) {
   escalation.setAttribute("data-testid", "escalation-card");
   const composer = createElement("form", "cortex-widget__composer");
   composer.setAttribute("data-testid", "composer");
+  const composerRow = createElement("div", "cortex-widget__composer-row");
+  const attachWrap = createElement("div", "cortex-widget__attach-wrap");
   const textarea = createElement("textarea", "cortex-widget__textarea");
   textarea.placeholder = options.placeholder;
   textarea.setAttribute("data-testid", "composer-textarea");
@@ -1884,7 +2121,6 @@ function createWidgetDom(options) {
   fileChipMain.append(fileChipName, fileChipMeta);
   fileChip.append(fileChipMain, fileChipRemove);
   const actions = createElement("div", "cortex-widget__actions");
-  const attachWrap = createElement("div", "cortex-widget__attach-wrap");
   const fileInput = createElement("input", "cortex-widget__file-input");
   fileInput.type = "file";
   fileInput.setAttribute("data-testid", "file-input");
@@ -1902,10 +2138,13 @@ function createWidgetDom(options) {
   sendButton.setAttribute("title", "Send message");
   sendButton.setAttribute("data-testid", "send-button");
   sendButton.innerHTML = getIconSvg("send-fill");
-  attachWrap.append(fileInput, attachButton, fileHint);
-  actions.append(attachWrap, sendButton);
-  composer.append(textarea, fileChip, actions);
-  header.append(title, subtitle, status);
+  attachWrap.append(fileInput, attachButton);
+  actions.append(fileHint);
+  composerRow.append(attachWrap, textarea, sendButton);
+  composer.append(fileChip, composerRow, actions);
+  headerText.append(title, subtitle, statusWrap);
+  headerMain.append(avatar, headerText);
+  header.append(headerMain);
   body.append(errorBanner, transcript, workerStatus, typing, escalation, composer);
   panel.append(header, body);
   if (options.mode === "floating") {
@@ -1917,11 +2156,14 @@ function createWidgetDom(options) {
   return {
     host,
     shadowRoot,
+    root,
     launcher,
     panel,
     title,
     subtitle,
     status,
+    avatar,
+    statusDot,
     errorBanner,
     transcript,
     workerStatus,
@@ -1940,7 +2182,7 @@ function createWidgetDom(options) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/errors.js
+// ../sdk-ui/dist/src/errors.js
 var ControllerError = class extends Error {
   constructor(code, message, details) {
     super(message);
@@ -1970,7 +2212,7 @@ function errorFromUnknown(error, fallbackCode = "controller_error", source) {
   });
 }
 
-// ../cortex-sdk-ui/dist/src/utils.js
+// ../sdk-ui/dist/src/utils.js
 var TERMINAL_SESSION_STATES = /* @__PURE__ */ new Set([
   "COMPLETED",
   "FAILED",
@@ -2055,7 +2297,7 @@ function toEscalationActions(value) {
   return asStringArray(value).filter((action) => action === "continue" || action === "operator_input" || action === "reply_user");
 }
 
-// ../cortex-sdk-ui/dist/src/normalize.js
+// ../sdk-ui/dist/src/normalize.js
 function buildAttachmentMeta(payload) {
   return Array.isArray(payload["attachments"]) ? { attachments: payload["attachments"] } : {};
 }
@@ -2222,7 +2464,7 @@ function normalizeEscalationState(message) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/escalation-controller.js
+// ../sdk-ui/dist/src/escalation-controller.js
 function createEscalationController(options) {
   let state = cloneEscalation(options.initialState ?? null);
   function emit(event) {
@@ -2318,7 +2560,7 @@ function createEscalationController(options) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/transcript-store.js
+// ../sdk-ui/dist/src/transcript-store.js
 function createTranscriptStore(options = {}) {
   const transcript = (options.initialTranscript ?? []).map((message) => cloneMessage(message));
   const indexById = /* @__PURE__ */ new Map();
@@ -2458,7 +2700,7 @@ function createTranscriptStore(options = {}) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/chat-controller.js
+// ../sdk-ui/dist/src/chat-controller.js
 var MESSAGE_SEND_TIMEOUT_MS = 15e3;
 async function withTimeout(promise, timeoutMs, msg) {
   let timer;
@@ -2865,10 +3107,14 @@ function createElement2(tagName, className, textContent) {
 }
 function createHistoryDom() {
   const host = createElement2("div");
+  host.style.width = "100%";
+  host.style.height = "100%";
+  host.style.display = "block";
   const shadowRoot = host.attachShadow({ mode: "open" });
   const style = createElement2("style");
   style.textContent = widgetStyles;
   const root = createElement2("section", "cortex-widget-history");
+  root.classList.add("cortex-widget-history--light");
   const panel = createElement2("div", "cortex-widget-history__panel");
   const header = createElement2("div", "cortex-widget-history__header");
   const status = createElement2("div", "cortex-widget-history__status", "");
@@ -3042,6 +3288,48 @@ function buildStatusText(state, isAwaitingAnswer, isTyping) {
 }
 
 // src/renderer.ts
+function getAvatarInitials(label) {
+  const normalized = label.trim();
+  if (!normalized) {
+    return "CX";
+  }
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("");
+  return initials || normalized.slice(0, 2).toUpperCase();
+}
+function parseHexColor(value) {
+  const hex = value.trim();
+  const short = /^#([\da-f]{3})$/i.exec(hex);
+  if (short) {
+    const [, raw2] = short;
+    return {
+      r: parseInt(`${raw2[0]}${raw2[0]}`, 16),
+      g: parseInt(`${raw2[1]}${raw2[1]}`, 16),
+      b: parseInt(`${raw2[2]}${raw2[2]}`, 16)
+    };
+  }
+  const full = /^#([\da-f]{6})$/i.exec(hex);
+  if (!full) {
+    return null;
+  }
+  const [, raw] = full;
+  return {
+    r: parseInt(raw.slice(0, 2), 16),
+    g: parseInt(raw.slice(2, 4), 16),
+    b: parseInt(raw.slice(4, 6), 16)
+  };
+}
+function isDarkColor(value, fallbackDark) {
+  if (!value) {
+    return fallbackDark;
+  }
+  const rgb = parseHexColor(value);
+  if (!rgb) {
+    return fallbackDark;
+  }
+  const luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+  return luminance < 0.45;
+}
 function formatFileSize(size) {
   if (size < 1024) {
     return `${size} B`;
@@ -3312,13 +3600,23 @@ function renderTranscript(transcriptEl, state) {
   transcriptEl.scrollTop = transcriptEl.scrollHeight;
 }
 function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
-  dom.host.style.setProperty("--cortex-accent-color", options.theme?.accentColor ?? "#2563eb");
-  dom.host.style.setProperty("--cortex-background-color", options.theme?.backgroundColor ?? "#ffffff");
-  dom.host.style.setProperty("--cortex-text-color", options.theme?.textColor ?? "#172033");
-  dom.host.style.setProperty("--cortex-border-radius", options.theme?.borderRadius ?? "18px");
+  const accentColor = options.theme?.accentColor ?? "#2563eb";
+  const backgroundColor = options.theme?.backgroundColor ?? "#ffffff";
+  const textColor = options.theme?.textColor ?? "#172033";
+  const borderRadius = options.theme?.borderRadius ?? "18px";
+  const darkTheme = isDarkColor(backgroundColor, false) || isDarkColor(textColor, false) && !options.theme?.backgroundColor;
+  dom.host.style.setProperty("--cortex-accent-color", accentColor);
+  dom.host.style.setProperty("--cortex-background-color", backgroundColor);
+  dom.host.style.setProperty("--cortex-text-color", textColor);
+  dom.host.style.setProperty("--cortex-border-radius", borderRadius);
+  dom.host.style.setProperty("color-scheme", darkTheme ? "dark" : "light");
+  dom.root.classList.toggle("cortex-widget--dark", darkTheme);
+  dom.root.classList.toggle("cortex-widget--light", !darkTheme);
   dom.title.textContent = options.title;
   dom.subtitle.textContent = options.subtitle;
   dom.status.textContent = state.isHistoricalView ? "Viewing chat history" : buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
+  dom.avatar.textContent = getAvatarInitials(options.title);
+  dom.statusDot.dataset.state = state.isHistoricalView ? "history" : state.chat.connection.isConnected ? "online" : state.isAwaitingAnswer || state.isTyping || state.chat.workerState.state === "working" || state.chat.workerState.state === "waiting" ? "active" : "idle";
   const isPanelVisible = state.mode === "embedded" || state.isOpen;
   dom.panel.hidden = !isPanelVisible;
   dom.launcher.textContent = options.launcherLabel;
