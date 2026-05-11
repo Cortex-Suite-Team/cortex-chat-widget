@@ -1,0 +1,254 @@
+import { jest } from '@jest/globals';
+import { changeInput, CustomClient, flushAsyncWork, resetMocks, submitComposer } from './helpers.js';
+import { mountCortexChat } from '../src/index.js';
+import { __getLastController } from './mocks/sdk-ui.js';
+
+function mockJsonResponse(body: unknown, status = 200): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  } as Response;
+}
+
+function installTargets() {
+  const history = document.createElement('div');
+  history.id = 'history';
+  const chat = document.createElement('div');
+  chat.id = 'chat';
+  document.body.append(history, chat);
+  return { history, chat };
+}
+
+function getChatShadow(): ShadowRoot {
+  const host = document.querySelector('#chat > *') as HTMLElement | null;
+  if (!host?.shadowRoot) {
+    throw new Error('Expected chat shadow root');
+  }
+  return host.shadowRoot;
+}
+
+function getHistoryShadow(): ShadowRoot {
+  const host = document.querySelector('#history > *') as HTMLElement | null;
+  if (!host?.shadowRoot) {
+    throw new Error('Expected history shadow root');
+  }
+  return host.shadowRoot;
+}
+
+function getFetchMock(): any {
+  return global.fetch as any;
+}
+
+describe('widget history', () => {
+  beforeEach(() => {
+    resetMocks();
+    global.fetch = jest.fn() as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('does not call history API when historyTarget is absent', async () => {
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: document.body.appendChild(document.createElement('div')),
+    });
+
+    await flushAsyncWork();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('fails clearly when historyTarget is provided without controlPlaneUrl', () => {
+    installTargets();
+
+    expect(() => {
+      mountCortexChat({
+        apiKey: 'test-key',
+        mode: 'embedded',
+        target: '#chat',
+        historyTarget: '#history',
+      });
+    }).toThrow('historyTarget requires controlPlaneUrl');
+  });
+
+  it('renders history panel, preserves backend order, and shows title-only rows plus actions', async () => {
+    installTargets();
+    getFetchMock().mockResolvedValueOnce(mockJsonResponse({
+      ok: true,
+      data: {
+        conversations: [
+          { session_id: 'sess_b', title: 'Bravo', renamed: false, pinned: false, last_message_at: '2026-05-11T10:00:00Z', created_at: '2026-05-11T09:00:00Z' },
+          { session_id: 'sess_a', title: 'Alpha', renamed: false, pinned: false, last_message_at: '2026-05-10T10:00:00Z', created_at: '2026-05-10T09:00:00Z' },
+        ],
+      },
+    }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const titles = Array.from(historyShadow.querySelectorAll('[data-testid="history-row-title"]')).map((el) => el.textContent);
+    expect(titles).toEqual(['Bravo', 'Alpha']);
+    expect(historyShadow.textContent).not.toContain('2026');
+    expect(historyShadow.textContent).not.toContain('preview');
+
+    const toggle = historyShadow.querySelector('[data-testid="history-menu-toggle"]') as HTMLButtonElement;
+    toggle.click();
+
+    const menu = historyShadow.querySelector('[data-testid="history-menu"]') as HTMLElement;
+    expect(menu.textContent).toContain('Pin');
+    expect(menu.textContent).toContain('Rename');
+    expect(menu.textContent).toContain('Delete');
+  });
+
+  it('clicking a history row loads read-only transcript and disables composer', async () => {
+    installTargets();
+    getFetchMock()
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          conversations: [
+            { session_id: 'sess_hist', title: 'Existing chat', renamed: false, pinned: false, last_message_at: '2026-05-11T10:00:00Z', created_at: '2026-05-11T09:00:00Z' },
+          ],
+        },
+      }))
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          session_id: 'sess_hist',
+          messages: [
+            { id: 'm1', type: 'chat::answer', role: 'assistant', content: 'Earlier answer', status: 'final', ts: '2026-05-11T10:00:00Z', meta: {} },
+          ],
+        },
+      }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const row = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    row.click();
+    await flushAsyncWork();
+
+    const chatShadow = getChatShadow();
+    const transcript = chatShadow.querySelector('[data-testid="transcript"]') as HTMLElement;
+    const textarea = chatShadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const sendButton = chatShadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
+
+    expect(transcript.textContent).toContain('Earlier answer');
+    expect(textarea.disabled).toBe(true);
+    expect(sendButton.disabled).toBe(true);
+    expect(textarea.placeholder).toContain('read-only');
+  });
+
+  it('new chat stays local draft only, and first real send refreshes history', async () => {
+    installTargets();
+    const client = new CustomClient();
+    client.uploadAttachmentImpl = async (file) => `attachment:${file.name}`;
+    getFetchMock()
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          conversations: [
+            { session_id: 'sess_hist', title: 'Existing chat', renamed: false, pinned: false, last_message_at: '2026-05-11T10:00:00Z', created_at: '2026-05-11T09:00:00Z' },
+          ],
+        },
+      }))
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          conversations: [
+            { session_id: 'sess_real', title: 'New chat', renamed: false, pinned: false, last_message_at: '2026-05-11T10:01:00Z', created_at: '2026-05-11T10:01:00Z' },
+            { session_id: 'sess_hist', title: 'Existing chat', renamed: false, pinned: false, last_message_at: '2026-05-11T10:00:00Z', created_at: '2026-05-11T09:00:00Z' },
+          ],
+        },
+      }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+      client,
+    });
+
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const draftRow = historyShadow.querySelector('[data-testid="history-draft-row"]') as HTMLButtonElement;
+    draftRow.click();
+    await flushAsyncWork();
+
+    expect(__getLastController()?.sendCalls).toHaveLength(0);
+
+    const chatShadow = getChatShadow();
+    const textarea = chatShadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = chatShadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+
+    changeInput(textarea, 'Start a new chat');
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(__getLastController()?.sendCalls).toHaveLength(1);
+    expect(getFetchMock().mock.calls.filter((call: any[]) => String(call[0]).includes('/api/chat/conversations/'))).toHaveLength(2);
+  });
+
+  it('delete removes item after backend success', async () => {
+    installTargets();
+    getFetchMock()
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          conversations: [
+            { session_id: 'sess_delete', title: 'Delete me', renamed: false, pinned: false, last_message_at: '2026-05-11T10:00:00Z', created_at: '2026-05-11T09:00:00Z' },
+          ],
+        },
+      }))
+      .mockResolvedValueOnce({ ok: true, status: 204 } as Response)
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          conversations: [],
+        },
+      }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const toggle = historyShadow.querySelector('[data-testid="history-menu-toggle"]') as HTMLButtonElement;
+    toggle.click();
+    const deleteButton = Array.from(historyShadow.querySelectorAll('.cortex-widget-history__menu-action'))
+      .find((el) => (el as HTMLElement).textContent === 'Delete') as HTMLButtonElement;
+    deleteButton.click();
+    await flushAsyncWork();
+    await flushAsyncWork();
+
+    expect(historyShadow.textContent).toContain('No chats yet');
+  });
+});

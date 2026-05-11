@@ -53,7 +53,9 @@ function resolveOptions(
     ...baseOptions,
     apiKey: baseOptions.apiKey,
     authUrl: baseOptions.authUrl,
+    controlPlaneUrl: baseOptions.controlPlaneUrl,
     target: baseOptions.target,
+    historyTarget: baseOptions.historyTarget,
     theme: baseOptions.theme,
     client: baseOptions.client,
     onReady: baseOptions.onReady,
@@ -76,6 +78,27 @@ function resolveMountTarget(options: NormalizedWidgetOptions): MountTargetResolu
     }
   }
 
+  let historyTarget: HTMLElement | undefined;
+  if (options.mode === 'embedded' && options.historyTarget) {
+    if (!options.controlPlaneUrl) {
+      throw createWidgetError(
+        'missing_control_plane_url',
+        'historyTarget requires controlPlaneUrl in embedded mode.',
+      );
+    }
+    if (typeof options.historyTarget === 'string') {
+      const historyElement = document.querySelector(options.historyTarget);
+      if (!isHTMLElement(historyElement)) {
+        throw createWidgetError('history_target_not_found', `History target selector not found: ${options.historyTarget}`);
+      }
+      historyTarget = historyElement;
+    } else if (isHTMLElement(options.historyTarget)) {
+      historyTarget = options.historyTarget;
+    } else {
+      throw createWidgetError('history_target_not_found', 'historyTarget must be a selector or HTMLElement.');
+    }
+  }
+
   if (typeof options.target === 'string') {
     const targetElement = document.querySelector(options.target);
     if (!isHTMLElement(targetElement)) {
@@ -84,6 +107,7 @@ function resolveMountTarget(options: NormalizedWidgetOptions): MountTargetResolu
     return {
       mountTarget: targetElement,
       targetElement,
+      historyTarget,
     };
   }
 
@@ -91,11 +115,13 @@ function resolveMountTarget(options: NormalizedWidgetOptions): MountTargetResolu
     return {
       mountTarget: options.target,
       targetElement: options.target,
+      historyTarget,
     };
   }
 
   return {
     mountTarget: document.body,
+    historyTarget,
   };
 }
 
@@ -123,7 +149,7 @@ export function mountCortexChat(
 
   assertBrowserEnvironment(partialOptions);
   const options = resolveOptions(targetOrOptions, maybeOptions);
-  const { mountTarget } = resolveMountTarget(options);
+  const { mountTarget, historyTarget } = resolveMountTarget(options);
 
   void mountTarget;
 
@@ -133,12 +159,12 @@ export function mountCortexChat(
     throw error;
   }
 
-  const client = createClient(options);
   const dom = createWidgetDom(options);
   return createWidgetHandle({
     options,
-    client,
     dom,
     mountTarget,
+    historyTarget,
+    createClient: () => createClient(options),
   });
 }

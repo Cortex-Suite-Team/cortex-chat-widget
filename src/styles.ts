@@ -586,4 +586,180 @@ export const widgetStyles = `
   height: 12px;
   pointer-events: none;
 }
+
+.cortex-widget-history {
+  --cortex-accent-color: #2563eb;
+  --cortex-background-color: #ffffff;
+  --cortex-text-color: #172033;
+  color: var(--cortex-text-color);
+  font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.4;
+}
+
+.cortex-widget-history,
+.cortex-widget-history *,
+.cortex-widget-history *::before,
+.cortex-widget-history *::after {
+  box-sizing: border-box;
+}
+
+.cortex-widget-history__panel {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 40%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), var(--cortex-background-color));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  padding: 16px;
+}
+
+.cortex-widget-history__header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cortex-widget-history__status {
+  min-height: 18px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.cortex-widget-history__search {
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.cortex-widget-history__new-chat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--cortex-accent-color), #1d4ed8);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.cortex-widget-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cortex-widget-history__empty,
+.cortex-widget-history__error {
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.cortex-widget-history__empty {
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.cortex-widget-history__error {
+  color: #9f1239;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+}
+
+.cortex-widget-history__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 44px 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--cortex-text-color);
+  cursor: pointer;
+  text-align: left;
+}
+
+.cortex-widget-history__row[data-active="true"] {
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.cortex-widget-history__row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cortex-widget-history__menu-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cortex-widget-history__row:hover .cortex-widget-history__menu-toggle,
+.cortex-widget-history__row[data-menu-open="true"] .cortex-widget-history__menu-toggle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cortex-widget-history__menu {
+  position: absolute;
+  right: 8px;
+  top: calc(100% + 4px);
+  min-width: 132px;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
+  z-index: 3;
+}
+
+.cortex-widget-history__row[data-menu-open="true"] .cortex-widget-history__menu {
+  display: flex;
+}
+
+.cortex-widget-history__menu-action {
+  border: 0;
+  background: transparent;
+  color: var(--cortex-text-color);
+  font: inherit;
+  text-align: left;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.cortex-widget-history__menu-action:hover {
+  background: #eff6ff;
+}
 `;

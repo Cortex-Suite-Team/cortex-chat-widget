@@ -98,7 +98,7 @@ function renderTranscript(
   if (visibleMessages.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'cortex-widget__empty';
-    empty.textContent = 'Start the conversation when you are ready.';
+    empty.textContent = state.isHistoricalView ? 'No messages in this chat yet.' : 'New chat';
     transcriptEl.appendChild(empty);
     return;
   }
@@ -335,7 +335,7 @@ function renderTranscript(
   if (transcriptEl.childElementCount === 0) {
     const empty = document.createElement('div');
     empty.className = 'cortex-widget__empty';
-    empty.textContent = 'Start the conversation when you are ready.';
+    empty.textContent = state.isHistoricalView ? 'No messages in this chat yet.' : 'New chat';
     transcriptEl.appendChild(empty);
     return;
   }
@@ -357,7 +357,9 @@ export function renderWidget(
 
   dom.title.textContent = options.title;
   dom.subtitle.textContent = options.subtitle;
-  dom.status.textContent = buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
+  dom.status.textContent = state.isHistoricalView
+    ? 'Viewing chat history'
+    : buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
 
   const isPanelVisible = state.mode === 'embedded' || state.isOpen;
   dom.panel.hidden = !isPanelVisible;
@@ -398,9 +400,12 @@ export function renderWidget(
     dom.escalation.textContent = '';
   }
 
-  dom.textarea.value = state.isDestroyed ? '' : dom.textarea.value;
+  if (state.isDestroyed) {
+    dom.textarea.value = '';
+  }
   const questionLocksInput = !!state.chat.activeQuestion && !state.chat.activeQuestion.allow_reply;
   dom.textarea.disabled = state.chat.input.locked || state.isAwaitingAnswer || isUploading || questionLocksInput;
+  dom.textarea.placeholder = state.isHistoricalView ? 'History view is read-only' : options.placeholder;
 
   const canSend = !state.chat.input.locked
     && !state.isAwaitingAnswer

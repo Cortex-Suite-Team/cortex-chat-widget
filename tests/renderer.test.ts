@@ -37,7 +37,7 @@ describe('widget renderer behavior', () => {
 
     changeInput(textarea, 'Hello from user');
     submitComposer(form);
-    await Promise.resolve();
+    await flushAsyncWork();
 
     expect(__getLastController()?.sendCalls).toHaveLength(1);
     expect(transcript.textContent).not.toContain('Hello from user');
@@ -64,7 +64,7 @@ describe('widget renderer behavior', () => {
 
     changeInput(textarea, 'Question');
     submitComposer(form);
-    await Promise.resolve();
+    await flushAsyncWork();
 
     expect(sendButton.disabled).toBe(true);
     expect(attachButton.disabled).toBe(true);
@@ -329,7 +329,7 @@ describe('widget renderer behavior', () => {
     }));
 
     expect(shadow.querySelector('[data-testid="message-bubble"]')).toBeNull();
-    expect(transcript.textContent).toContain('Start the conversation when you are ready.');
+    expect(transcript.textContent).toContain('New chat');
   });
 
   it('renders actor header with name and avatar when meta.actor is present on assistant message', () => {
@@ -566,7 +566,7 @@ describe('widget renderer behavior', () => {
 
     changeInput(textarea, 'Close later');
     submitComposer(form);
-    await Promise.resolve();
+    await flushAsyncWork();
 
     expect(sendButton.disabled).toBe(true);
 

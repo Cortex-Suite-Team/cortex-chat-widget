@@ -1,14 +1,19 @@
-import { createChatController, type ChatState } from '@cortex-suite/sdk-ui';
+import { createChatController, type ChatController, type ChatState } from '@cortex-suite/sdk-ui';
 import { createWidgetError, toWidgetError } from './errors.js';
+import { createHistoryClient } from './history-client.js';
+import { createHistoryDom } from './history-dom.js';
+import { renderHistoryList } from './history-renderer.js';
 import {
   getMessageFlags,
   isTerminalSessionState,
 } from './message-flags.js';
 import { renderWidget } from './renderer.js';
 import type {
+  ChatMessageViewModel,
   CortexChatWidgetHandle,
   CortexChatWidgetOptions,
   CortexChatWidgetState,
+  HistoryConversationSummary,
   InternalWidgetState,
   NormalizedWidgetOptions,
   WidgetClientLike,
@@ -32,6 +37,20 @@ const EMPTY_CHAT_STATE: ChatState = {
   workerState: { state: 'idle' },
 };
 
+function cloneChatState(state: ChatState): ChatState {
+  return {
+    connection: { ...state.connection },
+    transcript: [...state.transcript],
+    input: { ...state.input },
+    escalation: state.escalation ? { ...state.escalation } : null,
+    lastError: state.lastError ? { ...state.lastError } : null,
+    activeQuestion: state.activeQuestion
+      ? { ...state.activeQuestion, options: [...state.activeQuestion.options] }
+      : null,
+    workerState: { ...state.workerState },
+  };
+}
+
 function clonePublicState(
   options: NormalizedWidgetOptions,
   internal: InternalWidgetState,
@@ -42,8 +61,9 @@ function clonePublicState(
     isOpen: options.mode === 'embedded' ? true : internal.isOpen,
     isReady: internal.isReady,
     isDestroyed: internal.isDestroyed,
-    isAwaitingAnswer: internal.isAwaitingAnswer,
-    isTyping: internal.isTyping,
+    isAwaitingAnswer: internal.viewMode === 'historical' ? false : internal.isAwaitingAnswer,
+    isTyping: internal.viewMode === 'historical' ? false : internal.isTyping,
+    isHistoricalView: internal.viewMode === 'historical',
     selectedFile: internal.selectedFile ? { ...internal.selectedFile } : null,
     chat: chatState,
     error: internal.error ? { ...internal.error } : null,
@@ -75,17 +95,31 @@ function resolveRuntimeError(
 
 export function createWidgetHandle(args: {
   options: NormalizedWidgetOptions;
-  client: WidgetClientLike;
   dom: WidgetDom;
   mountTarget: HTMLElement;
+  historyTarget?: HTMLElement;
+  createClient: () => WidgetClientLike;
 }): CortexChatWidgetHandle {
-  const { options, client, dom, mountTarget } = args;
-  const controller = createChatController({
+  const { options, dom, mountTarget, historyTarget, createClient } = args;
+  const historyDom = options.mode === 'embedded' && historyTarget ? createHistoryDom() : null;
+  const historyClient = historyDom && options.controlPlaneUrl
+    ? createHistoryClient({ controlPlaneUrl: options.controlPlaneUrl, apiKey: options.apiKey })
+    : null;
+
+  let client = createClient();
+  let controller: ChatController = createChatController({
     client,
     mode: 'end_user',
   });
+  let liveChatState = controller.getState();
+  let historicalTranscript: ChatMessageViewModel[] = [];
+  let selectedHistorySessionId: string | null = null;
+  let historyMenuSessionId: string | null = null;
+  let historyItems: HistoryConversationSummary[] = [];
+  let historyState: 'disabled' | 'loading' | 'loaded' | 'empty' | 'error' = historyClient ? 'loading' : 'disabled';
+  let historyErrorMessage = '';
+  let liveConnected = false;
 
-  let chatState = controller.getState();
   const internal: InternalWidgetState = {
     isOpen: options.mode === 'embedded' ? true : options.initialOpen,
     isReady: false,
@@ -100,14 +134,41 @@ export function createWidgetHandle(args: {
     cachedUploadedFile: null,
     draftText: '',
     error: null,
+    viewMode: 'draft',
   };
 
   const domCleanup = new Set<() => void>();
   let unsubscribeController: (() => void) | null = null;
   let unsubscribeRawMessages: (() => void) | null = null;
 
+  function draftHasLiveData(state: ChatState): boolean {
+    return state.transcript.length > 0
+      || state.activeQuestion !== null
+      || state.escalation !== null
+      || state.lastError !== null
+      || state.workerState.state !== 'idle'
+      || state.connection.isConnected
+      || state.connection.isStale
+      || state.connection.sessionState !== EMPTY_CHAT_STATE.connection.sessionState
+      || state.connection.channelState !== EMPTY_CHAT_STATE.connection.channelState;
+  }
+
+  function getDisplayedChatState(): ChatState {
+    if (internal.viewMode === 'historical') {
+      return {
+        ...cloneChatState(EMPTY_CHAT_STATE),
+        transcript: [...historicalTranscript],
+        input: { locked: true, reason: 'historical_read_only' },
+      };
+    }
+    if (internal.viewMode === 'draft' && !draftHasLiveData(liveChatState)) {
+      return cloneChatState(EMPTY_CHAT_STATE);
+    }
+    return cloneChatState(liveChatState);
+  }
+
   function getPublicState(): CortexChatWidgetState {
-    return clonePublicState(options, internal, chatState);
+    return clonePublicState(options, internal, getDisplayedChatState());
   }
 
   function syncTextareaValue() {
@@ -116,11 +177,117 @@ export function createWidgetHandle(args: {
     }
   }
 
+  function renderHistory() {
+    if (!historyDom) {
+      return;
+    }
+    if (historyState === 'loading') {
+      renderHistoryList(historyDom, { kind: 'loading' });
+      return;
+    }
+    if (historyState === 'error') {
+      renderHistoryList(historyDom, { kind: 'error', message: historyErrorMessage || 'Unable to load chats.' });
+      return;
+    }
+    if (historyState === 'empty') {
+      renderHistoryList(historyDom, { kind: 'empty' });
+      return;
+    }
+    renderHistoryList(historyDom, {
+      kind: 'loaded',
+      items: historyItems,
+      selectedSessionId: selectedHistorySessionId,
+      menuSessionId: historyMenuSessionId,
+      draftSelected: internal.viewMode === 'draft',
+    });
+  }
+
   function notifyAndRender() {
     syncTextareaValue();
     const state = getPublicState();
     renderWidget(dom, state, options, internal.attachmentsAvailable, internal.isUploading);
+    renderHistory();
     options.onStateChange?.(state);
+  }
+
+  function bindControllerListeners() {
+    unsubscribeController = controller.subscribe((nextState: ChatState) => {
+      liveChatState = nextState;
+      if (nextState.lastError) {
+        internal.error = null;
+        internal.isAwaitingAnswer = false;
+        internal.isTyping = false;
+        internal.isUploading = false;
+      }
+      if (isTerminalSessionState(nextState.connection.sessionState)) {
+        internal.isAwaitingAnswer = false;
+        internal.isTyping = false;
+        internal.isUploading = false;
+      }
+      if (internal.viewMode !== 'historical') {
+        notifyAndRender();
+      }
+    });
+
+    unsubscribeRawMessages = client.onMessage((message) => {
+      const flags = getMessageFlags(message);
+      if (flags.startTyping) {
+        internal.isTyping = true;
+      }
+      if (flags.stopTyping) {
+        internal.isTyping = false;
+      }
+      if (flags.finalAnswer) {
+        internal.isAwaitingAnswer = false;
+        internal.isTyping = false;
+        internal.isUploading = false;
+        internal.error = null;
+      }
+      if (flags.isQuestion) {
+        internal.isAwaitingAnswer = false;
+        internal.isTyping = false;
+      }
+      if (internal.viewMode !== 'historical') {
+        notifyAndRender();
+      }
+    });
+  }
+
+  function teardownLiveListeners() {
+    if (unsubscribeController) {
+      unsubscribeController();
+      unsubscribeController = null;
+    }
+    if (unsubscribeRawMessages) {
+      unsubscribeRawMessages();
+      unsubscribeRawMessages = null;
+    }
+  }
+
+  async function resetLiveSession() {
+    teardownLiveListeners();
+    try {
+      await controller.disconnect();
+    } catch {}
+    controller.destroy();
+
+    client = options.client ?? createClient();
+    controller = createChatController({
+      client,
+      mode: 'end_user',
+    });
+    liveChatState = controller.getState();
+    internal.attachmentsAvailable = typeof client.uploadAttachment === 'function' || typeof client.uploadFile === 'function';
+    liveConnected = false;
+    bindControllerListeners();
+  }
+
+  async function ensureConnected(): Promise<void> {
+    if (liveConnected) {
+      return;
+    }
+    await controller.connect();
+    liveConnected = true;
   }
 
   function setSelectedFile(file: File | null) {
@@ -142,6 +309,13 @@ export function createWidgetHandle(args: {
   function clearSelectedFile() {
     setSelectedFile(null);
     dom.fileInput.value = '';
+  }
+
+  function clearDraftComposer() {
+    internal.draftText = '';
+    clearSelectedFile();
+    internal.cachedUploadedAttachmentId = null;
+    internal.cachedUploadedFile = null;
   }
 
   async function uploadSelectedFile(): Promise<string | null> {
@@ -183,18 +357,41 @@ export function createWidgetHandle(args: {
     }
   }
 
+  async function refreshHistory() {
+    if (!historyClient) {
+      return;
+    }
+    historyState = 'loading';
+    historyErrorMessage = '';
+    notifyAndRender();
+    try {
+      historyItems = await historyClient.listConversations();
+      historyState = historyItems.length === 0 ? 'empty' : 'loaded';
+      if (selectedHistorySessionId && !historyItems.some((item) => item.session_id === selectedHistorySessionId)) {
+        selectedHistorySessionId = null;
+        historicalTranscript = [];
+        internal.viewMode = 'draft';
+        clearDraftComposer();
+      }
+    } catch (error) {
+      historyState = 'error';
+      historyErrorMessage = error instanceof Error ? error.message : 'Unable to load chats.';
+    }
+    notifyAndRender();
+  }
+
   async function handleSend() {
-    if (internal.isDestroyed) {
+    if (internal.isDestroyed || internal.viewMode === 'historical') {
       return;
     }
 
     const content = internal.draftText.trim();
     const hasContent = content.length > 0;
     const hasFile = internal.selectedFileValue !== null;
-    const inputLocked = chatState.input.locked;
+    const displayedChatState = getDisplayedChatState();
+    const inputLocked = displayedChatState.input.locked;
 
-    const activeQuestion = chatState.activeQuestion;
-    // Block free-text when question is active but allow_reply=false
+    const activeQuestion = liveChatState.activeQuestion;
     if (activeQuestion && !activeQuestion.allow_reply) {
       return;
     }
@@ -212,12 +409,12 @@ export function createWidgetHandle(args: {
       }
     }
 
-    // Build question meta for custom reply
     const questionMeta = activeQuestion
       ? { question_id: activeQuestion.question_id, selected_option: 'reply' }
       : undefined;
 
     try {
+      await ensureConnected();
       const result = await controller.sendMessage({
         content: [content],
         attachments: attachmentId ? [attachmentId] : undefined,
@@ -232,13 +429,14 @@ export function createWidgetHandle(args: {
         return;
       }
 
-      internal.draftText = '';
-      clearSelectedFile();
-      internal.cachedUploadedAttachmentId = null;
-      internal.cachedUploadedFile = null;
+      internal.viewMode = 'live';
+      selectedHistorySessionId = null;
+      historicalTranscript = [];
+      clearDraftComposer();
       internal.error = null;
       internal.isAwaitingAnswer = true;
       notifyAndRender();
+      void refreshHistory();
     } catch (error) {
       resolveRuntimeError(error, options, internal);
       notifyAndRender();
@@ -246,10 +444,11 @@ export function createWidgetHandle(args: {
   }
 
   async function handleOptionSelect(questionId: string, optionId: string, optionLabel: string) {
-    if (internal.isDestroyed || internal.isAwaitingAnswer) {
+    if (internal.isDestroyed || internal.isAwaitingAnswer || internal.viewMode === 'historical') {
       return;
     }
     try {
+      await ensureConnected();
       const result = await controller.sendMessage({
         content: [optionLabel],
         meta: { question_id: questionId, selected_option: optionId },
@@ -262,12 +461,51 @@ export function createWidgetHandle(args: {
         return;
       }
 
-      internal.draftText = '';
+      internal.viewMode = 'live';
+      selectedHistorySessionId = null;
+      historicalTranscript = [];
+      clearDraftComposer();
       internal.error = null;
       internal.isAwaitingAnswer = true;
       notifyAndRender();
+      void refreshHistory();
     } catch (error) {
       resolveRuntimeError(error, options, internal);
+      notifyAndRender();
+    }
+  }
+
+  async function selectDraftMode() {
+    selectedHistorySessionId = null;
+    historicalTranscript = [];
+    historyMenuSessionId = null;
+    internal.viewMode = 'draft';
+    clearDraftComposer();
+    internal.error = null;
+    internal.isAwaitingAnswer = false;
+    internal.isTyping = false;
+    await resetLiveSession();
+    notifyAndRender();
+  }
+
+  async function selectHistoricalConversation(sessionId: string) {
+    if (!historyClient) {
+      return;
+    }
+    internal.error = null;
+    historyMenuSessionId = null;
+    notifyAndRender();
+    try {
+      historicalTranscript = await historyClient.getMessages(sessionId);
+      selectedHistorySessionId = sessionId;
+      internal.viewMode = 'historical';
+      internal.isAwaitingAnswer = false;
+      internal.isTyping = false;
+      clearDraftComposer();
+      clearSelectedFile();
+      notifyAndRender();
+    } catch (error) {
+      internal.error = toWidgetError(error, 'history_load_failed', 'History messages could not be loaded');
       notifyAndRender();
     }
   }
@@ -280,57 +518,19 @@ export function createWidgetHandle(args: {
     notifyAndRender();
   }
 
-  function teardown() {
-    if (unsubscribeController) {
-      unsubscribeController();
-      unsubscribeController = null;
-    }
-    if (unsubscribeRawMessages) {
-      unsubscribeRawMessages();
-      unsubscribeRawMessages = null;
-    }
+  async function teardown() {
+    teardownLiveListeners();
     for (const dispose of Array.from(domCleanup)) {
       dispose();
       domCleanup.delete(dispose);
     }
+    controller.destroy();
+    try {
+      await controller.disconnect();
+    } catch {}
   }
 
-  unsubscribeController = controller.subscribe((nextState: ChatState) => {
-    chatState = nextState;
-    if (nextState.lastError) {
-      internal.error = null;
-      internal.isAwaitingAnswer = false;
-      internal.isTyping = false;
-      internal.isUploading = false;
-    }
-    if (isTerminalSessionState(nextState.connection.sessionState)) {
-      internal.isAwaitingAnswer = false;
-      internal.isTyping = false;
-      internal.isUploading = false;
-    }
-    notifyAndRender();
-  });
-
-  unsubscribeRawMessages = client.onMessage((message) => {
-    const flags = getMessageFlags(message);
-    if (flags.startTyping) {
-      internal.isTyping = true;
-    }
-    if (flags.stopTyping) {
-      internal.isTyping = false;
-    }
-    if (flags.finalAnswer) {
-      internal.isAwaitingAnswer = false;
-      internal.isTyping = false;
-      internal.isUploading = false;
-      internal.error = null;
-    }
-    if (flags.isQuestion) {
-      internal.isAwaitingAnswer = false;
-      internal.isTyping = false;
-    }
-    notifyAndRender();
-  });
+  bindControllerListeners();
 
   const onTextareaInput = () => {
     internal.draftText = dom.textarea.value;
@@ -350,7 +550,7 @@ export function createWidgetHandle(args: {
   };
 
   const onAttachClick = () => {
-    if (!internal.attachmentsAvailable || internal.isUploading || internal.isAwaitingAnswer || chatState.input.locked) {
+    if (!internal.attachmentsAvailable || internal.isUploading || internal.isAwaitingAnswer || getDisplayedChatState().input.locked) {
       return;
     }
     dom.fileInput.click();
@@ -406,6 +606,75 @@ export function createWidgetHandle(args: {
     }
   };
 
+  const onHistoryClick = (event: MouseEvent) => {
+    const target = event.target as Element;
+    const draftRow = target.closest('[data-draft="true"]') as HTMLButtonElement | null;
+    if (draftRow) {
+      event.preventDefault();
+      void selectDraftMode();
+      return;
+    }
+
+    const actionButton = target.closest('.cortex-widget-history__menu-action') as HTMLButtonElement | null;
+    if (actionButton && historyClient) {
+      event.preventDefault();
+      event.stopPropagation();
+      const sessionId = actionButton.dataset.sessionId ?? '';
+      const action = actionButton.dataset.action ?? '';
+      historyMenuSessionId = null;
+      if (action === 'rename') {
+        const current = historyItems.find((item) => item.session_id === sessionId);
+        const nextTitle = window.prompt('Rename chat', current?.title ?? '');
+        if (typeof nextTitle === 'string' && nextTitle.trim()) {
+          void historyClient.renameConversation(sessionId, nextTitle.trim())
+            .then(() => refreshHistory())
+            .catch((error) => {
+              internal.error = toWidgetError(error, 'history_rename_failed', 'Chat rename failed');
+              notifyAndRender();
+            });
+        }
+      } else if (action === 'delete') {
+        void historyClient.deleteConversation(sessionId)
+          .then(async () => {
+            if (selectedHistorySessionId === sessionId) {
+              await selectDraftMode();
+            }
+            await refreshHistory();
+          })
+          .catch((error) => {
+            internal.error = toWidgetError(error, 'history_delete_failed', 'Chat delete failed');
+            notifyAndRender();
+          });
+      } else if (action === 'pin') {
+        const current = historyItems.find((item) => item.session_id === sessionId);
+        const task = current?.pinned
+          ? historyClient.unpinConversation(sessionId)
+          : historyClient.pinConversation(sessionId);
+        void task.then(() => refreshHistory()).catch((error) => {
+          internal.error = toWidgetError(error, 'history_pin_failed', 'Chat update failed');
+          notifyAndRender();
+        });
+      }
+      notifyAndRender();
+      return;
+    }
+
+    const toggleButton = target.closest('.cortex-widget-history__menu-toggle') as HTMLButtonElement | null;
+    if (toggleButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const sessionId = toggleButton.dataset.sessionId ?? null;
+      historyMenuSessionId = historyMenuSessionId === sessionId ? null : sessionId;
+      notifyAndRender();
+      return;
+    }
+
+    const row = target.closest('.cortex-widget-history__row') as HTMLButtonElement | null;
+    if (row?.dataset.sessionId) {
+      void selectHistoricalConversation(row.dataset.sessionId);
+    }
+  };
+
   dom.textarea.addEventListener('input', onTextareaInput);
   dom.textarea.addEventListener('keydown', onTextareaKeyDown);
   dom.composer.addEventListener('submit', onComposerSubmit);
@@ -425,14 +694,24 @@ export function createWidgetHandle(args: {
   domCleanup.add(() => dom.transcript.removeEventListener('click', onTranscriptClick));
 
   mountTarget.appendChild(dom.host);
+  if (historyDom && historyTarget) {
+    historyTarget.appendChild(historyDom.host);
+    const onNewChatClick = () => {
+      void selectDraftMode();
+    };
+    historyDom.newChatButton.addEventListener('click', onNewChatClick);
+    historyDom.list.addEventListener('click', onHistoryClick);
+    domCleanup.add(() => historyDom.newChatButton.removeEventListener('click', onNewChatClick));
+    domCleanup.add(() => historyDom.list.removeEventListener('click', onHistoryClick));
+  }
+
   internal.isReady = true;
   notifyAndRender();
   options.onReady?.();
 
-  void controller.connect().catch((error: unknown) => {
-    resolveRuntimeError(error, options, internal);
-    notifyAndRender();
-  });
+  if (historyClient) {
+    void refreshHistory();
+  }
 
   return {
     destroy() {
@@ -445,13 +724,9 @@ export function createWidgetHandle(args: {
       internal.isTyping = false;
       internal.isUploading = false;
 
-      teardown();
+      void teardown();
       dom.host.remove();
-
-      void controller.disconnect().catch((error: unknown) => {
-        resolveRuntimeError(error, options, internal);
-      });
-      controller.destroy();
+      historyDom?.host.remove();
     },
 
     open() {

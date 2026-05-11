@@ -34,16 +34,28 @@ export interface CortexChatWidgetState {
   isDestroyed: boolean;
   isAwaitingAnswer: boolean;
   isTyping: boolean;
+  isHistoricalView: boolean;
   selectedFile: SelectedFileState | null;
   chat: ChatState;
   error: CortexChatWidgetError | null;
+}
+
+export interface HistoryConversationSummary {
+  session_id: string;
+  title: string;
+  renamed: boolean;
+  pinned: boolean;
+  last_message_at: string | null;
+  created_at: string | null;
 }
 
 export interface CortexChatWidgetOptions {
   apiKey: string;
   mode?: 'embedded' | 'floating';
   target?: string | HTMLElement;
+  historyTarget?: string | HTMLElement;
   authUrl?: string;
+  controlPlaneUrl?: string;
   title?: string;
   subtitle?: string;
   placeholder?: string;
@@ -110,6 +122,7 @@ export interface InternalWidgetState {
   cachedUploadedFile: File | null;
   draftText: string;
   error: CortexChatWidgetError | null;
+  viewMode: 'draft' | 'live' | 'historical';
 }
 
 export interface WidgetDom {
@@ -137,6 +150,16 @@ export interface WidgetDom {
   fileChipRemove: HTMLButtonElement;
 }
 
+export interface HistoryDom {
+  host: HTMLElement;
+  shadowRoot: ShadowRoot;
+  root: HTMLElement;
+  status: HTMLElement;
+  searchPlaceholder: HTMLElement;
+  newChatButton: HTMLButtonElement;
+  list: HTMLElement;
+}
+
 export interface WidgetInstance {
   handle: CortexChatWidgetHandle;
 }
@@ -158,6 +181,7 @@ export interface MessageFlags {
 export interface MountTargetResolution {
   mountTarget: HTMLElement;
   targetElement?: HTMLElement;
+  historyTarget?: HTMLElement;
 }
 
 export interface TranscriptRenderMessage {
