@@ -59,6 +59,30 @@ function isDarkColor(value: string | undefined, fallbackDark: boolean): boolean 
   return luminance < 0.45;
 }
 
+export function applyResolvedTheme(
+  host: HTMLElement,
+  root: HTMLElement,
+  theme: NormalizedWidgetOptions['theme'] | undefined,
+  variantClasses: { light: string; dark: string },
+): boolean {
+  const accentColor = theme?.accentColor ?? '#2563eb';
+  const backgroundColor = theme?.backgroundColor ?? '#ffffff';
+  const textColor = theme?.textColor ?? '#172033';
+  const borderRadius = theme?.borderRadius ?? '18px';
+  const darkTheme = isDarkColor(backgroundColor, false);
+
+  host.style.setProperty('--cortex-accent-color', accentColor);
+  host.style.setProperty('--cortex-background-color', backgroundColor);
+  host.style.setProperty('--cortex-text-color', textColor);
+  host.style.setProperty('--cortex-border-radius', borderRadius);
+  host.style.setProperty('color-scheme', darkTheme ? 'dark' : 'light');
+
+  root.classList.toggle(variantClasses.dark, darkTheme);
+  root.classList.toggle(variantClasses.light, !darkTheme);
+
+  return darkTheme;
+}
+
 function formatFileSize(size: number): string {
   if (size < 1024) {
     return `${size} B`;
@@ -397,19 +421,10 @@ export function renderWidget(
   attachmentsAvailable: boolean,
   isUploading: boolean,
 ): void {
-  const accentColor = options.theme?.accentColor ?? '#2563eb';
-  const backgroundColor = options.theme?.backgroundColor ?? '#ffffff';
-  const textColor = options.theme?.textColor ?? '#172033';
-  const borderRadius = options.theme?.borderRadius ?? '18px';
-  const darkTheme = isDarkColor(backgroundColor, false) || (isDarkColor(textColor, false) && !options.theme?.backgroundColor);
-
-  dom.host.style.setProperty('--cortex-accent-color', accentColor);
-  dom.host.style.setProperty('--cortex-background-color', backgroundColor);
-  dom.host.style.setProperty('--cortex-text-color', textColor);
-  dom.host.style.setProperty('--cortex-border-radius', borderRadius);
-  dom.host.style.setProperty('color-scheme', darkTheme ? 'dark' : 'light');
-  dom.root.classList.toggle('cortex-widget--dark', darkTheme);
-  dom.root.classList.toggle('cortex-widget--light', !darkTheme);
+  applyResolvedTheme(dom.host, dom.root, options.theme, {
+    dark: 'cortex-widget--dark',
+    light: 'cortex-widget--light',
+  });
 
   dom.title.textContent = options.title;
   dom.subtitle.textContent = options.subtitle;

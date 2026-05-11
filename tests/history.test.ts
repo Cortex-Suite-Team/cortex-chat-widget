@@ -251,4 +251,36 @@ describe('widget history', () => {
 
     expect(historyShadow.textContent).toContain('No chats yet');
   });
+
+  it('syncs dark theme classes to history shadow root when theme background is dark', async () => {
+    installTargets();
+    getFetchMock().mockResolvedValueOnce(mockJsonResponse({
+      ok: true,
+      data: {
+        conversations: [],
+      },
+    }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+      theme: {
+        backgroundColor: '#111827',
+        textColor: '#f8fafc',
+      },
+    });
+
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const historyRoot = historyShadow.querySelector('.cortex-widget-history') as HTMLElement;
+    const historyHost = document.querySelector('#history > *') as HTMLElement;
+
+    expect(historyRoot.classList.contains('cortex-widget-history--dark')).toBe(true);
+    expect(historyRoot.classList.contains('cortex-widget-history--light')).toBe(false);
+    expect(historyHost.style.getPropertyValue('--cortex-background-color')).toBe('#111827');
+  });
 });

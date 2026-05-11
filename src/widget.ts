@@ -7,7 +7,7 @@ import {
   getMessageFlags,
   isTerminalSessionState,
 } from './message-flags.js';
-import { renderWidget } from './renderer.js';
+import { applyResolvedTheme, renderWidget } from './renderer.js';
 import type {
   ChatMessageViewModel,
   CortexChatWidgetHandle,
@@ -206,6 +206,12 @@ export function createWidgetHandle(args: {
     syncTextareaValue();
     const state = getPublicState();
     renderWidget(dom, state, options, internal.attachmentsAvailable, internal.isUploading);
+    if (historyDom) {
+      applyResolvedTheme(historyDom.host, historyDom.root, options.theme, {
+        dark: 'cortex-widget-history--dark',
+        light: 'cortex-widget-history--light',
+      });
+    }
     renderHistory();
     options.onStateChange?.(state);
   }
