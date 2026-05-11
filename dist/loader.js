@@ -1055,7 +1055,9 @@
     "paperclip": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z"/></svg>`,
     "send-fill": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.964.686a.5.5 0 0 0-.65-.65L.767 5.855H.766l-.452.18a.5.5 0 0 0-.082.887l.41.26.001.002 4.995 3.178 3.178 4.995.002.002.26.41a.5.5 0 0 0 .886-.083zm-1.833 1.89L6.637 10.07l-.215-.338a.5.5 0 0 0-.154-.154l-.338-.215 7.494-7.494 1.178-.471z"/></svg>`,
     "reply-fill": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.921 11.9 1.353 8.62a.719.719 0 0 1 0-1.238L5.921 4.1A.716.716 0 0 1 7 4.719V6c1.5 0 6 0 7 8-2.5-4.5-7-4-7-4v1.281c0 .56-.606.898-1.079.62z"/></svg>`,
-    "arrow-clockwise": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>`
+    "arrow-clockwise": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>`,
+    "plus-lg": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 2.5a.5.5 0 0 1 .5.5v4.5H13a.5.5 0 0 1 0 1H8.5V13a.5.5 0 0 1-1 0V8.5H3a.5.5 0 0 1 0-1h4.5V3a.5.5 0 0 1 .5-.5"/></svg>`,
+    "three-dots": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M3 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3m5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3m5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/></svg>`
   };
   function getIconSvg(name) {
     return ICONS[name];
@@ -1649,6 +1651,182 @@
   width: 12px;
   height: 12px;
   pointer-events: none;
+}
+
+.cortex-widget-history {
+  --cortex-accent-color: #2563eb;
+  --cortex-background-color: #ffffff;
+  --cortex-text-color: #172033;
+  color: var(--cortex-text-color);
+  font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.4;
+}
+
+.cortex-widget-history,
+.cortex-widget-history *,
+.cortex-widget-history *::before,
+.cortex-widget-history *::after {
+  box-sizing: border-box;
+}
+
+.cortex-widget-history__panel {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 40%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), var(--cortex-background-color));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  padding: 16px;
+}
+
+.cortex-widget-history__header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cortex-widget-history__status {
+  min-height: 18px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.cortex-widget-history__search {
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.cortex-widget-history__new-chat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--cortex-accent-color), #1d4ed8);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.cortex-widget-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cortex-widget-history__empty,
+.cortex-widget-history__error {
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.cortex-widget-history__empty {
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.cortex-widget-history__error {
+  color: #9f1239;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+}
+
+.cortex-widget-history__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 44px 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--cortex-text-color);
+  cursor: pointer;
+  text-align: left;
+}
+
+.cortex-widget-history__row[data-active="true"] {
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.cortex-widget-history__row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cortex-widget-history__menu-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cortex-widget-history__row:hover .cortex-widget-history__menu-toggle,
+.cortex-widget-history__row[data-menu-open="true"] .cortex-widget-history__menu-toggle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cortex-widget-history__menu {
+  position: absolute;
+  right: 8px;
+  top: calc(100% + 4px);
+  min-width: 132px;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
+  z-index: 3;
+}
+
+.cortex-widget-history__row[data-menu-open="true"] .cortex-widget-history__menu {
+  display: flex;
+}
+
+.cortex-widget-history__menu-action {
+  border: 0;
+  background: transparent;
+  color: var(--cortex-text-color);
+  font: inherit;
+  text-align: left;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.cortex-widget-history__menu-action:hover {
+  background: #eff6ff;
 }
 `;
 
@@ -2601,6 +2779,195 @@
     };
   }
 
+  // src/history-client.ts
+  async function requestJson(url, apiKey, init) {
+    const response = await fetch(url, {
+      ...init,
+      headers: {
+        Authorization: `ApiKey ${apiKey}`,
+        "Content-Type": "application/json",
+        ...init?.headers ?? {}
+      }
+    });
+    if (!response.ok && response.status !== 204) {
+      throw new Error(`History API request failed with HTTP ${response.status}`);
+    }
+    if (response.status === 204) {
+      return {};
+    }
+    return response.json();
+  }
+  function createHistoryClient(args) {
+    const baseUrl = args.controlPlaneUrl.replace(/\/+$/, "");
+    const apiKey = args.apiKey;
+    return {
+      async listConversations() {
+        const body = await requestJson(`${baseUrl}/api/chat/conversations/`, apiKey);
+        return body.data?.conversations ?? [];
+      },
+      async getMessages(sessionId) {
+        const body = await requestJson(
+          `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/messages/`,
+          apiKey
+        );
+        return (body.data?.messages ?? []).map((message) => ({
+          id: message.id,
+          type: message.type,
+          role: message.role,
+          content: message.content,
+          status: message.status,
+          ts: message.ts ?? null,
+          meta: message.meta ?? {}
+        }));
+      },
+      async renameConversation(sessionId, title) {
+        await requestJson(
+          `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/rename/`,
+          apiKey,
+          {
+            method: "POST",
+            body: JSON.stringify({ title })
+          }
+        );
+      },
+      async pinConversation(sessionId) {
+        await requestJson(
+          `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/pin/`,
+          apiKey,
+          { method: "POST" }
+        );
+      },
+      async unpinConversation(sessionId) {
+        await requestJson(
+          `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/unpin/`,
+          apiKey,
+          { method: "POST" }
+        );
+      },
+      async deleteConversation(sessionId) {
+        await requestJson(
+          `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/`,
+          apiKey,
+          { method: "DELETE" }
+        );
+      }
+    };
+  }
+
+  // src/history-dom.ts
+  function createElement2(tagName, className, textContent) {
+    const element = document.createElement(tagName);
+    if (className) {
+      element.className = className;
+    }
+    if (textContent !== void 0) {
+      element.textContent = textContent;
+    }
+    return element;
+  }
+  function createHistoryDom() {
+    const host = createElement2("div");
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    const style = createElement2("style");
+    style.textContent = widgetStyles;
+    const root = createElement2("section", "cortex-widget-history");
+    const panel = createElement2("div", "cortex-widget-history__panel");
+    const header = createElement2("div", "cortex-widget-history__header");
+    const status = createElement2("div", "cortex-widget-history__status", "");
+    const searchPlaceholder = createElement2("div", "cortex-widget-history__search", "Search coming soon");
+    const newChatButton = createElement2("button", "cortex-widget-history__new-chat");
+    newChatButton.type = "button";
+    newChatButton.innerHTML = `${getIconSvg("plus-lg")}<span>New Chat</span>`;
+    newChatButton.setAttribute("data-testid", "history-new-chat");
+    const list = createElement2("div", "cortex-widget-history__list");
+    list.setAttribute("data-testid", "history-list");
+    header.append(status, searchPlaceholder, newChatButton);
+    panel.append(header, list);
+    root.append(panel);
+    shadowRoot.append(style, root);
+    return {
+      host,
+      shadowRoot,
+      root,
+      status,
+      searchPlaceholder,
+      newChatButton,
+      list
+    };
+  }
+
+  // src/history-renderer.ts
+  function renderHistoryList(dom, state) {
+    dom.list.replaceChildren();
+    dom.status.textContent = state.kind === "loading" ? "Loading chats\u2026" : "";
+    if (state.kind === "loading") {
+      const empty = document.createElement("div");
+      empty.className = "cortex-widget-history__empty";
+      empty.textContent = "Loading chats\u2026";
+      dom.list.appendChild(empty);
+      return;
+    }
+    if (state.kind === "error") {
+      const error = document.createElement("div");
+      error.className = "cortex-widget-history__error";
+      error.textContent = state.message;
+      dom.list.appendChild(error);
+      return;
+    }
+    if (state.kind === "empty") {
+      const empty = document.createElement("div");
+      empty.className = "cortex-widget-history__empty";
+      empty.textContent = "No chats yet";
+      dom.list.appendChild(empty);
+      return;
+    }
+    const draftRow = document.createElement("button");
+    draftRow.type = "button";
+    draftRow.className = "cortex-widget-history__row";
+    draftRow.dataset.draft = "true";
+    draftRow.dataset.active = String(state.draftSelected);
+    draftRow.setAttribute("data-testid", "history-draft-row");
+    const draftTitle = document.createElement("span");
+    draftTitle.className = "cortex-widget-history__row-title";
+    draftTitle.textContent = "New chat";
+    draftRow.appendChild(draftTitle);
+    dom.list.appendChild(draftRow);
+    for (const item of state.items) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "cortex-widget-history__row";
+      row.dataset.sessionId = item.session_id;
+      row.dataset.active = String(state.selectedSessionId === item.session_id);
+      row.dataset.menuOpen = String(state.menuSessionId === item.session_id);
+      row.setAttribute("data-testid", "history-row");
+      const title = document.createElement("span");
+      title.className = "cortex-widget-history__row-title";
+      title.textContent = item.title;
+      title.setAttribute("data-testid", "history-row-title");
+      const menuToggle = document.createElement("button");
+      menuToggle.type = "button";
+      menuToggle.className = "cortex-widget-history__menu-toggle";
+      menuToggle.dataset.sessionId = item.session_id;
+      menuToggle.setAttribute("aria-label", "Conversation actions");
+      menuToggle.setAttribute("data-testid", "history-menu-toggle");
+      menuToggle.innerHTML = getIconSvg("three-dots");
+      const menu = document.createElement("div");
+      menu.className = "cortex-widget-history__menu";
+      menu.setAttribute("data-testid", "history-menu");
+      for (const action of ["Pin", "Rename", "Delete"]) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "cortex-widget-history__menu-action";
+        button.dataset.sessionId = item.session_id;
+        button.dataset.action = action.toLowerCase();
+        button.textContent = action;
+        menu.appendChild(button);
+      }
+      row.append(title, menuToggle, menu);
+      dom.list.appendChild(row);
+    }
+  }
+
   // src/message-flags.ts
   var TYPING_TYPES = /* @__PURE__ */ new Set(["chat::typing", "typing::start", "typing::stop"]);
   var TERMINAL_SESSION_STATES2 = /* @__PURE__ */ new Set([
@@ -2745,7 +3112,7 @@
     if (visibleMessages.length === 0) {
       const empty = document.createElement("div");
       empty.className = "cortex-widget__empty";
-      empty.textContent = "Start the conversation when you are ready.";
+      empty.textContent = state.isHistoricalView ? "No messages in this chat yet." : "New chat";
       transcriptEl.appendChild(empty);
       return;
     }
@@ -2940,7 +3307,7 @@
     if (transcriptEl.childElementCount === 0) {
       const empty = document.createElement("div");
       empty.className = "cortex-widget__empty";
-      empty.textContent = "Start the conversation when you are ready.";
+      empty.textContent = state.isHistoricalView ? "No messages in this chat yet." : "New chat";
       transcriptEl.appendChild(empty);
       return;
     }
@@ -2953,7 +3320,7 @@
     dom.host.style.setProperty("--cortex-border-radius", options.theme?.borderRadius ?? "18px");
     dom.title.textContent = options.title;
     dom.subtitle.textContent = options.subtitle;
-    dom.status.textContent = buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
+    dom.status.textContent = state.isHistoricalView ? "Viewing chat history" : buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
     const isPanelVisible = state.mode === "embedded" || state.isOpen;
     dom.panel.hidden = !isPanelVisible;
     dom.launcher.textContent = options.launcherLabel;
@@ -2982,9 +3349,12 @@
       dom.escalation.dataset.visible = "false";
       dom.escalation.textContent = "";
     }
-    dom.textarea.value = state.isDestroyed ? "" : dom.textarea.value;
+    if (state.isDestroyed) {
+      dom.textarea.value = "";
+    }
     const questionLocksInput = !!state.chat.activeQuestion && !state.chat.activeQuestion.allow_reply;
     dom.textarea.disabled = state.chat.input.locked || state.isAwaitingAnswer || isUploading || questionLocksInput;
+    dom.textarea.placeholder = state.isHistoricalView ? "History view is read-only" : options.placeholder;
     const canSend = !state.chat.input.locked && !state.isAwaitingAnswer && !isUploading && !questionLocksInput && (dom.textarea.value.trim().length > 0 || state.selectedFile !== null);
     dom.sendButton.disabled = !canSend;
     const isReplyMode = state.chat.activeQuestion !== null;
@@ -3010,14 +3380,42 @@
   }
 
   // src/widget.ts
+  var EMPTY_CHAT_STATE = {
+    connection: {
+      channelState: "CLOSED",
+      sessionState: "CREATED",
+      isConnected: false,
+      isStale: false
+    },
+    transcript: [],
+    input: {
+      locked: false
+    },
+    escalation: null,
+    lastError: null,
+    activeQuestion: null,
+    workerState: { state: "idle" }
+  };
+  function cloneChatState(state) {
+    return {
+      connection: { ...state.connection },
+      transcript: [...state.transcript],
+      input: { ...state.input },
+      escalation: state.escalation ? { ...state.escalation } : null,
+      lastError: state.lastError ? { ...state.lastError } : null,
+      activeQuestion: state.activeQuestion ? { ...state.activeQuestion, options: [...state.activeQuestion.options] } : null,
+      workerState: { ...state.workerState }
+    };
+  }
   function clonePublicState(options, internal, chatState) {
     return {
       mode: options.mode,
       isOpen: options.mode === "embedded" ? true : internal.isOpen,
       isReady: internal.isReady,
       isDestroyed: internal.isDestroyed,
-      isAwaitingAnswer: internal.isAwaitingAnswer,
-      isTyping: internal.isTyping,
+      isAwaitingAnswer: internal.viewMode === "historical" ? false : internal.isAwaitingAnswer,
+      isTyping: internal.viewMode === "historical" ? false : internal.isTyping,
+      isHistoricalView: internal.viewMode === "historical",
       selectedFile: internal.selectedFile ? { ...internal.selectedFile } : null,
       chat: chatState,
       error: internal.error ? { ...internal.error } : null
@@ -3037,12 +3435,22 @@
     options.onError?.(error);
   }
   function createWidgetHandle(args) {
-    const { options, client, dom, mountTarget } = args;
-    const controller = createChatController({
+    const { options, dom, mountTarget, historyTarget, createClient: createClient2 } = args;
+    const historyDom = options.mode === "embedded" && historyTarget ? createHistoryDom() : null;
+    const historyClient = historyDom && options.controlPlaneUrl ? createHistoryClient({ controlPlaneUrl: options.controlPlaneUrl, apiKey: options.apiKey }) : null;
+    let client = createClient2();
+    let controller = createChatController({
       client,
       mode: "end_user"
     });
-    let chatState = controller.getState();
+    let liveChatState = controller.getState();
+    let historicalTranscript = [];
+    let selectedHistorySessionId = null;
+    let historyMenuSessionId = null;
+    let historyItems = [];
+    let historyState = historyClient ? "loading" : "disabled";
+    let historyErrorMessage = "";
+    let liveConnected = false;
     const internal = {
       isOpen: options.mode === "embedded" ? true : options.initialOpen,
       isReady: false,
@@ -3056,24 +3464,141 @@
       cachedUploadedAttachmentId: null,
       cachedUploadedFile: null,
       draftText: "",
-      error: null
+      error: null,
+      viewMode: "draft"
     };
     const domCleanup = /* @__PURE__ */ new Set();
     let unsubscribeController = null;
     let unsubscribeRawMessages = null;
+    function draftHasLiveData(state) {
+      return state.transcript.length > 0 || state.activeQuestion !== null || state.escalation !== null || state.lastError !== null || state.workerState.state !== "idle" || state.connection.isConnected || state.connection.isStale || state.connection.sessionState !== EMPTY_CHAT_STATE.connection.sessionState || state.connection.channelState !== EMPTY_CHAT_STATE.connection.channelState;
+    }
+    function getDisplayedChatState() {
+      if (internal.viewMode === "historical") {
+        return {
+          ...cloneChatState(EMPTY_CHAT_STATE),
+          transcript: [...historicalTranscript],
+          input: { locked: true, reason: "historical_read_only" }
+        };
+      }
+      if (internal.viewMode === "draft" && !draftHasLiveData(liveChatState)) {
+        return cloneChatState(EMPTY_CHAT_STATE);
+      }
+      return cloneChatState(liveChatState);
+    }
     function getPublicState() {
-      return clonePublicState(options, internal, chatState);
+      return clonePublicState(options, internal, getDisplayedChatState());
     }
     function syncTextareaValue() {
       if (dom.textarea.value !== internal.draftText) {
         dom.textarea.value = internal.draftText;
       }
     }
+    function renderHistory() {
+      if (!historyDom) {
+        return;
+      }
+      if (historyState === "loading") {
+        renderHistoryList(historyDom, { kind: "loading" });
+        return;
+      }
+      if (historyState === "error") {
+        renderHistoryList(historyDom, { kind: "error", message: historyErrorMessage || "Unable to load chats." });
+        return;
+      }
+      if (historyState === "empty") {
+        renderHistoryList(historyDom, { kind: "empty" });
+        return;
+      }
+      renderHistoryList(historyDom, {
+        kind: "loaded",
+        items: historyItems,
+        selectedSessionId: selectedHistorySessionId,
+        menuSessionId: historyMenuSessionId,
+        draftSelected: internal.viewMode === "draft"
+      });
+    }
     function notifyAndRender() {
       syncTextareaValue();
       const state = getPublicState();
       renderWidget(dom, state, options, internal.attachmentsAvailable, internal.isUploading);
+      renderHistory();
       options.onStateChange?.(state);
+    }
+    function bindControllerListeners() {
+      unsubscribeController = controller.subscribe((nextState) => {
+        liveChatState = nextState;
+        if (nextState.lastError) {
+          internal.error = null;
+          internal.isAwaitingAnswer = false;
+          internal.isTyping = false;
+          internal.isUploading = false;
+        }
+        if (isTerminalSessionState(nextState.connection.sessionState)) {
+          internal.isAwaitingAnswer = false;
+          internal.isTyping = false;
+          internal.isUploading = false;
+        }
+        if (internal.viewMode !== "historical") {
+          notifyAndRender();
+        }
+      });
+      unsubscribeRawMessages = client.onMessage((message) => {
+        const flags = getMessageFlags(message);
+        if (flags.startTyping) {
+          internal.isTyping = true;
+        }
+        if (flags.stopTyping) {
+          internal.isTyping = false;
+        }
+        if (flags.finalAnswer) {
+          internal.isAwaitingAnswer = false;
+          internal.isTyping = false;
+          internal.isUploading = false;
+          internal.error = null;
+        }
+        if (flags.isQuestion) {
+          internal.isAwaitingAnswer = false;
+          internal.isTyping = false;
+        }
+        if (internal.viewMode !== "historical") {
+          notifyAndRender();
+        }
+      });
+    }
+    function teardownLiveListeners() {
+      if (unsubscribeController) {
+        unsubscribeController();
+        unsubscribeController = null;
+      }
+      if (unsubscribeRawMessages) {
+        unsubscribeRawMessages();
+        unsubscribeRawMessages = null;
+      }
+    }
+    async function resetLiveSession() {
+      teardownLiveListeners();
+      try {
+        await controller.disconnect();
+      } catch {
+      }
+      controller.destroy();
+      client = options.client ?? createClient2();
+      controller = createChatController({
+        client,
+        mode: "end_user"
+      });
+      liveChatState = controller.getState();
+      internal.attachmentsAvailable = typeof client.uploadAttachment === "function" || typeof client.uploadFile === "function";
+      liveConnected = false;
+      bindControllerListeners();
+    }
+    async function ensureConnected() {
+      if (liveConnected) {
+        return;
+      }
+      await controller.connect();
+      liveConnected = true;
     }
     function setSelectedFile(file) {
       internal.selectedFileValue = file;
@@ -3090,6 +3615,12 @@
     function clearSelectedFile() {
       setSelectedFile(null);
       dom.fileInput.value = "";
+    }
+    function clearDraftComposer() {
+      internal.draftText = "";
+      clearSelectedFile();
+      internal.cachedUploadedAttachmentId = null;
+      internal.cachedUploadedFile = null;
     }
     async function uploadSelectedFile() {
       const file = internal.selectedFileValue;
@@ -3125,15 +3656,38 @@
         return null;
       }
     }
+    async function refreshHistory() {
+      if (!historyClient) {
+        return;
+      }
+      historyState = "loading";
+      historyErrorMessage = "";
+      notifyAndRender();
+      try {
+        historyItems = await historyClient.listConversations();
+        historyState = historyItems.length === 0 ? "empty" : "loaded";
+        if (selectedHistorySessionId && !historyItems.some((item) => item.session_id === selectedHistorySessionId)) {
+          selectedHistorySessionId = null;
+          historicalTranscript = [];
+          internal.viewMode = "draft";
+          clearDraftComposer();
+        }
+      } catch (error) {
+        historyState = "error";
+        historyErrorMessage = error instanceof Error ? error.message : "Unable to load chats.";
+      }
+      notifyAndRender();
+    }
     async function handleSend() {
-      if (internal.isDestroyed) {
+      if (internal.isDestroyed || internal.viewMode === "historical") {
         return;
       }
       const content = internal.draftText.trim();
       const hasContent = content.length > 0;
       const hasFile = internal.selectedFileValue !== null;
-      const inputLocked = chatState.input.locked;
-      const activeQuestion = chatState.activeQuestion;
+      const displayedChatState = getDisplayedChatState();
+      const inputLocked = displayedChatState.input.locked;
+      const activeQuestion = liveChatState.activeQuestion;
       if (activeQuestion && !activeQuestion.allow_reply) {
         return;
       }
@@ -3150,6 +3704,7 @@
       }
       const questionMeta = activeQuestion ? { question_id: activeQuestion.question_id, selected_option: "reply" } : void 0;
       try {
+        await ensureConnected();
         const result = await controller.sendMessage({
           content: [content],
           attachments: attachmentId ? [attachmentId] : void 0,
@@ -3162,23 +3717,25 @@
           notifyAndRender();
           return;
         }
-        internal.draftText = "";
-        clearSelectedFile();
-        internal.cachedUploadedAttachmentId = null;
-        internal.cachedUploadedFile = null;
+        internal.viewMode = "live";
+        selectedHistorySessionId = null;
+        historicalTranscript = [];
+        clearDraftComposer();
         internal.error = null;
         internal.isAwaitingAnswer = true;
         notifyAndRender();
+        void refreshHistory();
       } catch (error) {
         resolveRuntimeError(error, options, internal);
         notifyAndRender();
       }
     }
     async function handleOptionSelect(questionId, optionId, optionLabel) {
-      if (internal.isDestroyed || internal.isAwaitingAnswer) {
+      if (internal.isDestroyed || internal.isAwaitingAnswer || internal.viewMode === "historical") {
         return;
       }
       try {
+        await ensureConnected();
         const result = await controller.sendMessage({
           content: [optionLabel],
           meta: { question_id: questionId, selected_option: optionId }
@@ -3189,12 +3746,49 @@
           notifyAndRender();
           return;
         }
-        internal.draftText = "";
+        internal.viewMode = "live";
+        selectedHistorySessionId = null;
+        historicalTranscript = [];
+        clearDraftComposer();
         internal.error = null;
         internal.isAwaitingAnswer = true;
         notifyAndRender();
+        void refreshHistory();
       } catch (error) {
         resolveRuntimeError(error, options, internal);
+        notifyAndRender();
+      }
+    }
+    async function selectDraftMode() {
+      selectedHistorySessionId = null;
+      historicalTranscript = [];
+      historyMenuSessionId = null;
+      internal.viewMode = "draft";
+      clearDraftComposer();
+      internal.error = null;
+      internal.isAwaitingAnswer = false;
+      internal.isTyping = false;
+      await resetLiveSession();
+      notifyAndRender();
+    }
+    async function selectHistoricalConversation(sessionId) {
+      if (!historyClient) {
+        return;
+      }
+      internal.error = null;
+      historyMenuSessionId = null;
+      notifyAndRender();
+      try {
+        historicalTranscript = await historyClient.getMessages(sessionId);
+        selectedHistorySessionId = sessionId;
+        internal.viewMode = "historical";
+        internal.isAwaitingAnswer = false;
+        internal.isTyping = false;
+        clearDraftComposer();
+        clearSelectedFile();
+        notifyAndRender();
+      } catch (error) {
+        internal.error = toWidgetError(error, "history_load_failed", "History messages could not be loaded");
         notifyAndRender();
       }
     }
@@ -3205,55 +3799,19 @@
       internal.isOpen = nextOpen;
       notifyAndRender();
     }
-    function teardown() {
-      if (unsubscribeController) {
-        unsubscribeController();
-        unsubscribeController = null;
-      }
-      if (unsubscribeRawMessages) {
-        unsubscribeRawMessages();
-        unsubscribeRawMessages = null;
-      }
+    async function teardown() {
+      teardownLiveListeners();
       for (const dispose of Array.from(domCleanup)) {
         dispose();
         domCleanup.delete(dispose);
       }
+      controller.destroy();
+      try {
+        await controller.disconnect();
+      } catch {
+      }
     }
-    unsubscribeController = controller.subscribe((nextState) => {
-      chatState = nextState;
-      if (nextState.lastError) {
-        internal.error = null;
-        internal.isAwaitingAnswer = false;
-        internal.isTyping = false;
-        internal.isUploading = false;
-      }
-      if (isTerminalSessionState(nextState.connection.sessionState)) {
-        internal.isAwaitingAnswer = false;
-        internal.isTyping = false;
-        internal.isUploading = false;
-      }
-      notifyAndRender();
-    });
-    unsubscribeRawMessages = client.onMessage((message) => {
-      const flags = getMessageFlags(message);
-      if (flags.startTyping) {
-        internal.isTyping = true;
-      }
-      if (flags.stopTyping) {
-        internal.isTyping = false;
-      }
-      if (flags.finalAnswer) {
-        internal.isAwaitingAnswer = false;
-        internal.isTyping = false;
-        internal.isUploading = false;
-        internal.error = null;
-      }
-      if (flags.isQuestion) {
-        internal.isAwaitingAnswer = false;
-        internal.isTyping = false;
-      }
-      notifyAndRender();
-    });
+    bindControllerListeners();
     const onTextareaInput = () => {
       internal.draftText = dom.textarea.value;
       notifyAndRender();
@@ -3269,7 +3827,7 @@
       void handleSend();
     };
     const onAttachClick = () => {
-      if (!internal.attachmentsAvailable || internal.isUploading || internal.isAwaitingAnswer || chatState.input.locked) {
+      if (!internal.attachmentsAvailable || internal.isUploading || internal.isAwaitingAnswer || getDisplayedChatState().input.locked) {
         return;
       }
       dom.fileInput.click();
@@ -3319,6 +3877,65 @@
         void handleOptionSelect(questionId, optionId, optionLabel);
       }
     };
+    const onHistoryClick = (event) => {
+      const target = event.target;
+      const draftRow = target.closest('[data-draft="true"]');
+      if (draftRow) {
+        event.preventDefault();
+        void selectDraftMode();
+        return;
+      }
+      const actionButton = target.closest(".cortex-widget-history__menu-action");
+      if (actionButton && historyClient) {
+        event.preventDefault();
+        event.stopPropagation();
+        const sessionId = actionButton.dataset.sessionId ?? "";
+        const action = actionButton.dataset.action ?? "";
+        historyMenuSessionId = null;
+        if (action === "rename") {
+          const current = historyItems.find((item) => item.session_id === sessionId);
+          const nextTitle = window.prompt("Rename chat", current?.title ?? "");
+          if (typeof nextTitle === "string" && nextTitle.trim()) {
+            void historyClient.renameConversation(sessionId, nextTitle.trim()).then(() => refreshHistory()).catch((error) => {
+              internal.error = toWidgetError(error, "history_rename_failed", "Chat rename failed");
+              notifyAndRender();
+            });
+          }
+        } else if (action === "delete") {
+          void historyClient.deleteConversation(sessionId).then(async () => {
+            if (selectedHistorySessionId === sessionId) {
+              await selectDraftMode();
+            }
+            await refreshHistory();
+          }).catch((error) => {
+            internal.error = toWidgetError(error, "history_delete_failed", "Chat delete failed");
+            notifyAndRender();
+          });
+        } else if (action === "pin") {
+          const current = historyItems.find((item) => item.session_id === sessionId);
+          const task = current?.pinned ? historyClient.unpinConversation(sessionId) : historyClient.pinConversation(sessionId);
+          void task.then(() => refreshHistory()).catch((error) => {
+            internal.error = toWidgetError(error, "history_pin_failed", "Chat update failed");
+            notifyAndRender();
+          });
+        }
+        notifyAndRender();
+        return;
+      }
+      const toggleButton = target.closest(".cortex-widget-history__menu-toggle");
+      if (toggleButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        const sessionId = toggleButton.dataset.sessionId ?? null;
+        historyMenuSessionId = historyMenuSessionId === sessionId ? null : sessionId;
+        notifyAndRender();
+        return;
+      }
+      const row = target.closest(".cortex-widget-history__row");
+      if (row?.dataset.sessionId) {
+        void selectHistoricalConversation(row.dataset.sessionId);
+      }
+    };
     dom.textarea.addEventListener("input", onTextareaInput);
     dom.textarea.addEventListener("keydown", onTextareaKeyDown);
     dom.composer.addEventListener("submit", onComposerSubmit);
@@ -3336,13 +3953,22 @@
     domCleanup.add(() => dom.launcher.removeEventListener("click", onLauncherClick));
     domCleanup.add(() => dom.transcript.removeEventListener("click", onTranscriptClick));
     mountTarget.appendChild(dom.host);
+    if (historyDom && historyTarget) {
+      historyTarget.appendChild(historyDom.host);
+      const onNewChatClick = () => {
+        void selectDraftMode();
+      };
+      historyDom.newChatButton.addEventListener("click", onNewChatClick);
+      historyDom.list.addEventListener("click", onHistoryClick);
+      domCleanup.add(() => historyDom.newChatButton.removeEventListener("click", onNewChatClick));
+      domCleanup.add(() => historyDom.list.removeEventListener("click", onHistoryClick));
+    }
     internal.isReady = true;
     notifyAndRender();
     options.onReady?.();
-    void controller.connect().catch((error) => {
-      resolveRuntimeError(error, options, internal);
-      notifyAndRender();
-    });
+    if (historyClient) {
+      void refreshHistory();
+    }
     return {
       destroy() {
         if (internal.isDestroyed) {
@@ -3352,12 +3978,9 @@
         internal.isAwaitingAnswer = false;
         internal.isTyping = false;
         internal.isUploading = false;
-        teardown();
+        void teardown();
         dom.host.remove();
-        void controller.disconnect().catch((error) => {
-          resolveRuntimeError(error, options, internal);
-        });
-        controller.destroy();
+        historyDom?.host.remove();
       },
       open() {
         setOpen(true);
@@ -3407,7 +4030,9 @@
       ...baseOptions,
       apiKey: baseOptions.apiKey,
       authUrl: baseOptions.authUrl,
+      controlPlaneUrl: baseOptions.controlPlaneUrl,
       target: baseOptions.target,
+      historyTarget: baseOptions.historyTarget,
       theme: baseOptions.theme,
       client: baseOptions.client,
       onReady: baseOptions.onReady,
@@ -3428,6 +4053,26 @@
         throw createWidgetError("missing_target", "Embedded mode requires a target element or selector.");
       }
     }
+    let historyTarget;
+    if (options.mode === "embedded" && options.historyTarget) {
+      if (!options.controlPlaneUrl) {
+        throw createWidgetError(
+          "missing_control_plane_url",
+          "historyTarget requires controlPlaneUrl in embedded mode."
+        );
+      }
+      if (typeof options.historyTarget === "string") {
+        const historyElement = document.querySelector(options.historyTarget);
+        if (!isHTMLElement(historyElement)) {
+          throw createWidgetError("history_target_not_found", `History target selector not found: ${options.historyTarget}`);
+        }
+        historyTarget = historyElement;
+      } else if (isHTMLElement(options.historyTarget)) {
+        historyTarget = options.historyTarget;
+      } else {
+        throw createWidgetError("history_target_not_found", "historyTarget must be a selector or HTMLElement.");
+      }
+    }
     if (typeof options.target === "string") {
       const targetElement = document.querySelector(options.target);
       if (!isHTMLElement(targetElement)) {
@@ -3435,17 +4080,20 @@
       }
       return {
         mountTarget: targetElement,
-        targetElement
+        targetElement,
+        historyTarget
       };
     }
     if (isHTMLElement(options.target)) {
       return {
         mountTarget: options.target,
-        targetElement: options.target
+        targetElement: options.target,
+        historyTarget
       };
     }
     return {
-      mountTarget: document.body
+      mountTarget: document.body,
+      historyTarget
     };
   }
   function createClient(options) {
@@ -3463,20 +4111,20 @@
     const partialOptions = typeof targetOrOptions === "object" && targetOrOptions !== null && !isHTMLElement(targetOrOptions) ? targetOrOptions : maybeOptions ?? {};
     assertBrowserEnvironment(partialOptions);
     const options = resolveOptions(targetOrOptions, maybeOptions);
-    const { mountTarget } = resolveMountTarget(options);
+    const { mountTarget, historyTarget } = resolveMountTarget(options);
     void mountTarget;
     if (typeof HTMLElement.prototype.attachShadow !== "function") {
       const error = createWidgetError("shadow_dom_unsupported", "Cortex Chat Widget requires Shadow DOM support.");
       callOnError(options, error);
       throw error;
     }
-    const client = createClient(options);
     const dom = createWidgetDom(options);
     return createWidgetHandle({
       options,
-      client,
       dom,
-      mountTarget
+      mountTarget,
+      historyTarget,
+      createClient: () => createClient(options)
     });
   }
 
@@ -3493,7 +4141,9 @@
       apiKey: dataset.apiKey ?? "",
       mode: dataset.mode === "embedded" ? "embedded" : "floating",
       target: dataset.target,
+      historyTarget: dataset.historyTarget,
       authUrl: dataset.authUrl,
+      controlPlaneUrl: dataset.controlPlaneUrl,
       title: dataset.title,
       subtitle: dataset.subtitle,
       placeholder: dataset.placeholder,
