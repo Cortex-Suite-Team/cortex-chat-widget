@@ -1,4 +1,4 @@
-// ../cortex-sdk/js/dist/browser/generated/constants.js
+// node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://auth.cortexsuite.app";
 var AUTH_TOKEN_PATH = "/auth/token";
 var AUTH_REFRESH_PATH = "/auth/refresh";
@@ -16,7 +16,7 @@ var CORTEX_AUTH_URL = `${DEFAULT_AUTH_URL}${AUTH_TOKEN_PATH}`;
 var CORTEX_REFRESH_URL = `${DEFAULT_AUTH_URL}${AUTH_REFRESH_PATH}`;
 var RECONNECT_BACKOFF_MS = [1e3, 2e3, 5e3, 1e4, 2e4, 3e4];
 
-// ../cortex-sdk/js/dist/browser/generated/errors.js
+// node_modules/@cortex-suite/sdk/dist/browser/generated/errors.js
 var GENERATED_ERROR_CATALOG = [
   { code: "auth_invalid", retryable: false, fatal: true },
   { code: "auth_expired", retryable: true, fatal: false },
@@ -39,7 +39,7 @@ var GENERATED_ERROR_CATALOG = [
   { code: "file_operation_failed", retryable: true, fatal: false }
 ];
 
-// ../cortex-sdk/js/dist/browser/errors.js
+// node_modules/@cortex-suite/sdk/dist/browser/errors.js
 var CortexError = class extends Error {
   constructor(code, message, retryable, fatal) {
     super(message);
@@ -58,7 +58,7 @@ function lookupError(code) {
   return CATALOG_MAP.get(code);
 }
 
-// ../cortex-sdk/js/dist/browser/auth.js
+// node_modules/@cortex-suite/sdk/dist/browser/auth.js
 function parseJwtExp(token) {
   try {
     const parts = token.split(".");
@@ -126,7 +126,7 @@ function buildAuthEndpoint(authBaseUrl, path) {
   return `${normalizeAuthBaseUrl(authBaseUrl)}${path}`;
 }
 
-// ../cortex-sdk/js/dist/browser/transport.js
+// node_modules/@cortex-suite/sdk/dist/browser/transport.js
 function _asCloseReason(reason) {
   if (typeof reason === "string") {
     return reason;
@@ -244,7 +244,7 @@ function createTransport(WS, connectTimeoutMs) {
   return transport;
 }
 
-// ../cortex-sdk/js/dist/browser/liveness.js
+// node_modules/@cortex-suite/sdk/dist/browser/liveness.js
 function createLiveness(transport, pingIntervalMs, pongTimeoutMs, staleThresholdMs, callbacks) {
   let pingTimer = null;
   let pongTimer = null;
@@ -317,7 +317,7 @@ function createLiveness(transport, pingIntervalMs, pongTimeoutMs, staleThreshold
   };
 }
 
-// ../cortex-sdk/js/dist/browser/session.js
+// node_modules/@cortex-suite/sdk/dist/browser/session.js
 var TERMINAL_STATES = /* @__PURE__ */ new Set([
   "COMPLETED",
   "FAILED",
@@ -536,7 +536,7 @@ function createSession(callbacks) {
   };
 }
 
-// ../cortex-sdk/js/dist/browser/upload.js
+// node_modules/@cortex-suite/sdk/dist/browser/upload.js
 async function uploadFile(file, accessToken, uploadUrl, fetchFn, FormDataClass) {
   const formData = new FormDataClass();
   let blob;
@@ -576,7 +576,7 @@ async function uploadFile(file, accessToken, uploadUrl, fetchFn, FormDataClass) 
   return fileId;
 }
 
-// ../cortex-sdk/js/dist/browser/client.js
+// node_modules/@cortex-suite/sdk/dist/browser/client.js
 var CortexClient = class {
   constructor(options, platform) {
     this._messageHandlers = /* @__PURE__ */ new Set();
@@ -586,6 +586,7 @@ var CortexClient = class {
     this._wsUrl = null;
     this._runtimeHttpBaseUrl = null;
     this._cpApiUrl = null;
+    this._sessionMeta = null;
     this._channelId = `ch_${Math.random().toString(36).slice(2, 10)}`;
     this._reconnectAttempt = 0;
     this._disconnectRequested = false;
@@ -641,6 +642,9 @@ var CortexClient = class {
   get sessionId() {
     return this._session.sessionId;
   }
+  get sessionMeta() {
+    return this._sessionMeta;
+  }
   onMessage(handler) {
     this._messageHandlers.add(handler);
     return () => {
@@ -657,6 +661,7 @@ var CortexClient = class {
     this._runtimeHttpBaseUrl = deriveRuntimeHttpBaseUrl(authResponse.ws_url);
     this._runtimeHttpBaseUrl = deriveRuntimeHttpBaseUrlFromHttpUrl(this._platform.uploadUrl) ?? this._runtimeHttpBaseUrl;
     this._cpApiUrl = normalizeOptionalBaseUrl(authResponse.cp_api_url);
+    this._sessionMeta = asRecord(asRecord(authResponse.runtime_bootstrap?.trigger_payload)?.meta);
     await this._openChannel();
     this._session.setTransport(this._transport, this._options.sendTimeout);
     await this._session.sendInit(authResponse.runtime_bootstrap);
@@ -979,6 +984,12 @@ function normalizeOptionalBaseUrl(url) {
     return null;
   return url.replace(/\/$/, "");
 }
+function asRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value;
+}
 function withQueryParams(url, params) {
   const parsed = new URL(url);
   for (const [key, value] of Object.entries(params)) {
@@ -998,7 +1009,7 @@ function mapFileResponseError(status) {
   return makeError("file_operation_failed", `File operation failed with status ${status}`);
 }
 
-// ../cortex-sdk/js/dist/browser/index.js
+// node_modules/@cortex-suite/sdk/dist/browser/index.js
 var UPLOAD_URL = "/upload";
 function makePlatform() {
   return {
@@ -2240,7 +2251,7 @@ function createWidgetDom(options) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/errors.js
+// ../sdk-ui/dist/src/errors.js
 var ControllerError = class extends Error {
   constructor(code, message, details) {
     super(message);
@@ -2270,7 +2281,7 @@ function errorFromUnknown(error, fallbackCode = "controller_error", source) {
   });
 }
 
-// ../cortex-sdk-ui/dist/src/utils.js
+// ../sdk-ui/dist/src/utils.js
 var TERMINAL_SESSION_STATES = /* @__PURE__ */ new Set([
   "COMPLETED",
   "FAILED",
@@ -2355,7 +2366,7 @@ function toEscalationActions(value) {
   return asStringArray(value).filter((action) => action === "continue" || action === "operator_input" || action === "reply_user");
 }
 
-// ../cortex-sdk-ui/dist/src/normalize.js
+// ../sdk-ui/dist/src/normalize.js
 function buildAttachmentMeta(payload) {
   return Array.isArray(payload["attachments"]) ? { attachments: payload["attachments"] } : {};
 }
@@ -2532,7 +2543,7 @@ function normalizeEscalationState(message) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/escalation-controller.js
+// ../sdk-ui/dist/src/escalation-controller.js
 function createEscalationController(options) {
   let state = cloneEscalation(options.initialState ?? null);
   function emit(event) {
@@ -2628,7 +2639,7 @@ function createEscalationController(options) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/transcript-store.js
+// ../sdk-ui/dist/src/transcript-store.js
 function createTranscriptStore(options = {}) {
   const transcript = (options.initialTranscript ?? []).map((message) => cloneMessage(message));
   const indexById = /* @__PURE__ */ new Map();
@@ -2809,7 +2820,7 @@ function createTranscriptStore(options = {}) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/chat-controller.js
+// ../sdk-ui/dist/src/chat-controller.js
 var MESSAGE_SEND_TIMEOUT_MS = 15e3;
 async function withTimeout(promise, timeoutMs, msg) {
   let timer;
