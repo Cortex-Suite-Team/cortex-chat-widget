@@ -40,7 +40,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@cortex-suite/sdk": "^0.1.0",
+    "@cortex-suite/sdk": "^1.0.0",
     "@cortex-suite/sdk-ui": "^0.1.0"
   },
   "devDependencies": {
