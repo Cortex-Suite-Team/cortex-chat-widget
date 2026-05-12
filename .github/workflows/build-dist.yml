@@ -23,60 +23,30 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           path: cortex-chat-widget
 
-      - name: Checkout sdk-ui
-        uses: actions/checkout@v4
-        with:
-          repository: Cortex-Suite-Team/cortex-sdk-ui
-          path: cortex-sdk-ui
-
-      - name: Checkout sdk
-        uses: actions/checkout@v4
-        with:
-          repository: Cortex-Suite-Team/cortex-sdk
-          path: cortex-sdk
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      - name: Verify SDK dist
-        run: |
-          test -f cortex-sdk/js/dist/browser/index.js
-          test -f cortex-sdk/js/dist/browser/index.d.ts
-
-      - name: Build SDK UI
-        working-directory: cortex-sdk-ui
-        run: |
-          npm install
-          npm run typecheck
-          npm test
-          npm run build
-
-      - name: Install chat-widget dependencies from local packages
+      - name: Install dependencies
         working-directory: cortex-chat-widget
-        run: |
-          npm pkg set dependencies."@cortex-suite/sdk"="file:../cortex-sdk/js"
-          npm pkg set dependencies."@cortex-suite/sdk-ui"="file:../cortex-sdk-ui"
-          npm install
+        run: npm ci
 
-      - name: Typecheck chat widget
+      - name: Sync SDK to latest
+        working-directory: cortex-chat-widget
+        run: npm run sync:sdk
+
+      - name: Typecheck
         working-directory: cortex-chat-widget
         run: npm run typecheck
 
-      - name: Test chat widget
+      - name: Test
         working-directory: cortex-chat-widget
         run: npm test
 
-      - name: Build chat widget dist
+      - name: Build dist
         working-directory: cortex-chat-widget
         run: npm run build
-
-      - name: Restore publishable package.json
-        working-directory: cortex-chat-widget
-        run: |
-          git checkout -- package.json
-          rm -f package-lock.json
 
       - name: Commit built dist
         working-directory: cortex-chat-widget

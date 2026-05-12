@@ -32,12 +32,16 @@
     "LICENSE"
   ],
   "scripts": {
+    "sync:sdk": "node ./scripts/ensure-latest-sdk.mjs",
+    "prebuild": "npm run sync:sdk",
     "build": "npm run clean && npm run build:types && npm run build:bundle",
     "build:bundle": "node ./scripts/build.mjs",
     "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
     "clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('dist', { recursive: true, force: true }))\"",
-    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "pretypecheck": "npm run sync:sdk",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run sync:sdk",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
   },
   "dependencies": {
     "@cortex-suite/sdk": "^1.0.0",
