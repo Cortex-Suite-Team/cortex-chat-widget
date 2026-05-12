@@ -23,10 +23,24 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           path: cortex-chat-widget
 
+      - name: Checkout sdk-ui
+        uses: actions/checkout@v4
+        with:
+          repository: Cortex-Suite-Team/cortex-sdk-ui
+          path: sdk-ui
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Build sdk-ui
+        working-directory: sdk-ui
+        run: |
+          npm install
+          npm run typecheck
+          npm test
+          npm run build
 
       - name: Install dependencies
         working-directory: cortex-chat-widget
