@@ -20,6 +20,8 @@ export const layoutStyles = `
 .cortex-widget[data-mode="embedded"] {
   width: 100%;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .cortex-widget[data-mode="floating"] {
@@ -70,6 +72,8 @@ export const layoutStyles = `
 .cortex-widget[data-mode="embedded"] .cortex-widget__panel {
   width: 100%;
   height: 100%;
+  min-height: 0;
+  max-height: 100%;
 }
 
 .cortex-widget[data-mode="floating"] .cortex-widget__panel {
@@ -83,6 +87,7 @@ export const layoutStyles = `
 }
 
 .cortex-widget__header {
+  flex: 0 0 auto;
   padding: 14px 16px 12px;
   border-bottom: 1px solid var(--cortex-border-color);
   background: color-mix(in srgb, var(--cortex-background-color) 92%, #ffffff 8%);
@@ -107,6 +112,14 @@ export const layoutStyles = `
   background: var(--cortex-avatar-bg);
   color: var(--cortex-avatar-text);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, #ffffff 12%, transparent);
+}
+
+.cortex-widget__avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  display: block;
 }
 
 .cortex-widget__header-text {
@@ -147,9 +160,10 @@ export const layoutStyles = `
 
 .cortex-widget__body {
   min-height: 0;
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .cortex-widget__error {
@@ -164,7 +178,7 @@ export const layoutStyles = `
 }
 
 .cortex-widget__transcript {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -231,6 +245,7 @@ export const layoutStyles = `
 }
 
 .cortex-widget__composer {
+  flex: 0 0 auto;
   padding: 10px 12px 12px;
   border-top: 1px solid var(--cortex-border-color);
   background: color-mix(in srgb, var(--cortex-composer-bg) 92%, #ffffff 8%);

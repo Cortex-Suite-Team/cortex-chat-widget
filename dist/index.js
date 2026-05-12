@@ -1055,7 +1055,9 @@ var ICONS = {
   "reply-fill": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.921 11.9 1.353 8.62a.719.719 0 0 1 0-1.238L5.921 4.1A.716.716 0 0 1 7 4.719V6c1.5 0 6 0 7 8-2.5-4.5-7-4-7-4v1.281c0 .56-.606.898-1.079.62z"/></svg>`,
   "arrow-clockwise": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>`,
   "plus-lg": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 2.5a.5.5 0 0 1 .5.5v4.5H13a.5.5 0 0 1 0 1H8.5V13a.5.5 0 0 1-1 0V8.5H3a.5.5 0 0 1 0-1h4.5V3a.5.5 0 0 1 .5-.5"/></svg>`,
-  "three-dots": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M3 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3m5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3m5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/></svg>`
+  "three-dots": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M3 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3m5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3m5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/></svg>`,
+  "check2": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0"/></svg>`,
+  "check2-all": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.354 4.354a.5.5 0 0 0-.708-.708L6.5 8.793 4.854 7.146a.5.5 0 1 0-.708.708l2 2a.5.5 0 0 0 .708 0z"/><path d="M6.25 11.75a.5.5 0 0 0 .364-.157l7-7a.5.5 0 0 0-.707-.707L6.25 10.543l-.896-.897a.5.5 0 0 0-.708.708l1.25 1.25a.5.5 0 0 0 .354.146"/><path d="M4.854 5.646a.5.5 0 1 0-.708.708l1 1a.5.5 0 0 0 .708-.708z"/></svg>`
 };
 function getIconSvg(name) {
   return ICONS[name];
@@ -1252,6 +1254,8 @@ var layoutStyles = `
 .cortex-widget[data-mode="embedded"] {
   width: 100%;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .cortex-widget[data-mode="floating"] {
@@ -1302,6 +1306,8 @@ var layoutStyles = `
 .cortex-widget[data-mode="embedded"] .cortex-widget__panel {
   width: 100%;
   height: 100%;
+  min-height: 0;
+  max-height: 100%;
 }
 
 .cortex-widget[data-mode="floating"] .cortex-widget__panel {
@@ -1315,6 +1321,7 @@ var layoutStyles = `
 }
 
 .cortex-widget__header {
+  flex: 0 0 auto;
   padding: 14px 16px 12px;
   border-bottom: 1px solid var(--cortex-border-color);
   background: color-mix(in srgb, var(--cortex-background-color) 92%, #ffffff 8%);
@@ -1339,6 +1346,14 @@ var layoutStyles = `
   background: var(--cortex-avatar-bg);
   color: var(--cortex-avatar-text);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, #ffffff 12%, transparent);
+}
+
+.cortex-widget__avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  display: block;
 }
 
 .cortex-widget__header-text {
@@ -1379,9 +1394,10 @@ var layoutStyles = `
 
 .cortex-widget__body {
   min-height: 0;
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .cortex-widget__error {
@@ -1396,7 +1412,7 @@ var layoutStyles = `
 }
 
 .cortex-widget__transcript {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1463,6 +1479,7 @@ var layoutStyles = `
 }
 
 .cortex-widget__composer {
+  flex: 0 0 auto;
   padding: 10px 12px 12px;
   border-top: 1px solid var(--cortex-border-color);
   background: color-mix(in srgb, var(--cortex-composer-bg) 92%, #ffffff 8%);
@@ -1797,8 +1814,21 @@ var typographyStyles = `
 }
 
 .cortex-widget__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 10.5px;
   color: var(--cortex-muted-text);
+}
+
+.cortex-widget__meta-text {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.cortex-widget__meta-text[data-provisional="true"] {
+  opacity: 0.68;
 }
 
 .cortex-widget__formatted {
@@ -2010,12 +2040,34 @@ var typographyStyles = `
   color: var(--cortex-muted-text);
 }
 
+.cortex-widget__message-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.cortex-widget__message-status-icon svg {
+  width: 13px;
+  height: 13px;
+  pointer-events: none;
+}
+
 .cortex-widget__message-status[data-status="failed"] {
   color: #dc2626;
 }
 
 .cortex-widget__message-status[data-status="sending"] {
-  opacity: 0.75;
+  opacity: 0.72;
+}
+
+.cortex-widget__message-status[data-status="sent"],
+.cortex-widget__message-status[data-status="delivered"] {
+  color: var(--cortex-muted-text);
+}
+
+.cortex-widget__message-status[data-status="read"] {
+  color: color-mix(in srgb, var(--cortex-accent-color) 72%, #38bdf8 28%);
 }
 
 .cortex-widget__message-retry {
@@ -2068,6 +2120,8 @@ function createWidgetDom(options) {
   if (options.mode === "embedded") {
     host.style.width = "100%";
     host.style.height = "100%";
+    host.style.minHeight = "0";
+    host.style.overflow = "hidden";
     host.style.display = "block";
   }
   const shadowRoot = host.attachShadow({ mode: "open" });
@@ -2186,7 +2240,7 @@ function createWidgetDom(options) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/errors.js
+// ../sdk-ui/dist/src/errors.js
 var ControllerError = class extends Error {
   constructor(code, message, details) {
     super(message);
@@ -2216,7 +2270,7 @@ function errorFromUnknown(error, fallbackCode = "controller_error", source) {
   });
 }
 
-// ../cortex-sdk-ui/dist/src/utils.js
+// ../sdk-ui/dist/src/utils.js
 var TERMINAL_SESSION_STATES = /* @__PURE__ */ new Set([
   "COMPLETED",
   "FAILED",
@@ -2301,9 +2355,12 @@ function toEscalationActions(value) {
   return asStringArray(value).filter((action) => action === "continue" || action === "operator_input" || action === "reply_user");
 }
 
-// ../cortex-sdk-ui/dist/src/normalize.js
+// ../sdk-ui/dist/src/normalize.js
 function buildAttachmentMeta(payload) {
   return Array.isArray(payload["attachments"]) ? { attachments: payload["attachments"] } : {};
+}
+function getClientMsgId(meta) {
+  return asNonEmptyString(meta["client_msg_id"]) ?? void 0;
 }
 function normalizeCortexMessage(message) {
   const payload = asPayload(message);
@@ -2314,6 +2371,12 @@ function normalizeCortexMessage(message) {
   };
   switch (message.type) {
     case "chat::message":
+      if (mapRole(payload["role"], "user") === "user" && getClientMsgId(mergedMeta) && !message.ts) {
+        console.warn("[sdk-ui] user chat::message echo arrived without server timestamp", {
+          client_msg_id: getClientMsgId(mergedMeta),
+          seq: message.seq ?? null
+        });
+      }
       return {
         id: buildMessageId(message),
         seq: message.seq ?? null,
@@ -2322,6 +2385,7 @@ function normalizeCortexMessage(message) {
         content: payload["content"],
         status: "final",
         ts: message.ts ?? null,
+        clientMsgId: getClientMsgId(mergedMeta),
         meta: {
           ...mergedMeta,
           ...buildAttachmentMeta(payload)
@@ -2468,7 +2532,7 @@ function normalizeEscalationState(message) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/escalation-controller.js
+// ../sdk-ui/dist/src/escalation-controller.js
 function createEscalationController(options) {
   let state = cloneEscalation(options.initialState ?? null);
   function emit(event) {
@@ -2564,7 +2628,7 @@ function createEscalationController(options) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/transcript-store.js
+// ../sdk-ui/dist/src/transcript-store.js
 function createTranscriptStore(options = {}) {
   const transcript = (options.initialTranscript ?? []).map((message) => cloneMessage(message));
   const indexById = /* @__PURE__ */ new Map();
@@ -2594,7 +2658,11 @@ function createTranscriptStore(options = {}) {
     };
   }
   function updateMessage(index, message) {
+    const previous = transcript[index];
     transcript[index] = message;
+    if (previous && previous.id !== message.id) {
+      indexById.delete(previous.id);
+    }
     indexById.set(message.id, index);
     notify();
     return {
@@ -2603,6 +2671,38 @@ function createTranscriptStore(options = {}) {
         type: "message_updated",
         message: cloneMessage(message)
       }
+    };
+  }
+  function findMessageIndexByClientMsgId(clientMsgId) {
+    if (!clientMsgId) {
+      return void 0;
+    }
+    for (const [index, message] of transcript.entries()) {
+      if (message.clientMsgId === clientMsgId) {
+        return index;
+      }
+    }
+    return void 0;
+  }
+  function reconcileOptimisticUserMessage(existing, normalized) {
+    const nextMeta = {
+      ...normalized.meta ?? {}
+    };
+    if (normalized.ts) {
+      nextMeta["timestamp_source"] = "server";
+    } else if (existing.meta?.["timestamp_source"] !== void 0) {
+      nextMeta["timestamp_source"] = existing.meta["timestamp_source"];
+    }
+    return {
+      ...normalized,
+      id: normalized.id,
+      clientMsgId: normalized.clientMsgId ?? existing.clientMsgId,
+      deliveryStatus: "sent",
+      retryable: false,
+      sendError: void 0,
+      originalPayload: existing.originalPayload,
+      ts: normalized.ts ?? existing.ts ?? null,
+      meta: nextMeta
     };
   }
   function buildMalformedPartialMessage(message) {
@@ -2650,6 +2750,7 @@ function createTranscriptStore(options = {}) {
       }
       const normalized = normalizeCortexMessage(message);
       const existingIndex = indexById.get(normalized.id);
+      const optimisticIndex = message.type === "chat::message" && normalized.role === "user" ? findMessageIndexByClientMsgId(normalized.clientMsgId) : void 0;
       if (message.type === "chat::partial" && existingIndex !== void 0) {
         const existing = transcript[existingIndex];
         const nextMessage = {
@@ -2687,6 +2788,10 @@ function createTranscriptStore(options = {}) {
       if (existingIndex !== void 0) {
         return updateMessage(existingIndex, normalized);
       }
+      if (optimisticIndex !== void 0) {
+        const existing = transcript[optimisticIndex];
+        return updateMessage(optimisticIndex, reconcileOptimisticUserMessage(existing, normalized));
+      }
       return addMessage(normalized);
     },
     reset() {
@@ -2704,7 +2809,7 @@ function createTranscriptStore(options = {}) {
   };
 }
 
-// ../cortex-sdk-ui/dist/src/chat-controller.js
+// ../sdk-ui/dist/src/chat-controller.js
 var MESSAGE_SEND_TIMEOUT_MS = 15e3;
 async function withTimeout(promise, timeoutMs, msg) {
   let timer;
@@ -2725,6 +2830,28 @@ function generateClientMsgId() {
     return crypto.randomUUID();
   }
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+function getSessionCorrespondent(client) {
+  const rawMeta = client.sessionMeta;
+  if (!isRecord(rawMeta)) {
+    return null;
+  }
+  const rawCorrespondent = rawMeta["chat_correspondent"];
+  if (!isRecord(rawCorrespondent)) {
+    return null;
+  }
+  const name = asNonEmptyString(rawCorrespondent["name"]);
+  if (!name) {
+    return null;
+  }
+  return {
+    kind: asNonEmptyString(rawCorrespondent["kind"]) ?? void 0,
+    id: asNonEmptyString(rawCorrespondent["id"]) ?? null,
+    name,
+    title: asNonEmptyString(rawCorrespondent["title"]) ?? null,
+    subtitle: asNonEmptyString(rawCorrespondent["subtitle"]) ?? null,
+    avatarUrl: asNonEmptyString(rawCorrespondent["avatar_url"]) ?? null
+  };
 }
 function createChatController(options) {
   const listeners = /* @__PURE__ */ new Set();
@@ -2780,6 +2907,9 @@ function createChatController(options) {
       escalation
     }) : defaultInputLockPolicy();
     return {
+      session: {
+        correspondent: getSessionCorrespondent(options.client)
+      },
       connection: {
         channelState,
         sessionState,
@@ -2956,15 +3086,18 @@ function createChatController(options) {
         ts: (/* @__PURE__ */ new Date()).toISOString(),
         clientMsgId,
         retryable: false,
-        meta: { attachments: message.attachments ?? [] },
+        meta: {
+          ...message.meta ?? {},
+          ...message.attachments ? { attachments: message.attachments } : {},
+          client_msg_id: clientMsgId,
+          timestamp_source: "client"
+        },
         originalPayload: sendPayload
       };
       transcriptStore.upsertLocalMessage(optimistic);
       emitStateChanged();
       try {
         await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
-        transcriptStore.upsertLocalMessage({ ...optimistic, deliveryStatus: "sent", retryable: false });
-        emitStateChanged();
         return { ok: true, messageId: id, clientMsgId };
       } catch (err) {
         const sendError = err instanceof Error ? err.message : "Message was not sent";
@@ -2989,8 +3122,6 @@ function createChatController(options) {
       emitStateChanged();
       try {
         await withTimeout(options.client.sendMessage(msg.originalPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
-        transcriptStore.upsertLocalMessage({ ...updated, deliveryStatus: "sent", retryable: false });
-        emitStateChanged();
         return { ok: true, messageId, clientMsgId };
       } catch (err) {
         const sendError = err instanceof Error ? err.message : "Message was not sent";
@@ -3301,6 +3432,34 @@ function getAvatarInitials(label) {
   const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("");
   return initials || normalized.slice(0, 2).toUpperCase();
 }
+function getHeaderCorrespondent(state) {
+  return state.chat.session?.correspondent ?? null;
+}
+function getHeaderTitle(state, options) {
+  return getHeaderCorrespondent(state)?.name ?? options.title;
+}
+function getHeaderSubtitle(state, options) {
+  const correspondent = getHeaderCorrespondent(state);
+  return correspondent?.title ?? correspondent?.subtitle ?? options.subtitle;
+}
+function syncHeaderAvatar(avatarEl, title, avatarUrl) {
+  const existingImage = avatarEl.querySelector("img");
+  if (avatarUrl) {
+    let image = existingImage;
+    if (!image) {
+      image = document.createElement("img");
+      image.alt = "";
+      image.setAttribute("aria-hidden", "true");
+      avatarEl.appendChild(image);
+    }
+    image.src = avatarUrl;
+    avatarEl.textContent = "";
+    avatarEl.appendChild(image);
+    return;
+  }
+  existingImage?.remove();
+  avatarEl.textContent = getAvatarInitials(title);
+}
 function parseHexColor(value) {
   const hex = value.trim();
   const short = /^#([\da-f]{3})$/i.exec(hex);
@@ -3367,6 +3526,47 @@ function toNonEmptyString(value) {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+function formatMessageTime(value) {
+  if (!value) {
+    return null;
+  }
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    return null;
+  }
+  return new Intl.DateTimeFormat(void 0, {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(timestamp);
+}
+function getTimestampSource(message) {
+  const value = message.meta?.["timestamp_source"];
+  return value === "client" || value === "server" ? value : null;
+}
+function getDeliveryStatusIconName(status) {
+  if (status === "sending") {
+    return "check2";
+  }
+  if (status === "sent" || status === "delivered" || status === "read") {
+    return "check2-all";
+  }
+  return null;
+}
+function getDeliveryStatusLabel(status) {
+  if (status === "sending") {
+    return "Sending";
+  }
+  if (status === "sent") {
+    return "Sent";
+  }
+  if (status === "delivered") {
+    return "Delivered";
+  }
+  if (status === "read") {
+    return "Read";
+  }
+  return "Failed";
 }
 function toAttachmentViewModel(attachment) {
   if (typeof attachment === "string") {
@@ -3566,47 +3766,62 @@ function renderTranscript(transcriptEl, state) {
     }
     const meta = document.createElement("div");
     meta.className = "cortex-widget__meta";
+    const metaText = document.createElement("span");
+    metaText.className = "cortex-widget__meta-text";
+    metaText.setAttribute("data-testid", "message-meta-text");
+    const timestampText = formatMessageTime(message.ts ?? null);
+    const timestampSource = getTimestampSource(message);
+    metaText.dataset.timestampSource = timestampSource ?? "unknown";
+    if (timestampSource === "client") {
+      metaText.dataset.provisional = "true";
+    }
     if (hasActorHeader) {
-      meta.textContent = message.status === "streaming" ? "streaming" : "";
+      metaText.textContent = timestampText ?? (message.status === "streaming" ? "streaming" : "");
     } else {
       const displayName = message.role === "user" ? "You" : message.role === "assistant" ? "Assistant" : message.role;
       const metaParts = [displayName];
+      if (timestampText) {
+        metaParts.push(timestampText);
+      }
       if (message.status === "streaming") {
         metaParts.push("streaming");
       }
-      meta.textContent = metaParts.join(" \xB7 ");
+      metaText.textContent = metaParts.join(" \xB7 ");
     }
+    meta.appendChild(metaText);
     let statusEl = null;
-    if (message.role === "user" && message.deliveryStatus !== void 0 && message.deliveryStatus !== "sent") {
+    const deliveryStatus = typeof message.deliveryStatus === "string" ? message.deliveryStatus : void 0;
+    if (message.role === "user" && deliveryStatus) {
       statusEl = document.createElement("div");
       statusEl.className = "cortex-widget__message-status";
-      statusEl.dataset.status = message.deliveryStatus;
+      statusEl.dataset.status = deliveryStatus;
       statusEl.setAttribute("data-testid", "message-delivery-status");
-      if (message.deliveryStatus === "sending") {
-        statusEl.textContent = "Sending\u2026";
-      } else if (message.deliveryStatus === "failed") {
-        const text = document.createElement("span");
-        text.className = "cortex-widget__message-status-text";
-        text.textContent = "Not sent";
-        statusEl.appendChild(text);
-        if (message.retryable) {
-          const retryBtn = document.createElement("button");
-          retryBtn.className = "cortex-widget__message-retry";
-          retryBtn.type = "button";
-          retryBtn.setAttribute("aria-label", "Retry message");
-          retryBtn.setAttribute("title", "Retry message");
-          retryBtn.setAttribute("data-testid", "message-retry-button");
-          retryBtn.dataset.retryMsgId = message.id;
-          retryBtn.innerHTML = getIconSvg("arrow-clockwise");
-          statusEl.appendChild(retryBtn);
-        }
+      const iconName = getDeliveryStatusIconName(deliveryStatus);
+      if (iconName) {
+        const icon = document.createElement("span");
+        icon.className = "cortex-widget__message-status-icon";
+        icon.setAttribute("aria-label", getDeliveryStatusLabel(deliveryStatus));
+        icon.setAttribute("title", getDeliveryStatusLabel(deliveryStatus));
+        icon.setAttribute("data-testid", "message-delivery-icon");
+        icon.innerHTML = getIconSvg(iconName);
+        statusEl.appendChild(icon);
+      }
+      if (deliveryStatus === "failed" && message.retryable) {
+        const retryBtn = document.createElement("button");
+        retryBtn.className = "cortex-widget__message-retry";
+        retryBtn.type = "button";
+        retryBtn.setAttribute("aria-label", "Retry message");
+        retryBtn.setAttribute("title", "Retry message");
+        retryBtn.setAttribute("data-testid", "message-retry-button");
+        retryBtn.dataset.retryMsgId = message.id;
+        retryBtn.innerHTML = getIconSvg("arrow-clockwise");
+        statusEl.appendChild(retryBtn);
       }
     }
     if (statusEl) {
-      wrapper.append(bubble, statusEl, meta);
-    } else {
-      wrapper.append(bubble, meta);
+      meta.appendChild(statusEl);
     }
+    wrapper.append(bubble, meta);
     transcriptEl.appendChild(wrapper);
   }
   if (transcriptEl.childElementCount === 0) {
@@ -3623,10 +3838,13 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
     dark: "cortex-widget--dark",
     light: "cortex-widget--light"
   });
-  dom.title.textContent = options.title;
-  dom.subtitle.textContent = options.subtitle;
+  const headerCorrespondent = getHeaderCorrespondent(state);
+  const headerTitle = getHeaderTitle(state, options);
+  const headerSubtitle = getHeaderSubtitle(state, options);
+  dom.title.textContent = headerTitle;
+  dom.subtitle.textContent = headerSubtitle;
   dom.status.textContent = state.isHistoricalView ? "Viewing chat history" : buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
-  dom.avatar.textContent = getAvatarInitials(options.title);
+  syncHeaderAvatar(dom.avatar, headerTitle, headerCorrespondent?.avatarUrl ?? null);
   dom.statusDot.dataset.state = state.isHistoricalView ? "history" : state.chat.connection.isConnected ? "online" : state.isAwaitingAnswer || state.isTyping || state.chat.workerState.state === "working" || state.chat.workerState.state === "waiting" ? "active" : "idle";
   const isPanelVisible = state.mode === "embedded" || state.isOpen;
   dom.panel.hidden = !isPanelVisible;
@@ -3688,6 +3906,9 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
 
 // src/widget.ts
 var EMPTY_CHAT_STATE = {
+  session: {
+    correspondent: null
+  },
   connection: {
     channelState: "CLOSED",
     sessionState: "CREATED",
@@ -3705,6 +3926,9 @@ var EMPTY_CHAT_STATE = {
 };
 function cloneChatState(state) {
   return {
+    session: {
+      correspondent: state.session.correspondent ? { ...state.session.correspondent } : null
+    },
     connection: { ...state.connection },
     transcript: [...state.transcript],
     input: { ...state.input },

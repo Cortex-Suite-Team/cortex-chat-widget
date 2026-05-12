@@ -22,6 +22,43 @@ function getAvatarInitials(label: string): string {
   return initials || normalized.slice(0, 2).toUpperCase();
 }
 
+function getHeaderCorrespondent(state: CortexChatWidgetState) {
+  return state.chat.session?.correspondent ?? null;
+}
+
+function getHeaderTitle(state: CortexChatWidgetState, options: NormalizedWidgetOptions): string {
+  return getHeaderCorrespondent(state)?.name ?? options.title;
+}
+
+function getHeaderSubtitle(state: CortexChatWidgetState, options: NormalizedWidgetOptions): string {
+  const correspondent = getHeaderCorrespondent(state);
+  return correspondent?.title ?? correspondent?.subtitle ?? options.subtitle;
+}
+
+function syncHeaderAvatar(
+  avatarEl: HTMLElement,
+  title: string,
+  avatarUrl: string | null,
+): void {
+  const existingImage = avatarEl.querySelector('img');
+  if (avatarUrl) {
+    let image = existingImage as HTMLImageElement | null;
+    if (!image) {
+      image = document.createElement('img');
+      image.alt = '';
+      image.setAttribute('aria-hidden', 'true');
+      avatarEl.appendChild(image);
+    }
+    image.src = avatarUrl;
+    avatarEl.textContent = '';
+    avatarEl.appendChild(image);
+    return;
+  }
+
+  existingImage?.remove();
+  avatarEl.textContent = getAvatarInitials(title);
+}
+
 function parseHexColor(value: string): { r: number; g: number; b: number } | null {
   const hex = value.trim();
   const short = /^#([\da-f]{3})$/i.exec(hex);
@@ -103,6 +140,53 @@ function toNonEmptyString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function formatMessageTime(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(timestamp);
+}
+
+function getTimestampSource(message: ChatMessageViewModel): 'client' | 'server' | null {
+  const value = message.meta?.['timestamp_source'];
+  return value === 'client' || value === 'server' ? value : null;
+}
+
+function getDeliveryStatusIconName(status: string): 'check2' | 'check2-all' | null {
+  if (status === 'sending') {
+    return 'check2';
+  }
+  if (status === 'sent' || status === 'delivered' || status === 'read') {
+    return 'check2-all';
+  }
+  return null;
+}
+
+function getDeliveryStatusLabel(status: string): string {
+  if (status === 'sending') {
+    return 'Sending';
+  }
+  if (status === 'sent') {
+    return 'Sent';
+  }
+  if (status === 'delivered') {
+    return 'Delivered';
+  }
+  if (status === 'read') {
+    return 'Read';
+  }
+  return 'Failed';
 }
 
 function toAttachmentViewModel(attachment: unknown): TranscriptAttachmentViewModel | null {
@@ -351,55 +435,69 @@ function renderTranscript(
 
     const meta = document.createElement('div');
     meta.className = 'cortex-widget__meta';
+    const metaText = document.createElement('span');
+    metaText.className = 'cortex-widget__meta-text';
+    metaText.setAttribute('data-testid', 'message-meta-text');
+
+    const timestampText = formatMessageTime(message.ts ?? null);
+    const timestampSource = getTimestampSource(message);
+    metaText.dataset.timestampSource = timestampSource ?? 'unknown';
+    if (timestampSource === 'client') {
+      metaText.dataset.provisional = 'true';
+    }
     if (hasActorHeader) {
-      // Actor header already shows name; only show streaming indicator here
-      meta.textContent = message.status === 'streaming' ? 'streaming' : '';
+      metaText.textContent = timestampText ?? (message.status === 'streaming' ? 'streaming' : '');
     } else {
       const displayName = message.role === 'user' ? 'You'
         : message.role === 'assistant' ? 'Assistant'
         : message.role;
       const metaParts: string[] = [displayName];
+      if (timestampText) {
+        metaParts.push(timestampText);
+      }
       if (message.status === 'streaming') {
         metaParts.push('streaming');
       }
-      meta.textContent = metaParts.join(' · ');
+      metaText.textContent = metaParts.join(' · ');
     }
+    meta.appendChild(metaText);
 
-    // Delivery status for user messages (sending / failed only — sent is silent)
     let statusEl: HTMLElement | null = null;
-    if (message.role === 'user' && message.deliveryStatus !== undefined && message.deliveryStatus !== 'sent') {
+    const deliveryStatus = typeof message.deliveryStatus === 'string' ? message.deliveryStatus : undefined;
+    if (message.role === 'user' && deliveryStatus) {
       statusEl = document.createElement('div');
       statusEl.className = 'cortex-widget__message-status';
-      statusEl.dataset.status = message.deliveryStatus;
+      statusEl.dataset.status = deliveryStatus;
       statusEl.setAttribute('data-testid', 'message-delivery-status');
 
-      if (message.deliveryStatus === 'sending') {
-        statusEl.textContent = 'Sending…';
-      } else if (message.deliveryStatus === 'failed') {
-        const text = document.createElement('span');
-        text.className = 'cortex-widget__message-status-text';
-        text.textContent = 'Not sent';
-        statusEl.appendChild(text);
+      const iconName = getDeliveryStatusIconName(deliveryStatus);
+      if (iconName) {
+        const icon = document.createElement('span');
+        icon.className = 'cortex-widget__message-status-icon';
+        icon.setAttribute('aria-label', getDeliveryStatusLabel(deliveryStatus));
+        icon.setAttribute('title', getDeliveryStatusLabel(deliveryStatus));
+        icon.setAttribute('data-testid', 'message-delivery-icon');
+        icon.innerHTML = getIconSvg(iconName);
+        statusEl.appendChild(icon);
+      }
 
-        if (message.retryable) {
-          const retryBtn = document.createElement('button');
-          retryBtn.className = 'cortex-widget__message-retry';
-          retryBtn.type = 'button';
-          retryBtn.setAttribute('aria-label', 'Retry message');
-          retryBtn.setAttribute('title', 'Retry message');
-          retryBtn.setAttribute('data-testid', 'message-retry-button');
-          retryBtn.dataset.retryMsgId = message.id;
-          retryBtn.innerHTML = getIconSvg('arrow-clockwise');
-          statusEl.appendChild(retryBtn);
-        }
+      if (deliveryStatus === 'failed' && message.retryable) {
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'cortex-widget__message-retry';
+        retryBtn.type = 'button';
+        retryBtn.setAttribute('aria-label', 'Retry message');
+        retryBtn.setAttribute('title', 'Retry message');
+        retryBtn.setAttribute('data-testid', 'message-retry-button');
+        retryBtn.dataset.retryMsgId = message.id;
+        retryBtn.innerHTML = getIconSvg('arrow-clockwise');
+        statusEl.appendChild(retryBtn);
       }
     }
 
     if (statusEl) {
-      wrapper.append(bubble, statusEl, meta);
-    } else {
-      wrapper.append(bubble, meta);
+      meta.appendChild(statusEl);
     }
+    wrapper.append(bubble, meta);
     transcriptEl.appendChild(wrapper);
   }
 
@@ -426,12 +524,15 @@ export function renderWidget(
     light: 'cortex-widget--light',
   });
 
-  dom.title.textContent = options.title;
-  dom.subtitle.textContent = options.subtitle;
+  const headerCorrespondent = getHeaderCorrespondent(state);
+  const headerTitle = getHeaderTitle(state, options);
+  const headerSubtitle = getHeaderSubtitle(state, options);
+  dom.title.textContent = headerTitle;
+  dom.subtitle.textContent = headerSubtitle;
   dom.status.textContent = state.isHistoricalView
     ? 'Viewing chat history'
     : buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
-  dom.avatar.textContent = getAvatarInitials(options.title);
+  syncHeaderAvatar(dom.avatar, headerTitle, headerCorrespondent?.avatarUrl ?? null);
   dom.statusDot.dataset.state = state.isHistoricalView
     ? 'history'
     : state.chat.connection.isConnected

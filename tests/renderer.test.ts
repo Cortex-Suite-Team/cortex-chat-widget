@@ -1,4 +1,3 @@
-import { __getLastController } from './mocks/sdk-ui.js';
 import {
   applyChatState,
   baseChatState,
@@ -28,30 +27,49 @@ describe('widget renderer behavior', () => {
     resetMocks();
   });
 
-  it('does not render optimistic local user messages and renders backend echo only', async () => {
+  it('renders one optimistic user message and reconciles it with backend echo without duplication', async () => {
     mountWidget();
     const shadow = getShadow();
-    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
-    const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
     const transcript = shadow.querySelector('[data-testid="transcript"]') as HTMLElement;
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Test',
+        clientMsgId: 'msg_1',
+        deliveryStatus: 'sending',
+        ts: '2026-05-11T10:14:00Z',
+        meta: {
+          client_msg_id: 'msg_1',
+          timestamp_source: 'client',
+        },
+      }],
+    }));
 
-    changeInput(textarea, 'Hello from user');
-    submitComposer(form);
-    await flushAsyncWork();
-
-    expect(__getLastController()?.sendCalls).toHaveLength(1);
-    expect(transcript.textContent).not.toContain('Hello from user');
+    expect(shadow.querySelectorAll('[data-testid="transcript-message"]')).toHaveLength(1);
+    expect(transcript.textContent).toContain('Test');
+    expect((shadow.querySelector('[data-testid="message-meta-text"]') as HTMLElement).dataset.provisional).toBe('true');
 
     applyChatState(baseChatState({
       transcript: [{
         id: 'msg_1',
         type: 'chat::message',
         role: 'user',
-        content: 'Hello from user',
+        content: 'Test',
+        clientMsgId: 'msg_1',
+        deliveryStatus: 'sent',
+        ts: '2026-05-11T10:15:00Z',
+        meta: {
+          client_msg_id: 'msg_1',
+          timestamp_source: 'server',
+        },
       }],
     }));
 
-    expect(transcript.textContent).toContain('Hello from user');
+    expect(shadow.querySelectorAll('[data-testid="transcript-message"]')).toHaveLength(1);
+    expect(transcript.textContent).toContain('Test');
+    expect((shadow.querySelector('[data-testid="message-meta-text"]') as HTMLElement).dataset.provisional).toBeUndefined();
   });
 
   it('locks composer until final answer and does not unlock on partials', async () => {
@@ -401,6 +419,138 @@ describe('widget renderer behavior', () => {
     expect(avatar.textContent).toBe('SC');
   });
 
+  it('keeps fallback widget title and subtitle when no runtime correspondent exists', () => {
+    mountWidget({
+      title: 'Fallback Title',
+      subtitle: 'Fallback Subtitle',
+    });
+    const shadow = getShadow();
+
+    const title = shadow.querySelector('.cortex-widget__title') as HTMLElement;
+    const subtitle = shadow.querySelector('.cortex-widget__subtitle') as HTMLElement;
+
+    expect(title.textContent).toBe('Fallback Title');
+    expect(subtitle.textContent).toBe('Fallback Subtitle');
+  });
+
+  it('prefers runtime correspondent title and subtitle in the header when present', () => {
+    mountWidget({
+      title: 'Fallback Title',
+      subtitle: 'Fallback Subtitle',
+    });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          kind: 'digital_worker',
+          id: 'project_123',
+          name: 'Robot Vasya',
+          title: 'Legal Assistant',
+          subtitle: 'Contract review worker',
+          avatarUrl: null,
+        },
+      },
+    }));
+
+    const title = shadow.querySelector('.cortex-widget__title') as HTMLElement;
+    const subtitle = shadow.querySelector('.cortex-widget__subtitle') as HTMLElement;
+    const avatar = shadow.querySelector('[data-testid="header-avatar"]') as HTMLElement;
+
+    expect(title.textContent).toBe('Robot Vasya');
+    expect(subtitle.textContent).toBe('Legal Assistant');
+    expect(avatar.textContent).toBe('RV');
+  });
+
+  it('renders correspondent avatar image in the existing header avatar container', () => {
+    mountWidget({
+      title: 'Fallback Title',
+      subtitle: 'Fallback Subtitle',
+    });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          avatarUrl: 'https://example.test/robot-vasya.png',
+        },
+      },
+    }));
+
+    const avatar = shadow.querySelector('[data-testid="header-avatar"]') as HTMLElement;
+    const image = avatar.querySelector('img') as HTMLImageElement;
+
+    expect(image).toBeTruthy();
+    expect(image.src).toBe('https://example.test/robot-vasya.png');
+    expect(image.alt).toBe('');
+    expect(image.getAttribute('aria-hidden')).toBe('true');
+    expect(avatar.textContent).toBe('');
+  });
+
+  it('restores initials when correspondent avatar disappears', () => {
+    mountWidget({
+      title: 'Fallback Title',
+      subtitle: 'Fallback Subtitle',
+    });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          avatarUrl: 'https://example.test/robot-vasya.png',
+        },
+      },
+    }));
+    expect((shadow.querySelector('[data-testid="header-avatar"]') as HTMLElement).querySelector('img')).toBeTruthy();
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          avatarUrl: null,
+        },
+      },
+    }));
+
+    const avatar = shadow.querySelector('[data-testid="header-avatar"]') as HTMLElement;
+    expect(avatar.querySelector('img')).toBeNull();
+    expect(avatar.textContent).toBe('RV');
+  });
+
+  it('returns to fallback header identity when runtime correspondent disappears entirely', () => {
+    mountWidget({
+      title: 'Fallback Title',
+      subtitle: 'Fallback Subtitle',
+    });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          title: 'Legal Assistant',
+          avatarUrl: null,
+        },
+      },
+    }));
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: null,
+      },
+    }));
+
+    const title = shadow.querySelector('.cortex-widget__title') as HTMLElement;
+    const subtitle = shadow.querySelector('.cortex-widget__subtitle') as HTMLElement;
+    const avatar = shadow.querySelector('[data-testid="header-avatar"]') as HTMLElement;
+
+    expect(title.textContent).toBe('Fallback Title');
+    expect(subtitle.textContent).toBe('Fallback Subtitle');
+    expect(avatar.textContent).toBe('FT');
+  });
+
   it('renders question option buttons for chat::question messages', () => {
     mountWidget();
     const shadow = getShadow();
@@ -610,8 +760,58 @@ describe('widget renderer behavior', () => {
 
     expect(host.style.width).toBe('100%');
     expect(host.style.height).toBe('100%');
+    expect(host.style.minHeight).toBe('0');
+    expect(host.style.overflow).toBe('hidden');
+    expect(host.style.display).toBe('block');
     expect(root.dataset.mode).toBe('embedded');
     expect(panel).toBeTruthy();
+  });
+
+  it('keeps transcript as the embedded scroll container', () => {
+    const target = document.createElement('div');
+    target.style.height = '480px';
+    target.style.display = 'flex';
+    target.style.flexDirection = 'column';
+    document.body.appendChild(target);
+
+    mountWidget({
+      mode: 'embedded',
+      target,
+    });
+
+    const host = target.firstElementChild as HTMLElement;
+    const shadow = host.shadowRoot as ShadowRoot;
+    const style = shadow.querySelector('style') as HTMLStyleElement;
+    const root = shadow.querySelector('.cortex-widget') as HTMLElement;
+    const panel = shadow.querySelector('[data-testid="panel"]') as HTMLElement;
+    const body = shadow.querySelector('.cortex-widget__body') as HTMLElement;
+    const transcript = shadow.querySelector('[data-testid="transcript"]') as HTMLElement;
+    const header = shadow.querySelector('.cortex-widget__header') as HTMLElement;
+    const composer = shadow.querySelector('[data-testid="composer"]') as HTMLElement;
+
+    applyChatState(baseChatState({
+      transcript: Array.from({ length: 24 }, (_, index) => ({
+        id: `msg_${index}`,
+        type: 'chat::answer',
+        role: 'assistant',
+        content: `Message ${index}`,
+      })),
+    }));
+
+    expect(root.dataset.mode).toBe('embedded');
+    expect(panel).toBeTruthy();
+    expect(style.textContent).toContain('.cortex-widget__body {');
+    expect(style.textContent).toContain('overflow: hidden;');
+    expect(style.textContent).toContain('.cortex-widget__transcript {');
+    expect(style.textContent).toContain('overflow-y: auto;');
+    expect(style.textContent).toContain('overflow-x: hidden;');
+    expect(style.textContent).toContain('.cortex-widget__header {');
+    expect(style.textContent).toContain('flex: 0 0 auto;');
+    expect(style.textContent).toContain('.cortex-widget__composer {');
+    expect(body).toBeTruthy();
+    expect(transcript.children.length).toBeGreaterThan(10);
+    expect(header).toBeTruthy();
+    expect(composer).toBeTruthy();
   });
 });
 
@@ -843,7 +1043,7 @@ describe('message delivery status rendering', () => {
     resetMocks();
   });
 
-  it('user message with deliveryStatus=sending renders Sending… status', () => {
+  it('user message with deliveryStatus=sending renders a single-check status icon inline without text', () => {
     mountWidget();
     const shadow = getShadow();
 
@@ -858,12 +1058,15 @@ describe('message delivery status rendering', () => {
     }));
 
     const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
+    const icon = shadow.querySelector('[data-testid="message-delivery-icon"]') as HTMLElement;
     expect(statusEl).toBeTruthy();
     expect(statusEl.dataset.status).toBe('sending');
-    expect(statusEl.textContent).toContain('Sending');
+    expect(icon).toBeTruthy();
+    expect(icon.querySelector('svg')).toBeTruthy();
+    expect(shadow.textContent).not.toContain('Sending');
   });
 
-  it('user message with deliveryStatus=sent renders no delivery status element', () => {
+  it('user message with deliveryStatus=sent renders a double-check status icon inline', () => {
     mountWidget();
     const shadow = getShadow();
 
@@ -877,11 +1080,37 @@ describe('message delivery status rendering', () => {
       }],
     }));
 
-    const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]');
-    expect(statusEl).toBeNull();
+    const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
+    const icon = shadow.querySelector('[data-testid="message-delivery-icon"]') as HTMLElement;
+    expect(statusEl).toBeTruthy();
+    expect(statusEl.dataset.status).toBe('sent');
+    expect(icon).toBeTruthy();
   });
 
-  it('user message with deliveryStatus=failed renders Not sent text', () => {
+  it('renders timestamp text in the same meta row as the delivery status icon', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Hello',
+        ts: '2026-05-11T10:14:00Z',
+        deliveryStatus: 'sent',
+      }],
+    }));
+
+    const meta = shadow.querySelector('.cortex-widget__meta') as HTMLElement;
+    const metaText = shadow.querySelector('[data-testid="message-meta-text"]') as HTMLElement;
+
+    expect(meta).toBeTruthy();
+    expect(meta.querySelector('[data-testid="message-delivery-status"]')).toBeTruthy();
+    expect(metaText.textContent).toContain('You');
+  });
+
+  it('user message with deliveryStatus=failed renders compact retry control without text banner', () => {
     mountWidget();
     const shadow = getShadow();
 
@@ -897,9 +1126,11 @@ describe('message delivery status rendering', () => {
     }));
 
     const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
+    const retryBtn = shadow.querySelector('[data-testid="message-retry-button"]') as HTMLButtonElement;
     expect(statusEl).toBeTruthy();
     expect(statusEl.dataset.status).toBe('failed');
-    expect(statusEl.textContent).toContain('Not sent');
+    expect(retryBtn).toBeTruthy();
+    expect(shadow.textContent).not.toContain('Not sent');
   });
 
   it('failed retryable user message renders retry button with correct attributes', () => {
@@ -960,6 +1191,26 @@ describe('message delivery status rendering', () => {
 
     expect(shadow.querySelector('[data-testid="message-delivery-status"]')).toBeNull();
     expect(shadow.querySelector('[data-testid="message-retry-button"]')).toBeNull();
+  });
+
+  it('user message with deliveryStatus=read renders blue double-check icon inline', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_2',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Seen already',
+        deliveryStatus: 'read' as never,
+      }],
+    }));
+
+    const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
+    expect(statusEl).toBeTruthy();
+    expect(statusEl.dataset.status).toBe('read');
+    expect(shadow.querySelector('[data-testid="message-delivery-icon"]')).toBeTruthy();
   });
 
   it('workerStatus renders independently from user message deliveryStatus', () => {

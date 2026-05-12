@@ -55,8 +55,21 @@ export const typographyStyles = `
 }
 
 .cortex-widget__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 10.5px;
   color: var(--cortex-muted-text);
+}
+
+.cortex-widget__meta-text {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.cortex-widget__meta-text[data-provisional="true"] {
+  opacity: 0.68;
 }
 
 .cortex-widget__formatted {
@@ -268,12 +281,34 @@ export const typographyStyles = `
   color: var(--cortex-muted-text);
 }
 
+.cortex-widget__message-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.cortex-widget__message-status-icon svg {
+  width: 13px;
+  height: 13px;
+  pointer-events: none;
+}
+
 .cortex-widget__message-status[data-status="failed"] {
   color: #dc2626;
 }
 
 .cortex-widget__message-status[data-status="sending"] {
-  opacity: 0.75;
+  opacity: 0.72;
+}
+
+.cortex-widget__message-status[data-status="sent"],
+.cortex-widget__message-status[data-status="delivered"] {
+  color: var(--cortex-muted-text);
+}
+
+.cortex-widget__message-status[data-status="read"] {
+  color: color-mix(in srgb, var(--cortex-accent-color) 72%, #38bdf8 28%);
 }
 
 .cortex-widget__message-retry {

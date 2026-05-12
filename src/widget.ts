@@ -21,6 +21,9 @@ import type {
 } from './types.js';
 
 const EMPTY_CHAT_STATE: ChatState = {
+  session: {
+    correspondent: null,
+  },
   connection: {
     channelState: 'CLOSED',
     sessionState: 'CREATED',
@@ -39,6 +42,9 @@ const EMPTY_CHAT_STATE: ChatState = {
 
 function cloneChatState(state: ChatState): ChatState {
   return {
+    session: {
+      correspondent: state.session.correspondent ? { ...state.session.correspondent } : null,
+    },
     connection: { ...state.connection },
     transcript: [...state.transcript],
     input: { ...state.input },

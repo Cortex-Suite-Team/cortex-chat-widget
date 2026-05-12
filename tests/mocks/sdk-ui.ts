@@ -64,7 +64,21 @@ export interface WorkerState {
   correlation_id?: string;
 }
 
+export interface ChatCorrespondent {
+  kind?: string;
+  id?: string | null;
+  name: string;
+  title?: string | null;
+  subtitle?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface ChatSessionState {
+  correspondent: ChatCorrespondent | null;
+}
+
 export interface ChatState {
+  session: ChatSessionState;
   connection: {
     channelState: string;
     sessionState: string;
@@ -88,6 +102,7 @@ export interface CortexClientLike {
   sendMessage(options: { content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }): Promise<void>;
   onMessage(handler: (message: Record<string, unknown>) => void): () => void;
   sessionId?: string | null;
+  sessionMeta?: Record<string, unknown> | null;
   sessionState?: string;
   channelState?: string;
 }
@@ -173,6 +188,7 @@ export function createMockChatState(
   overrides: Partial<ChatState> = {},
 ): ChatState {
   return {
+    session: overrides.session ?? { correspondent: null },
     connection: {
       channelState: 'OPEN',
       sessionState: 'ACTIVE',

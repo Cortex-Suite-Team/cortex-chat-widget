@@ -22,6 +22,8 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   if (options.mode === 'embedded') {
     host.style.width = '100%';
     host.style.height = '100%';
+    host.style.minHeight = '0';
+    host.style.overflow = 'hidden';
     host.style.display = 'block';
   }
   const shadowRoot = host.attachShadow({ mode: 'open' });

@@ -10,6 +10,7 @@ export class CustomClient implements WidgetClientLike {
   readonly sentMessages: Array<{ content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }> = [];
   readonly uploadedAttachments: File[] = [];
   readonly uploadedFiles: File[] = [];
+  sessionMeta: Record<string, unknown> | null = null;
   sessionState = 'ACTIVE';
   channelState = 'OPEN';
   sessionId = 'sess_custom';
