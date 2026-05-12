@@ -76,6 +76,13 @@
       return null;
     }
   }
+  function trimTrailingSlashes(value) {
+    let end = value.length;
+    while (end > 0 && value.charCodeAt(end - 1) === 47) {
+      end--;
+    }
+    return value.slice(0, end);
+  }
   async function exchangeApiKey(apiKey, fetchFn, authBaseUrl = DEFAULT_AUTH_URL) {
     const res = await fetchFn(buildAuthEndpoint(authBaseUrl, AUTH_TOKEN_PATH), {
       method: "POST",
@@ -113,7 +120,7 @@
     return Date.now() > expMs - TOKEN_REFRESH_BUFFER_MS;
   }
   function normalizeAuthBaseUrl(authUrl) {
-    let normalized = authUrl.replace(/\/+$/, "");
+    let normalized = trimTrailingSlashes(authUrl);
     for (const knownPath of [AUTH_TOKEN_PATH, AUTH_REFRESH_PATH]) {
       if (normalized.endsWith(knownPath)) {
         const base = normalized.slice(0, -knownPath.length);
