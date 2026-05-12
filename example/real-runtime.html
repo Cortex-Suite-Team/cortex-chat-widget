@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cortex Chat Widget Real Runtime Example</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          Inter,
+          "Segoe UI",
+          Tahoma,
+          Geneva,
+          Verdana,
+          sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 233, 0.12), transparent 32%),
+          linear-gradient(180deg, #f8fbff 0%, #eef4f8 100%);
+        color: #163045;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        min-width: 320px;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      main {
+        width: min(100%, 1360px);
+        min-height: 100%;
+        margin: 0 auto;
+        padding: 28px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .intro {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      .intro-main {
+        min-width: 0;
+        max-width: 860px;
+      }
+
+      .eyebrow {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(14, 165, 233, 0.12);
+        color: #0369a1;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 12px 0 8px;
+        font-size: clamp(1.75rem, 4vw, 3rem);
+        line-height: 1.05;
+      }
+
+      p {
+        margin: 0;
+        line-height: 1.55;
+      }
+
+      code {
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 0.95em;
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 22px;
+        box-shadow: 0 20px 48px rgba(15, 23, 42, 0.09);
+        backdrop-filter: blur(10px);
+      }
+
+      .workbench {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(260px, 320px) minmax(420px, 1fr) minmax(260px, 320px);
+        gap: 18px;
+        align-items: stretch;
+        height: min(760px, calc(100vh - 180px));
+        min-height: 560px;
+      }
+
+      .panel {
+        min-height: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .panel-header {
+        flex: 0 0 auto;
+        padding: 16px 18px 12px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+      }
+
+      .panel-header h2 {
+        margin: 0 0 6px;
+        font-size: 1rem;
+      }
+
+      .panel-header p {
+        color: #587084;
+        font-size: 0.92rem;
+      }
+
+      .panel-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        padding: 16px 18px 18px;
+      }
+
+      .config-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .field label {
+        color: #334155;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .field input {
+        width: 100%;
+        border: 1px solid rgba(148, 163, 184, 0.5);
+        border-radius: 12px;
+        padding: 9px 10px;
+        color: #0f172a;
+        background: #ffffff;
+        outline: none;
+      }
+
+      .field input:focus {
+        border-color: #0284c7;
+        box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.14);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+      }
+
+      .button {
+        border: 0;
+        border-radius: 999px;
+        padding: 9px 14px;
+        background: #0369a1;
+        color: #ffffff;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      .button.secondary {
+        background: #e2e8f0;
+        color: #1e293b;
+      }
+
+      .debug-list {
+        display: grid;
+        gap: 9px;
+        margin: 0;
+      }
+
+      .debug-row {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr);
+        gap: 8px;
+        align-items: start;
+        font-size: 0.9rem;
+      }
+
+      .debug-row dt {
+        color: #64748b;
+        font-weight: 700;
+      }
+
+      .debug-row dd {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        color: #0f172a;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        color: #334155;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .status-pill[data-state="ready"] {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .status-pill[data-state="error"] {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
+      .chat-panel,
+      .history-panel {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      #chat-root,
+      #history-root {
+        flex: 1 1 auto;
+        height: 100%;
+        min-height: 0;
+      }
+
+      .empty-history {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        color: #64748b;
+        text-align: center;
+      }
+
+      .log {
+        display: grid;
+        gap: 8px;
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(148, 163, 184, 0.28);
+      }
+
+      .log h3 {
+        margin: 0;
+        font-size: 0.92rem;
+      }
+
+      .log-output {
+        min-height: 90px;
+        max-height: 220px;
+        overflow: auto;
+        margin: 0;
+        padding: 10px;
+        border-radius: 12px;
+        background: #0f172a;
+        color: #dbeafe;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 0.78rem;
+        white-space: pre-wrap;
+      }
+
+      .hint {
+        margin-top: 12px;
+        color: #64748b;
+        font-size: 0.86rem;
+      }
+
+      @media (max-width: 1100px) {
+        main {
+          padding: 20px 14px;
+        }
+
+        .intro {
+          display: block;
+        }
+
+        .workbench {
+          height: auto;
+          min-height: 0;
+          grid-template-columns: 1fr;
+        }
+
+        .config-panel,
+        .history-panel {
+          min-height: 320px;
+        }
+
+        .chat-panel {
+          height: min(720px, calc(100vh - 120px));
+          min-height: 520px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="intro">
+        <div class="intro-main">
+          <span class="eyebrow">Real Runtime Example</span>
+          <h1>Cortex Chat Widget → Runtime Echo Release</h1>
+          <p>
+            This page mounts the real widget bundle and connects it to a live Cortex deployment
+            through a Public Widget Key. No mock client is used here.
+          </p>
+        </div>
+      </section>
+
+      <section class="workbench">
+        <aside class="card panel config-panel">
+          <div class="panel-header">
+            <h2>Connection</h2>
+            <p>Fill once, save locally, then reload the widget.</p>
+          </div>
+
+          <div class="panel-body">
+            <form id="config-form" class="config-form">
+              <div class="field">
+                <label for="public-widget-key">Public Widget Key</label>
+                <input
+                  id="public-widget-key"
+                  name="publicWidgetKey"
+                  autocomplete="off"
+                  placeholder="pwk_..."
+                />
+              </div>
+
+              <div class="field">
+                <label for="control-plane-url">Control Plane URL</label>
+                <input
+                  id="control-plane-url"
+                  name="controlPlaneUrl"
+                  autocomplete="off"
+                  placeholder="https://cortexsuite.app"
+                />
+              </div>
+
+              <div class="field">
+                <label for="auth-url">Auth URL, optional</label>
+                <input
+                  id="auth-url"
+                  name="authUrl"
+                  autocomplete="off"
+                  placeholder="leave empty unless SDK requires explicit authUrl"
+                />
+              </div>
+
+              <div class="actions">
+                <button class="button" type="submit">Mount / Reload</button>
+                <button class="button secondary" type="button" id="clear-config">Clear</button>
+              </div>
+            </form>
+
+            <p class="hint">
+              You can also pass values through URL query parameters:
+              <code>?key=...&cp=...&auth=...</code>
+            </p>
+
+            <div class="log">
+              <h3>Debug</h3>
+              <dl class="debug-list">
+                <div class="debug-row">
+                  <dt>Status</dt>
+                  <dd><span id="debug-status" class="status-pill">not mounted</span></dd>
+                </div>
+                <div class="debug-row">
+                  <dt>Session</dt>
+                  <dd id="debug-session">—</dd>
+                </div>
+                <div class="debug-row">
+                  <dt>Channel</dt>
+                  <dd id="debug-channel">—</dd>
+                </div>
+                <div class="debug-row">
+                  <dt>Messages</dt>
+                  <dd id="debug-messages">0</dd>
+                </div>
+                <div class="debug-row">
+                  <dt>Historical</dt>
+                  <dd id="debug-historical">false</dd>
+                </div>
+              </dl>
+              <pre id="debug-log" class="log-output"></pre>
+            </div>
+          </div>
+        </aside>
+
+        <section class="card chat-panel">
+          <div id="chat-root" aria-label="Embedded Cortex Chat Widget real runtime example"></div>
+        </section>
+
+        <aside class="card history-panel">
+          <div class="panel-header">
+            <h2>History</h2>
+            <p>Loaded through Control Plane public chat endpoints.</p>
+          </div>
+          <div id="history-root" aria-label="Cortex Chat History real runtime example">
+            <div class="empty-history">
+              History will appear here after the widget is mounted with a Control Plane URL.
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module">
+      import { mountCortexChat } from "../dist/index.js";
+      // For GitHub-hosted manual testing, you may use this instead after build artifacts are published:
+      // import { mountCortexChat } from "https://cdn.jsdelivr.net/gh/Cortex-Suite-Team/cortex-chat-widget@main/dist/index.js";
+
+      const STORAGE_KEY = "cortex-chat-widget.real-runtime.config";
+
+      const DEFAULT_CONFIG = {
+        publicWidgetKey: "",
+        controlPlaneUrl: "https://cortexsuite.app",
+        authUrl: ""
+      };
+
+      let widgetHandle = null;
+
+      const form = document.querySelector("#config-form");
+      const keyInput = document.querySelector("#public-widget-key");
+      const cpInput = document.querySelector("#control-plane-url");
+      const authInput = document.querySelector("#auth-url");
+      const clearButton = document.querySelector("#clear-config");
+
+      const debugStatus = document.querySelector("#debug-status");
+      const debugSession = document.querySelector("#debug-session");
+      const debugChannel = document.querySelector("#debug-channel");
+      const debugMessages = document.querySelector("#debug-messages");
+      const debugHistorical = document.querySelector("#debug-historical");
+      const debugLog = document.querySelector("#debug-log");
+
+      function readQueryConfig() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+          publicWidgetKey: params.get("key") ?? params.get("apiKey") ?? "",
+          controlPlaneUrl: params.get("cp") ?? params.get("controlPlaneUrl") ?? "",
+          authUrl: params.get("auth") ?? params.get("authUrl") ?? ""
+        };
+      }
+
+      function readStoredConfig() {
+        try {
+          const raw = window.localStorage.getItem(STORAGE_KEY);
+          if (!raw) {
+            return {};
+          }
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === "object" ? parsed : {};
+        } catch {
+          return {};
+        }
+      }
+
+      function normalizeUrl(value) {
+        const trimmed = String(value ?? "").trim();
+        return trimmed.replace(/\/+$/, "");
+      }
+
+      function readConfigFromForm() {
+        return {
+          publicWidgetKey: keyInput.value.trim(),
+          controlPlaneUrl: normalizeUrl(cpInput.value),
+          authUrl: normalizeUrl(authInput.value)
+        };
+      }
+
+      function writeConfigToForm(config) {
+        keyInput.value = config.publicWidgetKey ?? "";
+        cpInput.value = config.controlPlaneUrl ?? "";
+        authInput.value = config.authUrl ?? "";
+      }
+
+      function saveConfig(config) {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+      }
+
+      function clearConfig() {
+        window.localStorage.removeItem(STORAGE_KEY);
+        writeConfigToForm(DEFAULT_CONFIG);
+        setStatus("not mounted");
+        writeLog("Local config cleared.");
+      }
+
+      function setStatus(text, state = "") {
+        debugStatus.textContent = text;
+        debugStatus.dataset.state = state;
+      }
+
+      function writeLog(message, data) {
+        const now = new Date().toLocaleTimeString();
+        const renderedData = data === undefined ? "" : `\n${safeStringify(data)}`;
+        debugLog.textContent = `[${now}] ${message}${renderedData}\n\n${debugLog.textContent}`.slice(0, 6000);
+      }
+
+      function safeStringify(value) {
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch (error) {
+          return String(error);
+        }
+      }
+
+      function updateDebugFromState(state) {
+        debugSession.textContent = state.chat?.connection?.sessionState ?? "—";
+        debugChannel.textContent = state.chat?.connection?.channelState ?? "—";
+        debugMessages.textContent = String(state.chat?.transcript?.length ?? 0);
+        debugHistorical.textContent = String(Boolean(state.isHistoricalView));
+      }
+
+      function buildWidgetOptions(config) {
+        const options = {
+          apiKey: config.publicWidgetKey,
+          mode: "embedded",
+          target: "#chat-root",
+          controlPlaneUrl: config.controlPlaneUrl,
+          historyTarget: "#history-root",
+          title: "Cortex Echo Worker",
+          subtitle: "Real runtime release",
+          placeholder: "Send a message to the echo graph...",
+          onReady() {
+            setStatus("ready", "ready");
+            writeLog("Widget is ready.");
+          },
+          onStateChange(state) {
+            updateDebugFromState(state);
+          },
+          onError(error) {
+            setStatus("error", "error");
+            writeLog("Widget error.", {
+              message: error?.message ?? String(error),
+              code: error?.code ?? null
+            });
+          }
+        };
+
+        if (config.authUrl) {
+          options.authUrl = config.authUrl;
+        }
+
+        return options;
+      }
+
+      function mount(config) {
+        if (!config.publicWidgetKey) {
+          setStatus("missing key", "error");
+          writeLog("Public Widget Key is required.");
+          return;
+        }
+
+        if (!config.controlPlaneUrl) {
+          setStatus("missing CP URL", "error");
+          writeLog("Control Plane URL is required when historyTarget is used.");
+          return;
+        }
+
+        if (widgetHandle) {
+          widgetHandle.destroy();
+          widgetHandle = null;
+        }
+
+        setStatus("mounting");
+        saveConfig(config);
+        writeLog("Mounting real runtime widget.", {
+          controlPlaneUrl: config.controlPlaneUrl,
+          authUrl: config.authUrl || null,
+          hasPublicWidgetKey: true
+        });
+
+        try {
+          widgetHandle = mountCortexChat("#chat-root", buildWidgetOptions(config));
+        } catch (error) {
+          setStatus("error", "error");
+          writeLog("Mount failed.", {
+            message: error?.message ?? String(error),
+            code: error?.code ?? null
+          });
+        }
+      }
+
+      const initialConfig = {
+        ...DEFAULT_CONFIG,
+        ...readStoredConfig(),
+        ...Object.fromEntries(
+          Object.entries(readQueryConfig()).filter(([, value]) => value)
+        )
+      };
+
+      writeConfigToForm(initialConfig);
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        mount(readConfigFromForm());
+      });
+
+      clearButton.addEventListener("click", () => {
+        if (widgetHandle) {
+          widgetHandle.destroy();
+          widgetHandle = null;
+        }
+        clearConfig();
+      });
+
+      if (initialConfig.publicWidgetKey) {
+        mount(initialConfig);
+      } else {
+        setStatus("waiting for key");
+        writeLog("Fill Public Widget Key and Control Plane URL, then click Mount / Reload.");
+      }
+    </script>
+  </body>
+</html>
