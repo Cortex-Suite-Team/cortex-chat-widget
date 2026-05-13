@@ -4657,6 +4657,7 @@ function createClient(options) {
   }
   return new CortexBrowserClient({
     apiKey: options.apiKey,
+    workerRef: options.workerRef,
     authUrl: options.authUrl,
     onMessage: () => {
     }

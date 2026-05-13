@@ -39,6 +39,7 @@ export interface HistoryConversationSummary {
 }
 export interface CortexChatWidgetOptions {
     apiKey: string;
+    workerRef?: string;
     mode?: 'embedded' | 'floating';
     target?: string | HTMLElement;
     historyTarget?: string | HTMLElement;

@@ -4659,6 +4659,7 @@
     }
     return new CortexBrowserClient({
       apiKey: options.apiKey,
+      workerRef: options.workerRef,
       authUrl: options.authUrl,
       onMessage: () => {
       }
@@ -4696,6 +4697,7 @@
     const dataset = script.dataset;
     return {
       apiKey: dataset.apiKey ?? "",
+      workerRef: dataset.workerRef,
       mode: dataset.mode === "embedded" ? "embedded" : "floating",
       target: dataset.target,
       historyTarget: dataset.historyTarget,
