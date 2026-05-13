@@ -81,13 +81,17 @@ function trimTrailingSlashes(value) {
   }
   return value.slice(0, end);
 }
-async function exchangeApiKey(apiKey, fetchFn, authBaseUrl = DEFAULT_AUTH_URL) {
-  const res = await fetchFn(buildAuthEndpoint(authBaseUrl, AUTH_TOKEN_PATH), {
+async function exchangeApiKey(apiKey, fetchFn, authBaseUrl = DEFAULT_AUTH_URL, workerRef) {
+  const requestInit = {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `ApiKey ${apiKey}`
-    }
+    },
+    ...workerRef ? { body: JSON.stringify({ worker_ref: workerRef }) } : {}
+  };
+  const res = await fetchFn(buildAuthEndpoint(authBaseUrl, AUTH_TOKEN_PATH), {
+    ...requestInit
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -661,7 +665,7 @@ var CortexClient = class {
   async connect() {
     this._disconnectRequested = false;
     this._reconnectAttempt = 0;
-    const authResponse = await exchangeApiKey(this._options.apiKey, this._platform.fetchFn, this._options.authUrl);
+    const authResponse = await exchangeApiKey(this._options.apiKey, this._platform.fetchFn, this._options.authUrl, this._options.workerRef);
     this._accessToken = authResponse.access_token;
     this._refreshToken = authResponse.refresh_token;
     this._wsUrl = authResponse.ws_url;
