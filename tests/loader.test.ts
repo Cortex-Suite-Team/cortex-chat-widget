@@ -11,6 +11,7 @@ describe('loader', () => {
   it('reads data attributes and mounts widget', async () => {
     const script = document.createElement('script');
     script.dataset.apiKey = 'loader-key';
+    script.dataset.workerRef = 'live-worker';
     script.dataset.mode = 'floating';
     script.dataset.title = 'Ask Cortex';
     script.dataset.position = 'bottom-right';
@@ -25,6 +26,8 @@ describe('loader', () => {
     const host = document.body.firstElementChild as HTMLElement;
     const title = host.shadowRoot?.querySelector('.cortex-widget__title');
     expect(title?.textContent).toBe('Ask Cortex');
+    const sdkModule = await import('./mocks/sdk-browser.js');
+    expect(sdkModule.__getLastSdkBrowserClient()?.options.workerRef).toBe('live-worker');
   });
 
   it('supports optional history loader attributes', async () => {

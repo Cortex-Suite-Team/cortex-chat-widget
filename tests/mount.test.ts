@@ -9,6 +9,7 @@ import {
   submitComposer,
 } from './helpers.js';
 import { mountCortexChat } from '../src/index.js';
+import { __getLastSdkBrowserClient } from './mocks/sdk-browser.js';
 
 describe('mountCortexChat', () => {
   beforeEach(() => {
@@ -71,6 +72,15 @@ describe('mountCortexChat', () => {
         apiKey: '',
       });
     }).toThrow('requires apiKey');
+  });
+
+  it('passes workerRef to the SDK client', () => {
+    mountCortexChat({
+      apiKey: 'test-key',
+      workerRef: 'live-worker',
+    });
+
+    expect(__getLastSdkBrowserClient()?.options.workerRef).toBe('live-worker');
   });
 
   it('renders attachment UI disabled when client has no upload capability', () => {

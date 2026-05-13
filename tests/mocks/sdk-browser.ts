@@ -2,6 +2,7 @@ type MessageHandler = (message: Record<string, unknown>) => void;
 
 interface CortexClientOptions {
   apiKey: string;
+  workerRef?: string;
   authUrl?: string;
   onMessage: (message: Record<string, unknown>) => void;
 }

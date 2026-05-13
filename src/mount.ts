@@ -132,6 +132,7 @@ function createClient(options: NormalizedWidgetOptions): WidgetClientLike {
 
   return new CortexClient({
     apiKey: options.apiKey,
+    workerRef: options.workerRef,
     authUrl: options.authUrl,
     onMessage: () => {},
   }) as unknown as WidgetClientLike;

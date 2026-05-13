@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cortex Chat Widget Real Runtime Example</title>
+    <title>Cortex Chat Widget Existing Worker Release</title>
     <style>
       :root {
         color-scheme: light;
@@ -331,10 +331,10 @@
       <section class="intro">
         <div class="intro-main">
           <span class="eyebrow">Real Runtime Example</span>
-          <h1>Cortex Chat Widget → Runtime Echo Release</h1>
+          <h1>Cortex Chat Widget -> Existing Worker Release</h1>
           <p>
-            This page mounts the real widget bundle and connects it to a live Cortex deployment
-            through a Public Widget Key. No mock client is used here.
+            This page mounts the real widget bundle and connects it to an existing active Cortex
+            worker release through <code>apiKey + workerRef</code>. No mock client is used here.
           </p>
         </div>
       </section>
@@ -349,12 +349,22 @@
           <div class="panel-body">
             <form id="config-form" class="config-form">
               <div class="field">
-                <label for="public-widget-key">Public Widget Key</label>
+                <label for="api-key">API Key</label>
                 <input
-                  id="public-widget-key"
-                  name="publicWidgetKey"
+                  id="api-key"
+                  name="apiKey"
                   autocomplete="off"
-                  placeholder="pwk_..."
+                  placeholder="csk_..."
+                />
+              </div>
+
+              <div class="field">
+                <label for="worker-ref">Worker reference</label>
+                <input
+                  id="worker-ref"
+                  name="workerRef"
+                  autocomplete="off"
+                  placeholder="existing-project-slug"
                 />
               </div>
 
@@ -386,7 +396,7 @@
 
             <p class="hint">
               You can also pass values through URL query parameters:
-              <code>?key=...&cp=...&auth=...</code>
+              <code>?key=...&workerRef=...&cp=...&auth=...</code>
             </p>
 
             <div class="log">
@@ -425,7 +435,7 @@
         <aside class="card history-panel">
           <div class="panel-header">
             <h2>History</h2>
-            <p>Loaded through Control Plane public chat endpoints.</p>
+            <p>Loaded through Control Plane conversation endpoints.</p>
           </div>
           <div id="history-root" aria-label="Cortex Chat History real runtime example">
             <div class="empty-history">
@@ -444,7 +454,8 @@
       const STORAGE_KEY = "cortex-chat-widget.real-runtime.config";
 
       const DEFAULT_CONFIG = {
-        publicWidgetKey: "",
+        apiKey: "",
+        workerRef: "",
         controlPlaneUrl: "https://cortexsuite.app",
         authUrl: ""
       };
@@ -452,7 +463,8 @@
       let widgetHandle = null;
 
       const form = document.querySelector("#config-form");
-      const keyInput = document.querySelector("#public-widget-key");
+      const apiKeyInput = document.querySelector("#api-key");
+      const workerRefInput = document.querySelector("#worker-ref");
       const cpInput = document.querySelector("#control-plane-url");
       const authInput = document.querySelector("#auth-url");
       const clearButton = document.querySelector("#clear-config");
@@ -467,7 +479,8 @@
       function readQueryConfig() {
         const params = new URLSearchParams(window.location.search);
         return {
-          publicWidgetKey: params.get("key") ?? params.get("apiKey") ?? "",
+          apiKey: params.get("key") ?? params.get("apiKey") ?? "",
+          workerRef: params.get("workerRef") ?? "",
           controlPlaneUrl: params.get("cp") ?? params.get("controlPlaneUrl") ?? "",
           authUrl: params.get("auth") ?? params.get("authUrl") ?? ""
         };
@@ -493,14 +506,16 @@
 
       function readConfigFromForm() {
         return {
-          publicWidgetKey: keyInput.value.trim(),
+          apiKey: apiKeyInput.value.trim(),
+          workerRef: workerRefInput.value.trim(),
           controlPlaneUrl: normalizeUrl(cpInput.value),
           authUrl: normalizeUrl(authInput.value)
         };
       }
 
       function writeConfigToForm(config) {
-        keyInput.value = config.publicWidgetKey ?? "";
+        apiKeyInput.value = config.apiKey ?? "";
+        workerRefInput.value = config.workerRef ?? "";
         cpInput.value = config.controlPlaneUrl ?? "";
         authInput.value = config.authUrl ?? "";
       }
@@ -544,14 +559,15 @@
 
       function buildWidgetOptions(config) {
         const options = {
-          apiKey: config.publicWidgetKey,
+          apiKey: config.apiKey,
+          workerRef: config.workerRef,
           mode: "embedded",
           target: "#chat-root",
           controlPlaneUrl: config.controlPlaneUrl,
           historyTarget: "#history-root",
-          title: "Cortex Echo Worker",
-          subtitle: "Real runtime release",
-          placeholder: "Send a message to the echo graph...",
+          title: "Cortex Worker",
+          subtitle: "Existing active release",
+          placeholder: "Send a message to the connected worker...",
           onReady() {
             setStatus("ready", "ready");
             writeLog("Widget is ready.");
@@ -576,9 +592,15 @@
       }
 
       function mount(config) {
-        if (!config.publicWidgetKey) {
+        if (!config.apiKey) {
           setStatus("missing key", "error");
-          writeLog("Public Widget Key is required.");
+          writeLog("API Key is required.");
+          return;
+        }
+
+        if (!config.workerRef) {
+          setStatus("missing workerRef", "error");
+          writeLog("workerRef is required for the tenant-key runtime bridge.");
           return;
         }
 
@@ -596,9 +618,10 @@
         setStatus("mounting");
         saveConfig(config);
         writeLog("Mounting real runtime widget.", {
+          workerRef: config.workerRef,
           controlPlaneUrl: config.controlPlaneUrl,
           authUrl: config.authUrl || null,
-          hasPublicWidgetKey: true
+          hasApiKey: true
         });
 
         try {
@@ -635,11 +658,11 @@
         clearConfig();
       });
 
-      if (initialConfig.publicWidgetKey) {
+      if (initialConfig.apiKey && initialConfig.workerRef) {
         mount(initialConfig);
       } else {
         setStatus("waiting for key");
-        writeLog("Fill Public Widget Key and Control Plane URL, then click Mount / Reload.");
+        writeLog("Fill API Key, workerRef, and Control Plane URL, then click Mount / Reload.");
       }
     </script>
   </body>

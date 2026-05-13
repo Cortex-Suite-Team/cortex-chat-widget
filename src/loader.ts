@@ -20,6 +20,7 @@ function buildOptionsFromScript(script: HTMLScriptElement): CortexChatWidgetOpti
   const dataset = script.dataset;
   return {
     apiKey: dataset.apiKey ?? '',
+    workerRef: dataset.workerRef,
     mode: dataset.mode === 'embedded' ? 'embedded' : 'floating',
     target: dataset.target,
     historyTarget: dataset.historyTarget,
