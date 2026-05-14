@@ -166,7 +166,7 @@ describe('mountCortexChat', () => {
     debugSpy.mockRestore();
   });
 
-  it('draft input does not change header correspondent once session identity is set', () => {
+  it('keeps the header correspondent immutable across typing, send, and message-level actors', async () => {
     mountWidget({
       mode: 'floating',
     });
@@ -174,6 +174,9 @@ describe('mountCortexChat', () => {
     const shadow = host.shadowRoot as ShadowRoot;
     const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
     const title = shadow.querySelector('.cortex-widget__title') as HTMLElement;
+    const subtitle = shadow.querySelector('.cortex-widget__subtitle') as HTMLElement;
+    const avatar = shadow.querySelector('[data-testid="header-avatar"]') as HTMLElement;
+    const composer = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
 
     applyChatState(baseChatState({
       session: {
@@ -185,9 +188,78 @@ describe('mountCortexChat', () => {
       },
     }));
 
+    const initialAvatar = avatar.querySelector('img') as HTMLImageElement;
+    expect(title.textContent).toBe('Echo Worker');
+    expect(subtitle.textContent).toBe('Tester');
+    expect(initialAvatar.src).toBe('https://example.test/avatar.png');
+
+    changeInput(textarea, 'd');
+    changeInput(textarea, 'dr');
     changeInput(textarea, 'draft text');
+    expect(title.textContent).toBe('Echo Worker');
+    expect(subtitle.textContent).toBe('Tester');
+    expect((avatar.querySelector('img') as HTMLImageElement).src).toBe('https://example.test/avatar.png');
+
+    submitComposer(composer);
+    await flushAsyncWork();
 
     expect(title.textContent).toBe('Echo Worker');
+    expect(subtitle.textContent).toBe('Tester');
+    expect((avatar.querySelector('img') as HTMLImageElement).src).toBe('https://example.test/avatar.png');
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Echo Worker',
+          title: 'Tester',
+          avatarUrl: 'https://example.test/avatar.png',
+        },
+      },
+      transcript: [{
+        id: 'assistant_1',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'Hello from another actor',
+        meta: {
+          actor: {
+            name: 'Local Bubble Actor',
+            title: 'Bubble Only',
+            avatar_url: 'https://example.test/local-bubble.png',
+          },
+        },
+      }],
+    }));
+
+    expect(title.textContent).toBe('Echo Worker');
+    expect(subtitle.textContent).toBe('Tester');
+    expect((avatar.querySelector('img') as HTMLImageElement).src).toBe('https://example.test/avatar.png');
+    expect((shadow.querySelector('[data-testid="actor-name"]') as HTMLElement).textContent).toBe('Local Bubble Actor');
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Echo Worker',
+          title: 'Tester',
+          avatarUrl: 'https://example.test/avatar.png',
+        },
+      },
+      transcript: [{
+        id: 'user_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'User message with actor metadata',
+        meta: {
+          actor: {
+            name: 'Should Not Render',
+          },
+        },
+      }],
+    }));
+
+    expect(title.textContent).toBe('Echo Worker');
+    expect(subtitle.textContent).toBe('Tester');
+    expect((avatar.querySelector('img') as HTMLImageElement).src).toBe('https://example.test/avatar.png');
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
   });
 
   it('handleSend calls controller.sendMessage once', async () => {
