@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.5 builtAt=2026-05-14T18:09:22.969Z */
+/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-14T18:16:12.664Z */
 
 // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://cortexsuite.app";
@@ -3057,7 +3057,10 @@ function createTranscriptStore(options = {}) {
     }
     return {
       ...normalized,
-      id: normalized.id,
+      // Keep the original optimistic bubble identity stable across echo reconciliation.
+      // Server seq/ts still become authoritative when present, but the logical user
+      // message id should not change underneath the UI.
+      id: existing.id,
       clientMsgId: normalized.clientMsgId ?? existing.clientMsgId,
       deliveryStatus: "processed",
       retryable: false,
