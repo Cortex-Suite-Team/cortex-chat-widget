@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.5 builtAt=2026-05-14T16:33:15.831Z */
+/* cortex-chat-widget build: sdk=1.1.5 builtAt=2026-05-14T17:15:52.707Z */
 
 // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://cortexsuite.app";
