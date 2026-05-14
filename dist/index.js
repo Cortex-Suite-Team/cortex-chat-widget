@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.4 builtAt=2026-05-14T16:19:05.947Z */
+/* cortex-chat-widget build: sdk=1.1.5 builtAt=2026-05-14T16:33:15.831Z */
 
 // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://cortexsuite.app";
@@ -141,6 +141,25 @@ function buildAuthEndpoint(authBaseUrl, path) {
   return `${normalizeAuthBaseUrl(authBaseUrl)}${path}`;
 }
 
+// node_modules/@cortex-suite/sdk/dist/browser/debug.js
+function readSdkDebugFlag() {
+  try {
+    return globalThis.localStorage?.getItem("cortex_debug") === "1";
+  } catch {
+    return false;
+  }
+}
+function debugLog(enabled, message, data) {
+  if (!enabled) {
+    return;
+  }
+  if (data === void 0) {
+    console.debug(message);
+    return;
+  }
+  console.debug(message, data);
+}
+
 // node_modules/@cortex-suite/sdk/dist/browser/transport.js
 function _asCloseReason(reason) {
   if (typeof reason === "string") {
@@ -171,7 +190,7 @@ function _buildOpenError(wsUrl, baseMessage, details = {}) {
   error.phase = details.phase;
   return error;
 }
-function createTransport(WS, connectTimeoutMs) {
+function createTransport(WS, connectTimeoutMs, isDebugEnabled = () => false) {
   let ws = null;
   const transport = {
     onMessage: null,
@@ -243,12 +262,12 @@ function createTransport(WS, connectTimeoutMs) {
         }, timeoutMs);
         try {
           const envelopeType = typeof message === "object" && message !== null && "type" in message && typeof message.type === "string" ? message.type : "unknown";
-          console.debug("[sdk] transport.send start", {
+          debugLog(isDebugEnabled(), "[sdk] transport.send start", {
             envelopeType,
             readyState: ws.readyState
           });
           ws.send(JSON.stringify(message));
-          console.debug("[sdk] transport.send done", {
+          debugLog(isDebugEnabled(), "[sdk] transport.send done", {
             envelopeType,
             readyState: ws.readyState
           });
@@ -647,6 +666,7 @@ var CortexClient = class {
     this._channelId = `ch_${Math.random().toString(36).slice(2, 10)}`;
     this._reconnectAttempt = 0;
     this._disconnectRequested = false;
+    this._debugEnabled = false;
     this._connectPromise = null;
     this._sessionOpenWaiter = null;
     this._sessionOpenTimer = null;
@@ -664,11 +684,13 @@ var CortexClient = class {
       pingInterval: DEFAULT_PING_INTERVAL_MS,
       pongTimeout: DEFAULT_PONG_TIMEOUT_MS,
       staleThreshold: DEFAULT_STALE_THRESHOLD_MS,
+      debug: false,
       ...options,
       authUrl
     };
     this._platform = platform;
-    this._transport = createTransport(platform.WS, this._options.connectTimeout);
+    this._debugEnabled = options.debug === true || readSdkDebugFlag();
+    this._transport = createTransport(platform.WS, this._options.connectTimeout, () => this._debugEnabled);
     this._session = createSession({
       onMessage: (msg) => this._handleSessionMessage(msg),
       onFatalError: (err) => this._handleSessionFatalError(err)
@@ -721,10 +743,13 @@ var CortexClient = class {
     this._transport.close();
   }
   async sendMessage(options) {
-    console.debug("[sdk] CortexClient.sendMessage start", summarizeSendPayload(options));
+    debugLog(this._debugEnabled, "[sdk] CortexClient.sendMessage start", summarizeSendPayload(options));
     this._requireActiveSessionId();
     await this._session.sendChatMessage(options.content, options.attachments, options.meta);
-    console.debug("[sdk] CortexClient.sendMessage done");
+    debugLog(this._debugEnabled, "[sdk] CortexClient.sendMessage done");
+  }
+  setDebugLoggingEnabled(enabled) {
+    this._debugEnabled = enabled || readSdkDebugFlag();
   }
   async replyEscalation(options) {
     this._requireActiveSessionId();
@@ -2660,12 +2685,6 @@ function normalizeCortexMessage(message) {
   };
   switch (message.type) {
     case "chat::message":
-      if (mapRole(payload["role"], "user") === "user" && getClientMsgId(mergedMeta) && !message.ts) {
-        console.warn("[sdk-ui] user chat::message echo arrived without server timestamp", {
-          client_msg_id: getClientMsgId(mergedMeta),
-          seq: message.seq ?? null
-        });
-      }
       return {
         id: buildMessageId(message),
         seq: message.seq ?? null,
@@ -2918,9 +2937,14 @@ function createEscalationController(options) {
 }
 
 // ../sdk-ui/dist/src/transcript-store.js
+function isUserSafeSystemError(message) {
+  const payload = asPayload(message);
+  const meta = isRecord(payload["meta"]) ? payload["meta"] : null;
+  return meta?.["user_safe"] === true;
+}
 function shouldStoreInTranscript(message) {
   if (message.type === "system::error") {
-    return true;
+    return isUserSafeSystemError(message);
   }
   return !message.type.startsWith("system::");
 }
