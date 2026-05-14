@@ -70,3 +70,7 @@ Then serve the package directory and open:
 ```
 
 The page also reads `../dist/build-info.json` and prints the exact bundle metadata, including the resolved `@cortex-suite/sdk` version used at build time, so stale or missing local `dist` is visible instead of silent.
+
+This live smoke intentionally uses a tenant API key plus `workerRef`. In that flow the runtime
+session identity is expected to resolve as `actor_kind=tenant_api_key_user`. `public_widget_user`
+applies only when `/auth/token` is called with a `PublicWidgetKey`.
