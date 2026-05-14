@@ -1,4 +1,8 @@
+
 /* cortex-chat-widget loader build: sdk=1.1.2 builtAt=2026-05-14T08:54:21.399Z */
+
+/* cortex-chat-widget loader build: sdk=1.1.2 builtAt=2026-05-14T08:46:23.752Z */
+
 "use strict";
 (() => {
   // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
