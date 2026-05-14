@@ -53,8 +53,8 @@ describe('widget renderer behavior', () => {
 
     applyChatState(baseChatState({
       transcript: [{
-        id: 'msg_1',
-        type: 'chat::echo',
+        id: 'client:msg_1',
+        type: 'chat::message',
         role: 'user',
         content: 'Test',
         clientMsgId: 'msg_1',
@@ -63,14 +63,18 @@ describe('widget renderer behavior', () => {
         meta: {
           client_msg_id: 'msg_1',
           timestamp_source: 'server',
+          echo_type: 'chat::echo',
         },
       }],
     }));
 
-    expect(shadow.querySelectorAll('[data-testid="transcript-message"]')).toHaveLength(1);
+    const messages = shadow.querySelectorAll('[data-testid="transcript-message"]');
+    expect(messages).toHaveLength(1);
     expect(transcript.textContent).toContain('Test');
     expect((shadow.querySelector('[data-testid="message-meta-text"]') as HTMLElement).dataset.provisional).toBeUndefined();
     expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
+    expect((messages[0] as HTMLElement).dataset.role).toBe('user');
+    expect((shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement).dataset.status).toBe('processed');
   });
 
   it('does not unlock composer on chat::echo while awaiting final answer', async () => {
@@ -1273,6 +1277,7 @@ describe('message delivery status rendering', () => {
     expect(statusEl.dataset.status).toBe('sending');
     expect(icon).toBeTruthy();
     expect(icon.querySelector('svg')).toBeTruthy();
+    expect(icon.innerHTML).toContain('bi-check');
     expect(shadow.textContent).not.toContain('Sending');
   });
 
@@ -1295,6 +1300,28 @@ describe('message delivery status rendering', () => {
     expect(statusEl).toBeTruthy();
     expect(statusEl.dataset.status).toBe('sent');
     expect(icon).toBeTruthy();
+    expect(icon.innerHTML).toContain('bi-check');
+  });
+
+  it('user message with deliveryStatus=delivered renders gray double-check icon inline', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_1',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Delivered',
+        deliveryStatus: 'delivered',
+      }],
+    }));
+
+    const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
+    const icon = shadow.querySelector('[data-testid="message-delivery-icon"]') as HTMLElement;
+    expect(statusEl).toBeTruthy();
+    expect(statusEl.dataset.status).toBe('delivered');
+    expect(icon.innerHTML).toContain('bi-check2-all');
   });
 
   it('user message with deliveryStatus=processed renders blue double-check icon inline', () => {
@@ -1312,9 +1339,63 @@ describe('message delivery status rendering', () => {
     }));
 
     const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
+    const icon = shadow.querySelector('[data-testid="message-delivery-icon"]') as HTMLElement;
     expect(statusEl).toBeTruthy();
     expect(statusEl.dataset.status).toBe('processed');
-    expect(shadow.querySelector('[data-testid="message-delivery-icon"]')).toBeTruthy();
+    expect(icon).toBeTruthy();
+    expect(icon.innerHTML).toContain('bi-check2-all');
+  });
+
+  it('matched chat::echo reconciliation keeps one user bubble with server timestamp and processed state', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:abc',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Тестовое сообщение',
+        clientMsgId: 'abc',
+        deliveryStatus: 'sent',
+        ts: '2026-05-14T18:35:00.000Z',
+        meta: {
+          client_msg_id: 'abc',
+          timestamp_source: 'client',
+        },
+      }],
+    }));
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:abc',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Тестовое сообщение',
+        clientMsgId: 'abc',
+        deliveryStatus: 'processed',
+        ts: '2026-05-14T18:35:10.000Z',
+        meta: {
+          client_msg_id: 'abc',
+          timestamp_source: 'server',
+          echo_type: 'chat::echo',
+        },
+      }],
+    }));
+
+    const messages = shadow.querySelectorAll('[data-testid="transcript-message"]');
+    const message = messages[0] as HTMLElement;
+    const metaText = shadow.querySelector('[data-testid="message-meta-text"]') as HTMLElement;
+    const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
+    const icon = shadow.querySelector('[data-testid="message-delivery-icon"]') as HTMLElement;
+
+    expect(messages).toHaveLength(1);
+    expect(message.dataset.role).toBe('user');
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
+    expect(statusEl.dataset.status).toBe('processed');
+    expect(icon.innerHTML).toContain('bi-check2-all');
+    expect(metaText.dataset.timestampSource).toBe('server');
+    expect(metaText.textContent).toContain('You');
   });
 
   it('renders timestamp text in the same meta row as the delivery status icon', () => {

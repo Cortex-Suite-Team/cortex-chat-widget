@@ -215,9 +215,9 @@ function getTimestampSource(message: ChatMessageViewModel): 'client' | 'server' 
   return value === 'client' || value === 'server' ? value : null;
 }
 
-function getDeliveryStatusIconName(status: string): 'check2' | 'check2-all' | null {
+function getDeliveryStatusIconName(status: string): 'check' | 'check2-all' | null {
   if (status === 'sending' || status === 'sent') {
-    return 'check2';
+    return 'check';
   }
   if (status === 'delivered' || status === 'processed') {
     return 'check2-all';
