@@ -1,8 +1,8 @@
-/* cortex-chat-widget loader build: sdk=1.1.2 builtAt=2026-05-14T08:59:48.675Z */
+/* cortex-chat-widget loader build: sdk=1.1.3 builtAt=2026-05-14T09:11:04.957Z */
 "use strict";
 (() => {
   // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
-  var DEFAULT_AUTH_URL = "https://auth.cortexsuite.app";
+  var DEFAULT_AUTH_URL = "https://cortexsuite.app";
   var AUTH_TOKEN_PATH = "/auth/token";
   var AUTH_REFRESH_PATH = "/auth/refresh";
   var WS_SUBPROTOCOL = "cortex-sdk.v1";
@@ -241,7 +241,16 @@
             reject(makeError("transport_send_timeout", "Send timed out"));
           }, timeoutMs);
           try {
+            const envelopeType = typeof message === "object" && message !== null && "type" in message && typeof message.type === "string" ? message.type : "unknown";
+            console.debug("[sdk] transport.send start", {
+              envelopeType,
+              readyState: ws.readyState
+            });
             ws.send(JSON.stringify(message));
+            console.debug("[sdk] transport.send done", {
+              envelopeType,
+              readyState: ws.readyState
+            });
             clearTimeout(timer);
             resolve();
           } catch (err) {
@@ -591,6 +600,16 @@
   }
 
   // node_modules/@cortex-suite/sdk/dist/browser/client.js
+  function summarizeSendPayload(payload) {
+    return {
+      contentKind: Array.isArray(payload.content) ? "array" : typeof payload.content,
+      contentLength: Array.isArray(payload.content) ? payload.content.length : void 0,
+      hasAttachments: Boolean(payload.attachments?.length),
+      attachmentCount: payload.attachments?.length ?? 0,
+      metaKeys: payload.meta ? Object.keys(payload.meta) : [],
+      clientMsgId: payload.meta && typeof payload.meta.client_msg_id === "string" ? payload.meta.client_msg_id : void 0
+    };
+  }
   var CortexClient = class {
     constructor(options, platform) {
       this._messageHandlers = /* @__PURE__ */ new Set();
@@ -694,7 +713,9 @@
       this._transport.close();
     }
     async sendMessage(options) {
+      console.debug("[sdk] CortexClient.sendMessage start", summarizeSendPayload(options));
       await this._session.sendChatMessage(options.content, options.attachments, options.meta);
+      console.debug("[sdk] CortexClient.sendMessage done");
     }
     async replyEscalation(options) {
       this._requireSessionId();
@@ -2878,6 +2899,16 @@
       avatarUrl: asNonEmptyString(rawCorrespondent["avatar_url"]) ?? null
     };
   }
+  function summarizeSendPayload2(payload) {
+    return {
+      contentKind: Array.isArray(payload.content) ? "array" : typeof payload.content,
+      contentLength: Array.isArray(payload.content) ? payload.content.length : void 0,
+      hasAttachments: Boolean(payload.attachments?.length),
+      attachmentCount: payload.attachments?.length ?? 0,
+      metaKeys: payload.meta ? Object.keys(payload.meta) : [],
+      clientMsgId: payload.meta && typeof payload.meta.client_msg_id === "string" ? payload.meta.client_msg_id : void 0
+    };
+  }
   function createChatController(options) {
     const listeners = /* @__PURE__ */ new Set();
     const transcriptStore = createTranscriptStore();
@@ -3122,7 +3153,7 @@
         transcriptStore.upsertLocalMessage(optimistic);
         emitStateChanged();
         try {
-          console.debug("[sdk-ui] sendMessage -> client.sendMessage start", sendPayload);
+          console.debug("[sdk-ui] sendMessage -> client.sendMessage start", summarizeSendPayload2(sendPayload));
           await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
           console.debug("[sdk-ui] sendMessage -> client.sendMessage done", {
             clientMsgId,
@@ -3155,7 +3186,7 @@
         transcriptStore.upsertLocalMessage(updated);
         emitStateChanged();
         try {
-          console.debug("[sdk-ui] retryMessage -> client.sendMessage start", msg.originalPayload);
+          console.debug("[sdk-ui] retryMessage -> client.sendMessage start", summarizeSendPayload2(msg.originalPayload));
           await withTimeout(options.client.sendMessage(msg.originalPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
           console.debug("[sdk-ui] retryMessage -> client.sendMessage done", {
             clientMsgId,
@@ -4008,7 +4039,7 @@
     internal.error = toWidgetError(error, "widget_runtime_error", "Widget runtime error");
     options.onError?.(error);
   }
-  function summarizeSendPayload(payload) {
+  function summarizeSendPayload3(payload) {
     return {
       contentKind: Array.isArray(payload.content) ? "array" : typeof payload.content,
       contentLength: Array.isArray(payload.content) ? payload.content.length : void 0,
@@ -4301,7 +4332,7 @@
           meta: questionMeta
         };
         console.debug("[cortex-chat-widget] handleSend -> controller.sendMessage start", {
-          ...summarizeSendPayload(sendRequest)
+          ...summarizeSendPayload3(sendRequest)
         });
         const result = await controller.sendMessage(sendRequest);
         console.debug("[cortex-chat-widget] handleSend -> controller.sendMessage done", {
