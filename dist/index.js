@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-14T18:16:12.664Z */
+/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-14T18:33:07.517Z */
 
 // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://cortexsuite.app";
@@ -4050,13 +4050,33 @@ function syncHeaderAvatar(avatarEl, title, avatarUrl) {
       image.setAttribute("aria-hidden", "true");
       avatarEl.appendChild(image);
     }
-    image.src = avatarUrl;
-    avatarEl.textContent = "";
-    avatarEl.appendChild(image);
+    for (const node of Array.from(avatarEl.childNodes)) {
+      if (node === image) {
+        continue;
+      }
+      if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE && node.tagName !== "IMG") {
+        node.remove();
+      }
+    }
+    if (image.getAttribute("src") !== avatarUrl) {
+      image.src = avatarUrl;
+    }
+    if (avatarEl.lastChild !== image) {
+      avatarEl.appendChild(image);
+    }
     return;
   }
   existingImage?.remove();
-  avatarEl.textContent = getAvatarInitials(title);
+  const initials = getAvatarInitials(title);
+  const currentText = Array.from(avatarEl.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent ?? "").join("");
+  for (const node of Array.from(avatarEl.childNodes)) {
+    if (node.nodeType !== Node.TEXT_NODE) {
+      node.remove();
+    }
+  }
+  if (currentText !== initials) {
+    avatarEl.textContent = initials;
+  }
 }
 function parseHexColor(value) {
   const hex = value.trim();
@@ -4439,8 +4459,12 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
   const headerCorrespondent = getHeaderCorrespondent(state);
   const headerTitle = getHeaderTitle(state, options);
   const headerSubtitle = getHeaderSubtitle(state, options);
-  dom.title.textContent = headerTitle;
-  dom.subtitle.textContent = headerSubtitle;
+  if (dom.title.textContent !== headerTitle) {
+    dom.title.textContent = headerTitle;
+  }
+  if (dom.subtitle.textContent !== headerSubtitle) {
+    dom.subtitle.textContent = headerSubtitle;
+  }
   dom.status.textContent = state.isHistoricalView ? "Viewing chat history" : buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
   syncHeaderAvatar(dom.avatar, headerTitle, normalizeAvatarUrl(headerCorrespondent?.avatarUrl ?? null, options));
   dom.statusDot.dataset.state = state.isHistoricalView ? "history" : state.chat.connection.isConnected ? "online" : state.isAwaitingAnswer || state.isTyping || state.chat.workerState.state === "working" || state.chat.workerState.state === "waiting" ? "active" : "idle";
