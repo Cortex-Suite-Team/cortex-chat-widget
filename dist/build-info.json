@@ -1,10 +1,14 @@
 {
-  "builtAt": "2026-05-14T08:46:23.752Z",
+  "builtAt": "2026-05-14T08:59:48.675Z",
   "widgetEntry": "dist/index.js",
   "sdk": {
     "name": "@cortex-suite/sdk",
     "version": "1.1.2",
-    "packageJsonPath": "/home/runner/work/cortex-chat-widget/cortex-chat-widget/cortex-chat-widget/node_modules/@cortex-suite/sdk/package.json",
-    "browserEntryPath": "/home/runner/work/cortex-chat-widget/cortex-chat-widget/cortex-chat-widget/node_modules/@cortex-suite/sdk/dist/browser/index.js"
+    "browserEntry": "@cortex-suite/sdk/browser"
+  },
+  "sources": {
+    "widget": "https://github.com/Cortex-Suite-Team/cortex-chat-widget",
+    "sdk": "https://github.com/Cortex-Suite-Team/cortex-sdk",
+    "sdkUi": "https://github.com/Cortex-Suite-Team/cortex-sdk-ui"
   }
 }

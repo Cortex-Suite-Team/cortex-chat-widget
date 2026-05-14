@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.2 builtAt=2026-05-14T08:54:21.399Z */
+/* cortex-chat-widget build: sdk=1.1.2 builtAt=2026-05-14T08:59:48.675Z */
 
 // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://auth.cortexsuite.app";
@@ -3121,9 +3121,18 @@ function createChatController(options) {
       transcriptStore.upsertLocalMessage(optimistic);
       emitStateChanged();
       try {
+        console.debug("[sdk-ui] sendMessage -> client.sendMessage start", sendPayload);
         await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
+        console.debug("[sdk-ui] sendMessage -> client.sendMessage done", {
+          clientMsgId,
+          ok: true
+        });
         return { ok: true, messageId: id, clientMsgId };
       } catch (err) {
+        console.debug("[sdk-ui] sendMessage -> client.sendMessage failed", {
+          clientMsgId,
+          error: err instanceof Error ? err.message : String(err)
+        });
         const sendError = err instanceof Error ? err.message : "Message was not sent";
         transcriptStore.upsertLocalMessage({ ...optimistic, deliveryStatus: "failed", retryable: true, sendError });
         emitStateChanged();
@@ -3145,9 +3154,18 @@ function createChatController(options) {
       transcriptStore.upsertLocalMessage(updated);
       emitStateChanged();
       try {
+        console.debug("[sdk-ui] retryMessage -> client.sendMessage start", msg.originalPayload);
         await withTimeout(options.client.sendMessage(msg.originalPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
+        console.debug("[sdk-ui] retryMessage -> client.sendMessage done", {
+          clientMsgId,
+          ok: true
+        });
         return { ok: true, messageId, clientMsgId };
       } catch (err) {
+        console.debug("[sdk-ui] retryMessage -> client.sendMessage failed", {
+          clientMsgId,
+          error: err instanceof Error ? err.message : String(err)
+        });
         const sendError = err instanceof Error ? err.message : "Message was not sent";
         transcriptStore.upsertLocalMessage({ ...updated, deliveryStatus: "failed", retryable: true, sendError });
         emitStateChanged();
