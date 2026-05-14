@@ -307,7 +307,7 @@ export const typographyStyles = `
   color: var(--cortex-muted-text);
 }
 
-.cortex-widget__message-status[data-status="read"] {
+.cortex-widget__message-status[data-status="processed"] {
   color: color-mix(in srgb, var(--cortex-accent-color) 72%, #38bdf8 28%);
 }
 

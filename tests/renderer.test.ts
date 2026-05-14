@@ -58,7 +58,7 @@ describe('widget renderer behavior', () => {
         role: 'user',
         content: 'Test',
         clientMsgId: 'msg_1',
-        deliveryStatus: 'sent',
+        deliveryStatus: 'processed',
         ts: '2026-05-11T10:15:00Z',
         meta: {
           client_msg_id: 'msg_1',
@@ -70,6 +70,7 @@ describe('widget renderer behavior', () => {
     expect(shadow.querySelectorAll('[data-testid="transcript-message"]')).toHaveLength(1);
     expect(transcript.textContent).toContain('Test');
     expect((shadow.querySelector('[data-testid="message-meta-text"]') as HTMLElement).dataset.provisional).toBeUndefined();
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
   });
 
   it('does not unlock composer on chat::echo while awaiting final answer', async () => {
@@ -1170,7 +1171,7 @@ describe('message delivery status rendering', () => {
     expect(shadow.textContent).not.toContain('Sending');
   });
 
-  it('user message with deliveryStatus=sent renders a double-check status icon inline', () => {
+  it('user message with deliveryStatus=sent renders a single-check status icon inline', () => {
     mountWidget();
     const shadow = getShadow();
 
@@ -1189,6 +1190,26 @@ describe('message delivery status rendering', () => {
     expect(statusEl).toBeTruthy();
     expect(statusEl.dataset.status).toBe('sent');
     expect(icon).toBeTruthy();
+  });
+
+  it('user message with deliveryStatus=processed renders blue double-check icon inline', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'client:msg_2',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Processed',
+        deliveryStatus: 'processed',
+      }],
+    }));
+
+    const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
+    expect(statusEl).toBeTruthy();
+    expect(statusEl.dataset.status).toBe('processed');
+    expect(shadow.querySelector('[data-testid="message-delivery-icon"]')).toBeTruthy();
   });
 
   it('renders timestamp text in the same meta row as the delivery status icon', () => {
@@ -1295,26 +1316,6 @@ describe('message delivery status rendering', () => {
 
     expect(shadow.querySelector('[data-testid="message-delivery-status"]')).toBeNull();
     expect(shadow.querySelector('[data-testid="message-retry-button"]')).toBeNull();
-  });
-
-  it('user message with deliveryStatus=read renders blue double-check icon inline', () => {
-    mountWidget();
-    const shadow = getShadow();
-
-    applyChatState(baseChatState({
-      transcript: [{
-        id: 'client:msg_2',
-        type: 'chat::message',
-        role: 'user',
-        content: 'Seen already',
-        deliveryStatus: 'read' as never,
-      }],
-    }));
-
-    const statusEl = shadow.querySelector('[data-testid="message-delivery-status"]') as HTMLElement;
-    expect(statusEl).toBeTruthy();
-    expect(statusEl.dataset.status).toBe('read');
-    expect(shadow.querySelector('[data-testid="message-delivery-icon"]')).toBeTruthy();
   });
 
   it('workerStatus renders independently from user message deliveryStatus', () => {

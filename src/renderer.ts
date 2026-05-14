@@ -188,10 +188,10 @@ function getTimestampSource(message: ChatMessageViewModel): 'client' | 'server' 
 }
 
 function getDeliveryStatusIconName(status: string): 'check2' | 'check2-all' | null {
-  if (status === 'sending') {
+  if (status === 'sending' || status === 'sent') {
     return 'check2';
   }
-  if (status === 'sent' || status === 'delivered' || status === 'read') {
+  if (status === 'delivered' || status === 'processed') {
     return 'check2-all';
   }
   return null;
@@ -207,8 +207,8 @@ function getDeliveryStatusLabel(status: string): string {
   if (status === 'delivered') {
     return 'Delivered';
   }
-  if (status === 'read') {
-    return 'Read';
+  if (status === 'processed') {
+    return 'Processed by Runtime';
   }
   return 'Failed';
 }

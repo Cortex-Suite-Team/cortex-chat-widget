@@ -1,6 +1,6 @@
 type Listener = (state: ChatState) => void;
 
-export type ChatMessageDeliveryStatus = 'sending' | 'sent' | 'failed';
+export type ChatMessageDeliveryStatus = 'sending' | 'sent' | 'delivered' | 'processed' | 'failed';
 
 export type SendMessageResult =
   | { ok: true; messageId: string; clientMsgId: string }
