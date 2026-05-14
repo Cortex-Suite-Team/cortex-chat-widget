@@ -73,14 +73,42 @@ function syncHeaderAvatar(
       image.setAttribute('aria-hidden', 'true');
       avatarEl.appendChild(image);
     }
-    image.src = avatarUrl;
-    avatarEl.textContent = '';
-    avatarEl.appendChild(image);
+
+    for (const node of Array.from(avatarEl.childNodes)) {
+      if (node === image) {
+        continue;
+      }
+      if (node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName !== 'IMG')) {
+        node.remove();
+      }
+    }
+
+    if (image.getAttribute('src') !== avatarUrl) {
+      image.src = avatarUrl;
+    }
+
+    if (avatarEl.lastChild !== image) {
+      avatarEl.appendChild(image);
+    }
     return;
   }
 
   existingImage?.remove();
-  avatarEl.textContent = getAvatarInitials(title);
+  const initials = getAvatarInitials(title);
+  const currentText = Array.from(avatarEl.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent ?? '')
+    .join('');
+
+  for (const node of Array.from(avatarEl.childNodes)) {
+    if (node.nodeType !== Node.TEXT_NODE) {
+      node.remove();
+    }
+  }
+
+  if (currentText !== initials) {
+    avatarEl.textContent = initials;
+  }
 }
 
 function parseHexColor(value: string): { r: number; g: number; b: number } | null {
@@ -552,8 +580,12 @@ export function renderWidget(
   const headerCorrespondent = getHeaderCorrespondent(state);
   const headerTitle = getHeaderTitle(state, options);
   const headerSubtitle = getHeaderSubtitle(state, options);
-  dom.title.textContent = headerTitle;
-  dom.subtitle.textContent = headerSubtitle;
+  if (dom.title.textContent !== headerTitle) {
+    dom.title.textContent = headerTitle;
+  }
+  if (dom.subtitle.textContent !== headerSubtitle) {
+    dom.subtitle.textContent = headerSubtitle;
+  }
   dom.status.textContent = state.isHistoricalView
     ? 'Viewing chat history'
     : buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);

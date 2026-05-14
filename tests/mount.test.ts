@@ -192,19 +192,29 @@ describe('mountCortexChat', () => {
     expect(title.textContent).toBe('Echo Worker');
     expect(subtitle.textContent).toBe('Tester');
     expect(initialAvatar.src).toBe('https://example.test/avatar.png');
+    expect(initialAvatar.getAttribute('src')).toBe('https://example.test/avatar.png');
 
     changeInput(textarea, 'd');
+    expect(avatar.querySelector('img')).toBe(initialAvatar);
+    expect(avatar.querySelectorAll('img')).toHaveLength(1);
     changeInput(textarea, 'dr');
+    expect(avatar.querySelector('img')).toBe(initialAvatar);
+    expect(avatar.querySelectorAll('img')).toHaveLength(1);
     changeInput(textarea, 'draft text');
     expect(title.textContent).toBe('Echo Worker');
     expect(subtitle.textContent).toBe('Tester');
+    expect(avatar.querySelector('img')).toBe(initialAvatar);
+    expect(avatar.querySelectorAll('img')).toHaveLength(1);
     expect((avatar.querySelector('img') as HTMLImageElement).src).toBe('https://example.test/avatar.png');
+    expect((avatar.querySelector('img') as HTMLImageElement).getAttribute('src')).toBe('https://example.test/avatar.png');
 
     submitComposer(composer);
     await flushAsyncWork();
 
     expect(title.textContent).toBe('Echo Worker');
     expect(subtitle.textContent).toBe('Tester');
+    expect(avatar.querySelector('img')).toBe(initialAvatar);
+    expect(avatar.querySelectorAll('img')).toHaveLength(1);
     expect((avatar.querySelector('img') as HTMLImageElement).src).toBe('https://example.test/avatar.png');
 
     applyChatState(baseChatState({
@@ -232,6 +242,8 @@ describe('mountCortexChat', () => {
 
     expect(title.textContent).toBe('Echo Worker');
     expect(subtitle.textContent).toBe('Tester');
+    expect(avatar.querySelector('img')).toBe(initialAvatar);
+    expect(avatar.querySelectorAll('img')).toHaveLength(1);
     expect((avatar.querySelector('img') as HTMLImageElement).src).toBe('https://example.test/avatar.png');
     expect((shadow.querySelector('[data-testid="actor-name"]') as HTMLElement).textContent).toBe('Local Bubble Actor');
 
@@ -258,6 +270,8 @@ describe('mountCortexChat', () => {
 
     expect(title.textContent).toBe('Echo Worker');
     expect(subtitle.textContent).toBe('Tester');
+    expect(avatar.querySelector('img')).toBe(initialAvatar);
+    expect(avatar.querySelectorAll('img')).toHaveLength(1);
     expect((avatar.querySelector('img') as HTMLImageElement).src).toBe('https://example.test/avatar.png');
     expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
   });

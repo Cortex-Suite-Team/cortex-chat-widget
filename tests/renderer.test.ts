@@ -521,6 +521,46 @@ describe('widget renderer behavior', () => {
     expect(avatar.textContent).toBe('');
   });
 
+  it('keeps header avatar/title/subtitle stable across rerenders with the same correspondent', () => {
+    mountWidget({
+      title: 'Fallback Title',
+      subtitle: 'Fallback Subtitle',
+    });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          title: 'Legal Assistant',
+          avatarUrl: 'https://example.test/robot-vasya.png',
+        },
+      },
+    }));
+
+    const avatar = shadow.querySelector('[data-testid="header-avatar"]') as HTMLElement;
+    const title = shadow.querySelector('.cortex-widget__title') as HTMLElement;
+    const subtitle = shadow.querySelector('.cortex-widget__subtitle') as HTMLElement;
+    const initialImage = avatar.querySelector('img') as HTMLImageElement;
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          title: 'Legal Assistant',
+          avatarUrl: 'https://example.test/robot-vasya.png',
+        },
+      },
+    }));
+
+    const nextImage = avatar.querySelector('img') as HTMLImageElement;
+    expect(nextImage).toBe(initialImage);
+    expect(avatar.querySelectorAll('img')).toHaveLength(1);
+    expect(nextImage.getAttribute('src')).toBe('https://example.test/robot-vasya.png');
+    expect(title.textContent).toBe('Robot Vasya');
+    expect(subtitle.textContent).toBe('Legal Assistant');
+  });
+
   it('preserves absolute correspondent avatar urls exactly', () => {
     mountWidget({
       title: 'Fallback Title',
@@ -618,6 +658,71 @@ describe('widget renderer behavior', () => {
     }));
 
     const avatar = shadow.querySelector('[data-testid="header-avatar"]') as HTMLElement;
+    expect(avatar.querySelector('img')).toBeNull();
+    expect(avatar.textContent).toBe('RV');
+  });
+
+  it('reuses the same header avatar img until the avatar url changes or disappears', () => {
+    mountWidget({
+      title: 'Fallback Title',
+      subtitle: 'Fallback Subtitle',
+    });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          title: 'Legal Assistant',
+          avatarUrl: 'https://example.test/robot-vasya.png',
+        },
+      },
+    }));
+
+    const avatar = shadow.querySelector('[data-testid="header-avatar"]') as HTMLElement;
+    const initialImage = avatar.querySelector('img') as HTMLImageElement;
+    expect(initialImage.getAttribute('src')).toBe('https://example.test/robot-vasya.png');
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          title: 'Legal Assistant',
+          avatarUrl: 'https://example.test/robot-vasya.png',
+        },
+      },
+    }));
+
+    const unchangedImage = avatar.querySelector('img') as HTMLImageElement;
+    expect(unchangedImage).toBe(initialImage);
+    expect(avatar.querySelectorAll('img')).toHaveLength(1);
+    expect(unchangedImage.getAttribute('src')).toBe('https://example.test/robot-vasya.png');
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          title: 'Legal Assistant',
+          avatarUrl: 'https://example.test/robot-vasya-v2.png',
+        },
+      },
+    }));
+
+    const updatedImage = avatar.querySelector('img') as HTMLImageElement;
+    expect(updatedImage).toBe(initialImage);
+    expect(avatar.querySelectorAll('img')).toHaveLength(1);
+    expect(updatedImage.getAttribute('src')).toBe('https://example.test/robot-vasya-v2.png');
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          title: 'Legal Assistant',
+          avatarUrl: null,
+        },
+      },
+    }));
+
     expect(avatar.querySelector('img')).toBeNull();
     expect(avatar.textContent).toBe('RV');
   });
