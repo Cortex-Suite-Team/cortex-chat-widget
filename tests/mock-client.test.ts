@@ -62,7 +62,7 @@ describe('example mock client attachments', () => {
 
     expect(createObjectUrlSpy).toHaveBeenCalledWith(file);
 
-    const userMessage = messages.find((message) => message.type === 'chat::message');
+    const userMessage = messages.find((message) => message.type === 'chat::echo');
     expect(userMessage?.payload).toMatchObject({
       role: 'user',
       content: '',

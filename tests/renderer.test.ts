@@ -54,7 +54,7 @@ describe('widget renderer behavior', () => {
     applyChatState(baseChatState({
       transcript: [{
         id: 'msg_1',
-        type: 'chat::message',
+        type: 'chat::echo',
         role: 'user',
         content: 'Test',
         clientMsgId: 'msg_1',
@@ -70,6 +70,38 @@ describe('widget renderer behavior', () => {
     expect(shadow.querySelectorAll('[data-testid="transcript-message"]')).toHaveLength(1);
     expect(transcript.textContent).toContain('Test');
     expect((shadow.querySelector('[data-testid="message-meta-text"]') as HTMLElement).dataset.provisional).toBeUndefined();
+  });
+
+  it('does not unlock composer on chat::echo while awaiting final answer', async () => {
+    const { autoClient } = mountWidget();
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+
+    changeInput(textarea, 'Question');
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(textarea.disabled).toBe(true);
+
+    autoClient?.emit({
+      type: 'chat::echo',
+      payload: {
+        content: 'Question',
+        role: 'user',
+      },
+    });
+
+    expect(textarea.disabled).toBe(true);
+
+    autoClient?.emit({
+      type: 'chat::answer',
+      payload: {
+        answer_kind: 'final',
+      },
+    });
+
+    expect(textarea.disabled).toBe(false);
   });
 
   it('locks composer until final answer and does not unlock on partials', async () => {
@@ -230,7 +262,7 @@ describe('widget renderer behavior', () => {
     applyChatState(baseChatState({
       transcript: [{
         id: 'msg_attachment_only',
-        type: 'chat::message',
+        type: 'chat::echo',
         role: 'user',
         content: '',
         meta: {
@@ -258,7 +290,7 @@ describe('widget renderer behavior', () => {
     applyChatState(baseChatState({
       transcript: [{
         id: 'msg_text_attachment',
-        type: 'chat::message',
+        type: 'chat::echo',
         role: 'user',
         content: 'Please review this file',
         meta: {

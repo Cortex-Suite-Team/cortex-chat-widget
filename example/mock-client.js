@@ -205,7 +205,7 @@ export function createMockCortexClient() {
       const finalContent = buildAnswerContent(contentStr, resolvedAttachments);
       const partialChunks = buildPartialChunks(contentStr, resolvedAttachments);
 
-      emit(createEnvelope('chat::message', sessionId, nextSeq(), {
+      emit(createEnvelope('chat::echo', sessionId, nextSeq(), {
         role: 'user',
         content,
         attachments: resolvedAttachments,
