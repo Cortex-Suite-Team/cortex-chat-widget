@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.3 builtAt=2026-05-14T09:11:04.957Z */
+/* cortex-chat-widget loader build: sdk=1.1.4 builtAt=2026-05-14T13:40:35.484Z */
 "use strict";
 (() => {
   // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
@@ -9,6 +9,7 @@
   var WS_SUBPROTOCOL_JWT_PREFIX = "cortex-sdk.jwt.";
   var SCHEMA_VERSION = "1.0";
   var DEFAULT_CONNECT_TIMEOUT_MS = 1e4;
+  var DEFAULT_SESSION_OPEN_TIMEOUT_MS = 1e4;
   var DEFAULT_SEND_TIMEOUT_MS = 1e4;
   var DEFAULT_RESYNC_TIMEOUT_MS = 15e3;
   var DEFAULT_PING_INTERVAL_MS = 15e3;
@@ -28,6 +29,7 @@
     { code: "transport_send_timeout", retryable: true, fatal: false },
     { code: "transport_protocol_violation", retryable: false, fatal: true },
     { code: "unknown_session", retryable: false, fatal: true },
+    { code: "session_open_timeout", retryable: true, fatal: false },
     { code: "session_terminal", retryable: false, fatal: true },
     { code: "resync_timeout", retryable: true, fatal: false },
     { code: "replay_unavailable", retryable: true, fatal: false },
@@ -364,6 +366,7 @@
     let _transport = null;
     let _sendTimeoutMs = 1e4;
     let _tenantId = null;
+    let _opened = false;
     function setSessionState(next) {
       if (TERMINAL_STATES.has(_sessionState) && _sessionState !== next) {
         return;
@@ -396,6 +399,13 @@
       if (!_transport)
         return Promise.reject(new Error("No transport"));
       return _transport.send(envelope, _sendTimeoutMs);
+    }
+    function reset() {
+      _sessionId = null;
+      _sessionState = "CREATED";
+      _lastSeq = 0;
+      _tenantId = null;
+      _opened = false;
     }
     function buildEnvelope(type, payload) {
       const env = {
@@ -484,6 +494,7 @@
         _transport = transport;
         _sendTimeoutMs = sendTimeoutMs;
       },
+      reset,
       get sessionId() {
         return _sessionId;
       },
@@ -494,6 +505,8 @@
         return _lastSeq;
       },
       sendInit(bootstrap) {
+        _sessionId = null;
+        _opened = false;
         _sessionState = "INITIALIZING";
         const envelope = {
           type: "system::init",
@@ -541,10 +554,20 @@
         } catch {
           return;
         }
-        if (!_sessionId && msg.session_id) {
-          _sessionId = msg.session_id;
-          if (!TERMINAL_STATES.has(_sessionState)) {
-            _sessionState = "ACTIVE";
+        if (!_opened) {
+          if (msg.type === "system::opened") {
+            if (!msg.session_id) {
+              callbacks.onFatalError(makeError("transport_protocol_violation", "system::opened requires session_id"));
+              return;
+            }
+            _sessionId = msg.session_id;
+            _opened = true;
+            if (!TERMINAL_STATES.has(_sessionState)) {
+              _sessionState = "ACTIVE";
+            }
+          } else if (msg.type !== "system::error") {
+            callbacks.onFatalError(makeError("transport_protocol_violation", `Received ${msg.type} before system::opened`));
+            return;
           }
         }
         if (typeof msg.seq === "number" && msg.seq > _lastSeq) {
@@ -620,9 +643,15 @@
       this._runtimeHttpBaseUrl = null;
       this._cpApiUrl = null;
       this._sessionMeta = null;
+      this._sessionContext = null;
+      this._bootstrapMeta = null;
       this._channelId = `ch_${Math.random().toString(36).slice(2, 10)}`;
       this._reconnectAttempt = 0;
       this._disconnectRequested = false;
+      this._connectPromise = null;
+      this._sessionOpenWaiter = null;
+      this._sessionOpenTimer = null;
+      this._suppressNextReconnect = false;
       this._liveness = null;
       this._tokenRefreshTimer = null;
       this._pendingDelayCancels = /* @__PURE__ */ new Set();
@@ -630,6 +659,7 @@
       const authUrl = normalizeAuthBaseUrl(options.authUrl ?? DEFAULT_AUTH_URL);
       this._options = {
         connectTimeout: DEFAULT_CONNECT_TIMEOUT_MS,
+        sessionOpenTimeout: DEFAULT_SESSION_OPEN_TIMEOUT_MS,
         sendTimeout: DEFAULT_SEND_TIMEOUT_MS,
         resyncTimeout: DEFAULT_RESYNC_TIMEOUT_MS,
         pingInterval: DEFAULT_PING_INTERVAL_MS,
@@ -641,25 +671,8 @@
       this._platform = platform;
       this._transport = createTransport(platform.WS, this._options.connectTimeout);
       this._session = createSession({
-        onMessage: (msg) => {
-          if (msg.type === "system::pong" && typeof msg.payload["heartbeat_id"] === "string") {
-            this._liveness?.handlePong(msg.payload["heartbeat_id"]);
-            return;
-          }
-          this._dispatchMessage(msg);
-        },
-        onFatalError: (err) => {
-          this._channelState = "AUTH_FAILED";
-          this._stopBackgroundActivity();
-          this._transport.close();
-          this._dispatchMessage({
-            type: "system::error",
-            schema: "1.0",
-            session_id: this._session.sessionId ?? "",
-            payload: { code: err.code, message: err.message },
-            ts: (/* @__PURE__ */ new Date()).toISOString()
-          });
-        }
+        onMessage: (msg) => this._handleSessionMessage(msg),
+        onFatalError: (err) => this._handleSessionFatalError(err)
       });
       this._transport.onMessage = (data) => this._session.handleIncoming(data);
       this._transport.onClose = (code, reason) => this._handleClose(code, reason);
@@ -678,47 +691,44 @@
     get sessionMeta() {
       return this._sessionMeta;
     }
+    get sessionContext() {
+      return this._sessionContext;
+    }
     onMessage(handler) {
       this._messageHandlers.add(handler);
       return () => {
         this._messageHandlers.delete(handler);
       };
     }
-    async connect() {
-      this._disconnectRequested = false;
-      this._reconnectAttempt = 0;
-      const authResponse = await exchangeApiKey(this._options.apiKey, this._platform.fetchFn, this._options.authUrl, this._options.workerRef);
-      this._accessToken = authResponse.access_token;
-      this._refreshToken = authResponse.refresh_token;
-      this._wsUrl = authResponse.ws_url;
-      this._runtimeHttpBaseUrl = deriveRuntimeHttpBaseUrl(authResponse.ws_url);
-      this._runtimeHttpBaseUrl = deriveRuntimeHttpBaseUrlFromHttpUrl(this._platform.uploadUrl) ?? this._runtimeHttpBaseUrl;
-      this._cpApiUrl = normalizeOptionalBaseUrl(authResponse.cp_api_url);
-      this._sessionMeta = asRecord(asRecord(authResponse.runtime_bootstrap?.trigger_payload)?.meta);
-      await this._openChannel();
-      this._session.setTransport(this._transport, this._options.sendTimeout);
-      await this._session.sendInit(authResponse.runtime_bootstrap);
-      this._liveness = createLiveness(this._transport, this._options.pingInterval, this._options.pongTimeout, this._options.staleThreshold, {
-        onStale: () => this._handleStale(),
-        getSessionId: () => this._session.sessionId,
-        getChannelId: () => this._channelId
+    connect() {
+      if (this._isSessionReady()) {
+        return Promise.resolve();
+      }
+      if (this._connectPromise) {
+        return this._connectPromise;
+      }
+      this._connectPromise = this._connectInternal().catch((error) => {
+        this._cleanupFailedConnect();
+        throw error;
+      }).finally(() => {
+        this._connectPromise = null;
       });
-      this._liveness.start();
-      this._scheduleTokenRefresh();
+      return this._connectPromise;
     }
     async disconnect() {
       this._disconnectRequested = true;
       this._stopBackgroundActivity();
-      this._channelState = "CLOSED";
+      this._resetConnectionRuntimeState();
       this._transport.close();
     }
     async sendMessage(options) {
       console.debug("[sdk] CortexClient.sendMessage start", summarizeSendPayload(options));
+      this._requireActiveSessionId();
       await this._session.sendChatMessage(options.content, options.attachments, options.meta);
       console.debug("[sdk] CortexClient.sendMessage done");
     }
     async replyEscalation(options) {
-      this._requireSessionId();
+      this._requireActiveSessionId();
       await this._session.sendEscalationReply(options.escalationId, options.waitToken, options.action, options.content, options.meta);
     }
     async uploadFile(file, options = {}) {
@@ -788,15 +798,85 @@
       return body;
     }
     async stop() {
+      this._requireActiveSessionId();
       await this._session.sendStop();
+    }
+    async _connectInternal() {
+      this._disconnectRequested = false;
+      this._reconnectAttempt = 0;
+      this._stopBackgroundActivity();
+      this._resetSessionRuntimeState();
+      this._channelState = "CLOSED";
+      const authResponse = await exchangeApiKey(this._options.apiKey, this._platform.fetchFn, this._options.authUrl, this._options.workerRef);
+      this._accessToken = authResponse.access_token;
+      this._refreshToken = authResponse.refresh_token;
+      this._wsUrl = authResponse.ws_url;
+      this._runtimeHttpBaseUrl = deriveRuntimeHttpBaseUrl(authResponse.ws_url);
+      this._runtimeHttpBaseUrl = deriveRuntimeHttpBaseUrlFromHttpUrl(this._platform.uploadUrl) ?? this._runtimeHttpBaseUrl;
+      this._cpApiUrl = normalizeOptionalBaseUrl(authResponse.cp_api_url);
+      this._bootstrapMeta = asRecord(asRecord(authResponse.runtime_bootstrap?.trigger_payload)?.meta);
+      this._sessionMeta = this._bootstrapMeta;
+      await this._openChannel();
+      this._session.setTransport(this._transport, this._options.sendTimeout);
+      const openWaiter = this._createSessionOpenWaiter();
+      await this._session.sendInit(authResponse.runtime_bootstrap);
+      await openWaiter;
+      this._startLiveness();
+      this._scheduleTokenRefresh();
     }
     async _openChannel() {
       if (!this._wsUrl || !this._accessToken)
         throw new Error("Auth not completed");
+      this._suppressNextReconnect = false;
       this._channelState = "CONNECTING";
       await this._transport.open(this._wsUrl, this._accessToken);
       this._channelState = "OPEN";
       this._reconnectAttempt = 0;
+    }
+    _startLiveness() {
+      this._liveness?.stop();
+      this._liveness = createLiveness(this._transport, this._options.pingInterval, this._options.pongTimeout, this._options.staleThreshold, {
+        onStale: () => this._handleStale(),
+        getSessionId: () => this._session.sessionId,
+        getChannelId: () => this._channelId
+      });
+      this._liveness.start();
+    }
+    _createSessionOpenWaiter() {
+      const waiter = createDeferred();
+      this._sessionOpenWaiter = waiter;
+      this._clearSessionOpenTimer();
+      this._sessionOpenTimer = setTimeout(() => {
+        this._rejectSessionOpen(makeError("session_open_timeout", "Session did not open after system::init"));
+        this._closeTransportWithoutReconnect(1e3, "session_open_timeout");
+      }, this._options.sessionOpenTimeout);
+      return waiter.promise;
+    }
+    _clearSessionOpenTimer() {
+      if (this._sessionOpenTimer !== null) {
+        clearTimeout(this._sessionOpenTimer);
+        this._sessionOpenTimer = null;
+      }
+    }
+    _clearSessionOpenWaiter() {
+      this._clearSessionOpenTimer();
+      this._sessionOpenWaiter = null;
+    }
+    _resolveSessionOpen() {
+      if (!this._sessionOpenWaiter) {
+        return;
+      }
+      const waiter = this._sessionOpenWaiter;
+      this._clearSessionOpenWaiter();
+      waiter.resolve();
+    }
+    _rejectSessionOpen(error) {
+      if (!this._sessionOpenWaiter) {
+        return;
+      }
+      const waiter = this._sessionOpenWaiter;
+      this._clearSessionOpenWaiter();
+      waiter.reject(error);
     }
     _handleStale() {
       if (this._channelState === "STALE" || this._channelState === "RECONNECTING")
@@ -810,6 +890,17 @@
         return;
       if (this._channelState === "AUTH_FAILED")
         return;
+      if (this._suppressNextReconnect) {
+        this._suppressNextReconnect = false;
+        this._channelState = "CLOSED";
+        return;
+      }
+      if (this._sessionOpenWaiter) {
+        this._rejectSessionOpen(code === 4001 ? makeError("auth_invalid", "Session open failed during authentication") : makeError("transport_protocol_violation", reason ? `Connection closed before session opened (${reason})` : "Connection closed before session opened"));
+        this._channelState = code === 4001 ? "AUTH_FAILED" : "CLOSED";
+        this._stopBackgroundActivity();
+        return;
+      }
       if (code === 4001) {
         this._channelState = "AUTH_FAILED";
         this._stopBackgroundActivity();
@@ -821,6 +912,36 @@
           this._reconnectLoopPromise = null;
         });
       }
+    }
+    _handleSessionMessage(msg) {
+      if (msg.type === "system::pong" && typeof msg.payload["heartbeat_id"] === "string") {
+        this._liveness?.handlePong(msg.payload["heartbeat_id"]);
+        return;
+      }
+      if (msg.type === "system::opened") {
+        const sessionContext = extractSessionContext(msg);
+        this._sessionContext = sessionContext;
+        this._sessionMeta = mergeLegacySessionMeta(this._bootstrapMeta, sessionContext);
+        this._resolveSessionOpen();
+      } else if (msg.type === "system::error" && this._sessionOpenWaiter) {
+        const code = typeof msg.payload["code"] === "string" ? msg.payload["code"] : "session_not_ready";
+        const message = typeof msg.payload["message"] === "string" ? msg.payload["message"] : "Session open failed";
+        this._rejectSessionOpen(makeError(code, message));
+      }
+      this._dispatchMessage(msg);
+    }
+    _handleSessionFatalError(err) {
+      this._rejectSessionOpen(err);
+      this._channelState = "AUTH_FAILED";
+      this._stopBackgroundActivity();
+      this._transport.close();
+      this._dispatchMessage({
+        type: "system::error",
+        schema: "1.0",
+        session_id: this._session.sessionId ?? "",
+        payload: { code: err.code ?? "transport_protocol_violation", message: err.message },
+        ts: (/* @__PURE__ */ new Date()).toISOString()
+      });
     }
     async _reconnectLoop() {
       while (!this._shouldStopReconnect()) {
@@ -861,13 +982,7 @@
         } finally {
           resyncTimeout.cancel();
         }
-        this._liveness?.stop();
-        this._liveness = createLiveness(this._transport, this._options.pingInterval, this._options.pongTimeout, this._options.staleThreshold, {
-          onStale: () => this._handleStale(),
-          getSessionId: () => this._session.sessionId,
-          getChannelId: () => this._channelId
-        });
-        this._liveness.start();
+        this._startLiveness();
         this._scheduleTokenRefresh();
         return;
       }
@@ -916,6 +1031,14 @@
         }
       }
     }
+    _cleanupFailedConnect() {
+      this._stopBackgroundActivity();
+      this._resetConnectionRuntimeState();
+      this._closeTransportWithoutReconnect();
+    }
+    _isSessionReady() {
+      return this._channelState === "OPEN" && this._sessionContext !== null && this._session.sessionId !== null;
+    }
     _shouldStopReconnect() {
       return this._disconnectRequested || this._channelState === "AUTH_FAILED";
     }
@@ -948,6 +1071,33 @@
       for (const cancel of Array.from(this._pendingDelayCancels)) {
         cancel();
       }
+    }
+    _resetSessionRuntimeState() {
+      this._clearSessionOpenWaiter();
+      this._session.reset();
+      this._sessionContext = null;
+      this._sessionMeta = null;
+      this._bootstrapMeta = null;
+    }
+    _resetConnectionRuntimeState() {
+      this._resetSessionRuntimeState();
+      this._channelState = "CLOSED";
+      this._accessToken = null;
+      this._refreshToken = null;
+      this._wsUrl = null;
+      this._runtimeHttpBaseUrl = null;
+      this._cpApiUrl = null;
+    }
+    _closeTransportWithoutReconnect(code, reason) {
+      this._suppressNextReconnect = true;
+      this._transport.close(code, reason);
+    }
+    _requireActiveSessionId() {
+      const effectiveSessionId = this.sessionId;
+      if (!effectiveSessionId || !this._isSessionReady()) {
+        throw makeError("session_not_ready", "Session is not ready");
+      }
+      return effectiveSessionId;
     }
     _requireSessionId(sessionId) {
       const effectiveSessionId = sessionId ?? this.sessionId;
@@ -1025,6 +1175,74 @@
     }
     return value;
   }
+  function asNullableString(value) {
+    if (typeof value !== "string") {
+      return null;
+    }
+    const normalized = value.trim();
+    return normalized === "" ? null : normalized;
+  }
+  function extractSessionContext(message) {
+    const payload = asRecord(message.payload) ?? {};
+    const identity = asRecord(payload["identity"]);
+    const correspondent = asRecord(payload["correspondent"]);
+    const sessionId = message.session_id;
+    if (!sessionId) {
+      throw makeError("transport_protocol_violation", "system::opened missing session_id");
+    }
+    return {
+      sessionId,
+      status: asNullableString(payload["status"]) ?? "initializing",
+      executionMode: asNullableString(payload["execution_mode"]) ?? "production",
+      artifactId: asNullableString(payload["artifact_id"]),
+      artifactKind: asNullableString(payload["artifact_kind"]),
+      runMode: asNullableString(payload["run_mode"]),
+      identity: identity ? {
+        tenantId: asNullableString(identity["tenant_id"]),
+        projectId: asNullableString(identity["project_id"]),
+        deploymentId: asNullableString(identity["deployment_id"]),
+        releaseId: asNullableString(identity["release_id"]),
+        userId: asNullableString(identity["user_id"]),
+        userUuid: asNullableString(identity["user_uuid"]),
+        actorKind: asNullableString(identity["actor_kind"]),
+        actorRef: asNullableString(identity["actor_ref"])
+      } : null,
+      correspondent: correspondent && asNullableString(correspondent["name"]) ? {
+        kind: asNullableString(correspondent["kind"]),
+        id: asNullableString(correspondent["id"]),
+        name: asNullableString(correspondent["name"]),
+        title: asNullableString(correspondent["title"]),
+        subtitle: asNullableString(correspondent["subtitle"]),
+        avatarUrl: asNullableString(correspondent["avatar_url"])
+      } : null
+    };
+  }
+  function mergeLegacySessionMeta(bootstrapMeta, sessionContext) {
+    const merged = { ...bootstrapMeta ?? {} };
+    if (sessionContext.correspondent) {
+      merged["chat_correspondent"] = {
+        kind: sessionContext.correspondent.kind ?? void 0,
+        id: sessionContext.correspondent.id ?? void 0,
+        name: sessionContext.correspondent.name,
+        title: sessionContext.correspondent.title ?? void 0,
+        subtitle: sessionContext.correspondent.subtitle ?? void 0,
+        avatar_url: sessionContext.correspondent.avatarUrl ?? void 0
+      };
+    }
+    if (sessionContext.identity) {
+      merged["identity"] = {
+        tenant_id: sessionContext.identity.tenantId,
+        project_id: sessionContext.identity.projectId,
+        deployment_id: sessionContext.identity.deploymentId,
+        release_id: sessionContext.identity.releaseId,
+        user_id: sessionContext.identity.userId,
+        user_uuid: sessionContext.identity.userUuid,
+        actor_kind: sessionContext.identity.actorKind,
+        actor_ref: sessionContext.identity.actorRef
+      };
+    }
+    return merged;
+  }
   function withQueryParams(url, params) {
     const parsed = new URL(url);
     for (const [key, value] of Object.entries(params)) {
@@ -1042,6 +1260,15 @@
     if (status === 410)
       return makeError("file_expired", "File expired");
     return makeError("file_operation_failed", `File operation failed with status ${status}`);
+  }
+  function createDeferred() {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
   }
 
   // node_modules/@cortex-suite/sdk/dist/browser/index.js
@@ -2864,11 +3091,17 @@
         promise,
         new Promise((_, reject) => {
           timer = setTimeout(() => reject(new Error(msg)), timeoutMs);
+          unrefTimer(timer);
         })
       ]);
     } finally {
       if (timer !== void 0)
         clearTimeout(timer);
+    }
+  }
+  function unrefTimer(timer) {
+    if (timer && typeof timer.unref === "function") {
+      timer.unref();
     }
   }
   function generateClientMsgId() {
@@ -2878,6 +3111,21 @@
     return `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   }
   function getSessionCorrespondent(client) {
+    const rawSessionContext = client.sessionContext;
+    if (isRecord(rawSessionContext) && isRecord(rawSessionContext["correspondent"])) {
+      const contextCorrespondent = rawSessionContext["correspondent"];
+      const name2 = asNonEmptyString(contextCorrespondent["name"]);
+      if (name2) {
+        return {
+          kind: asNonEmptyString(contextCorrespondent["kind"]) ?? void 0,
+          id: asNonEmptyString(contextCorrespondent["id"]) ?? null,
+          name: name2,
+          title: asNonEmptyString(contextCorrespondent["title"]) ?? null,
+          subtitle: asNonEmptyString(contextCorrespondent["subtitle"]) ?? null,
+          avatarUrl: asNonEmptyString(contextCorrespondent["avatarUrl"]) ?? null
+        };
+      }
+    }
     const rawMeta = client.sessionMeta;
     if (!isRecord(rawMeta)) {
       return null;
@@ -2918,6 +3166,7 @@
     let activeQuestion = null;
     let workerState = { state: "idle" };
     let workerStateTtlTimer = null;
+    let awaitingAnswer = false;
     const escalationController = createEscalationController({
       client: options.client,
       replyRequestBuilder: options.replyRequestBuilder,
@@ -2935,13 +3184,37 @@
     function getSessionState() {
       return options.client.sessionState ?? "CREATED";
     }
+    function getSessionId() {
+      return options.client.sessionId ?? options.client.sessionContext?.sessionId ?? null;
+    }
+    function isSessionReady() {
+      return getChannelState() === "OPEN" && getSessionId() !== null;
+    }
     function defaultInputLockPolicy() {
       const sessionState = getSessionState();
       const escalation = escalationController.getState();
+      if (getChannelState() === "CONNECTING" || getChannelState() === "RECONNECTING") {
+        return {
+          locked: true,
+          reason: "session_opening"
+        };
+      }
+      if (!isSessionReady()) {
+        return {
+          locked: true,
+          reason: "session_not_ready"
+        };
+      }
       if (TERMINAL_SESSION_STATES.has(sessionState)) {
         return {
           locked: true,
           reason: `session_${sessionState.toLowerCase()}`
+        };
+      }
+      if (awaitingAnswer) {
+        return {
+          locked: true,
+          reason: "awaiting_answer"
         };
       }
       if (options.mode !== "operator" && escalation?.status === "pending") {
@@ -2955,11 +3228,15 @@
     function computeState() {
       const channelState = getChannelState();
       const sessionState = getSessionState();
+      const sessionId = getSessionId();
+      const sessionReady = isSessionReady();
       const escalation = escalationController.getState();
       const input = options.inputLockPolicy ? options.inputLockPolicy({
         mode: options.mode ?? "end_user",
         channelState,
         sessionState,
+        sessionId,
+        isSessionReady: sessionReady,
         escalation
       }) : defaultInputLockPolicy();
       return {
@@ -2969,6 +3246,8 @@
         connection: {
           channelState,
           sessionState,
+          sessionId,
+          isSessionReady: sessionReady,
           isConnected: channelState === "OPEN",
           isStale: channelState === "STALE" || channelState === "RECONNECTING"
         },
@@ -3015,6 +3294,7 @@
           workerStateTtlTimer = null;
           emitStateChanged();
         }, remaining);
+        unrefTimer(workerStateTtlTimer);
       }
     }
     function resetWorkerStateToIdle() {
@@ -3063,6 +3343,7 @@
         emit({ type: "escalation_opened", escalation: cloneEscalation(escalation) });
       }
       if (message.type === "chat::question") {
+        awaitingAnswer = false;
         resetWorkerStateToIdle();
         const payload = asPayload(message);
         const meta = isRecord(payload["meta"]) ? payload["meta"] : null;
@@ -3079,8 +3360,16 @@
         }
       }
       if (message.type === "chat::answer" || message.type === "system::error") {
+        awaitingAnswer = false;
         activeQuestion = null;
         resetWorkerStateToIdle();
+      }
+      if (message.type === "sandbox::lifecycle") {
+        const payload = asPayload(message);
+        const status = asNonEmptyString(payload["status"])?.toLowerCase() ?? null;
+        if (status && ["completed", "failed", "stopped", "timeout", "cancelled"].includes(status)) {
+          awaitingAnswer = false;
+        }
       }
       if (message.type === "system::error") {
         const payload = asPayload(message);
@@ -3114,6 +3403,7 @@
         emitStateChanged();
       },
       async disconnect() {
+        awaitingAnswer = false;
         if (options.client.disconnect) {
           await options.client.disconnect();
         }
@@ -3155,12 +3445,15 @@
         try {
           console.debug("[sdk-ui] sendMessage -> client.sendMessage start", summarizeSendPayload2(sendPayload));
           await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
+          awaitingAnswer = true;
           console.debug("[sdk-ui] sendMessage -> client.sendMessage done", {
             clientMsgId,
             ok: true
           });
+          emitStateChanged();
           return { ok: true, messageId: id, clientMsgId };
         } catch (err) {
+          awaitingAnswer = false;
           console.debug("[sdk-ui] sendMessage -> client.sendMessage failed", {
             clientMsgId,
             error: err instanceof Error ? err.message : String(err)
@@ -3188,12 +3481,15 @@
         try {
           console.debug("[sdk-ui] retryMessage -> client.sendMessage start", summarizeSendPayload2(msg.originalPayload));
           await withTimeout(options.client.sendMessage(msg.originalPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
+          awaitingAnswer = true;
           console.debug("[sdk-ui] retryMessage -> client.sendMessage done", {
             clientMsgId,
             ok: true
           });
+          emitStateChanged();
           return { ok: true, messageId, clientMsgId };
         } catch (err) {
+          awaitingAnswer = false;
           console.debug("[sdk-ui] retryMessage -> client.sendMessage failed", {
             clientMsgId,
             error: err instanceof Error ? err.message : String(err)
@@ -3986,6 +4282,8 @@
     connection: {
       channelState: "CLOSED",
       sessionState: "CREATED",
+      sessionId: null,
+      isSessionReady: false,
       isConnected: false,
       isStale: false
     },
@@ -4066,6 +4364,7 @@
     let historyState = historyClient ? "loading" : "disabled";
     let historyErrorMessage = "";
     let liveConnected = false;
+    let liveConnectPromise = null;
     const internal = {
       isOpen: options.mode === "embedded" ? true : options.initialOpen,
       isReady: false,
@@ -4212,14 +4511,23 @@
       liveChatState = controller.getState();
       internal.attachmentsAvailable = typeof client.uploadAttachment === "function" || typeof client.uploadFile === "function";
       liveConnected = false;
+      liveConnectPromise = null;
       bindControllerListeners();
     }
     async function ensureConnected() {
       if (liveConnected) {
         return;
       }
-      await controller.connect();
-      liveConnected = true;
+      if (liveConnectPromise) {
+        return liveConnectPromise;
+      }
+      liveConnectPromise = (async () => {
+        await controller.connect();
+        liveConnected = true;
+      })().finally(() => {
+        liveConnectPromise = null;
+      });
+      return liveConnectPromise;
     }
     function setSelectedFile(file) {
       internal.selectedFileValue = file;
@@ -4325,7 +4633,6 @@
       }
       const questionMeta = activeQuestion ? { question_id: activeQuestion.question_id, selected_option: "reply" } : void 0;
       try {
-        await ensureConnected();
         const sendRequest = {
           content: [content],
           attachments: attachmentId ? [attachmentId] : void 0,
@@ -4365,7 +4672,6 @@
         return;
       }
       try {
-        await ensureConnected();
         const result = await controller.sendMessage({
           content: [optionLabel],
           meta: { question_id: questionId, selected_option: optionId }
@@ -4399,6 +4705,12 @@
       internal.isAwaitingAnswer = false;
       internal.isTyping = false;
       await resetLiveSession();
+      if (options.mode === "embedded" || internal.isOpen) {
+        void ensureConnected().catch((error) => {
+          resolveRuntimeError(error, options, internal);
+          notifyAndRender();
+        });
+      }
       notifyAndRender();
     }
     async function selectHistoricalConversation(sessionId) {
@@ -4427,6 +4739,12 @@
         return;
       }
       internal.isOpen = nextOpen;
+      if (nextOpen) {
+        void ensureConnected().catch((error) => {
+          resolveRuntimeError(error, options, internal);
+          notifyAndRender();
+        });
+      }
       notifyAndRender();
     }
     async function teardown() {
@@ -4479,8 +4797,7 @@
       if (options.mode !== "floating") {
         return;
       }
-      internal.isOpen = !internal.isOpen;
-      notifyAndRender();
+      setOpen(!internal.isOpen);
     };
     const onTranscriptClick = (event) => {
       const retryBtn = event.target.closest("[data-retry-msg-id]");
@@ -4596,6 +4913,12 @@
     internal.isReady = true;
     notifyAndRender();
     options.onReady?.();
+    if (options.mode === "embedded" || internal.isOpen) {
+      void ensureConnected().catch((error) => {
+        resolveRuntimeError(error, options, internal);
+        notifyAndRender();
+      });
+    }
     if (historyClient) {
       void refreshHistory();
     }
