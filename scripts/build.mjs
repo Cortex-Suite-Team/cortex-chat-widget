@@ -1,5 +1,9 @@
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+
+const require = createRequire(import.meta.url);
 
 const GITHUB_SOURCE_BASES = [
   {
@@ -45,6 +49,27 @@ async function rewriteSourceMapSources(mapPath) {
   await writeFile(mapPath, `${JSON.stringify(map, null, 2)}\n`, 'utf8');
 }
 
+async function resolveBuildInfo() {
+  const sdkBrowserEntry = require.resolve('@cortex-suite/sdk/browser');
+  const sdkPackagePath = join(dirname(dirname(dirname(sdkBrowserEntry))), 'package.json');
+  const sdkPackage = JSON.parse(await readFile(sdkPackagePath, 'utf8'));
+
+  return {
+    builtAt: new Date().toISOString(),
+    widgetEntry: 'dist/index.js',
+    sdk: {
+      name: sdkPackage.name,
+      version: sdkPackage.version,
+      packageJsonPath: sdkPackagePath,
+      browserEntryPath: sdkBrowserEntry,
+    },
+  };
+}
+
+const buildInfo = await resolveBuildInfo();
+console.log(`[chat-widget build] ${buildInfo.sdk.name} version: ${buildInfo.sdk.version}`);
+console.log(`[chat-widget build] ${buildInfo.sdk.name} browser entry: ${buildInfo.sdk.browserEntryPath}`);
+
 await build({
   entryPoints: ['src/index.ts'],
   outfile: 'dist/index.js',
@@ -53,8 +78,12 @@ await build({
   platform: 'browser',
   target: 'es2020',
   sourcemap: true,
+  banner: {
+    js: `/* cortex-chat-widget build: sdk=${buildInfo.sdk.version} builtAt=${buildInfo.builtAt} */`,
+  },
 });
 await rewriteSourceMapSources('dist/index.js.map');
+await writeFile('dist/build-info.json', `${JSON.stringify(buildInfo, null, 2)}\n`, 'utf8');
 
 await build({
   entryPoints: ['src/loader.ts'],
@@ -64,5 +93,8 @@ await build({
   platform: 'browser',
   target: 'es2020',
   sourcemap: true,
+  banner: {
+    js: `/* cortex-chat-widget loader build: sdk=${buildInfo.sdk.version} builtAt=${buildInfo.builtAt} */`,
+  },
 });
 await rewriteSourceMapSources('dist/loader.js.map');

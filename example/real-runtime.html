@@ -418,6 +418,7 @@
       const debugChannel = document.querySelector("#debug-channel");
       const debugMessages = document.querySelector("#debug-messages");
       const debugLog = document.querySelector("#debug-log");
+      const BUNDLE_INFO_URL = "../dist/build-info.json";
 
       function readQueryConfig() {
         const params = new URLSearchParams(window.location.search);
@@ -480,6 +481,25 @@
         const now = new Date().toLocaleTimeString();
         const renderedData = data === undefined ? "" : `\n${safeStringify(data)}`;
         debugLog.textContent = `[${now}] ${message}${renderedData}\n\n${debugLog.textContent}`.slice(0, 6000);
+      }
+
+      async function logBundleInfo() {
+        writeLog("Widget bundle import path.", {
+          importPath: "../dist/index.js"
+        });
+
+        try {
+          const response = await fetch(BUNDLE_INFO_URL, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const buildInfo = await response.json();
+          writeLog("Loaded widget build metadata.", buildInfo);
+        } catch (error) {
+          writeLog("Unable to load dist/build-info.json. Rebuild before using real-runtime.html.", {
+            message: error?.message ?? String(error)
+          });
+        }
       }
 
       function safeStringify(value) {
@@ -595,6 +615,8 @@
         setStatus("waiting for key");
         writeLog("Fill API Key, workerRef, and Control Plane URL, then mount the live widget.");
       }
+
+      void logBundleInfo();
     </script>
   </body>
 </html>

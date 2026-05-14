@@ -1,8 +1,11 @@
-# Mock example for `@cortex-suite/chat-widget`
+# Examples for `@cortex-suite/chat-widget`
 
-This example is a standalone mock browser demo for the widget package.
+This directory contains both:
 
-It uses:
+- `/example/` for the standalone mock browser demo
+- `/example/real-runtime.html` for the live Control Plane auth -> SessionManager WebSocket smoke path
+
+The mock page uses:
 
 - the GitHub-hosted widget bundle from the `cortex-chat-widget` repository
 - the GitHub-hosted mock `client` from the same repository
@@ -16,7 +19,9 @@ It does not require:
 
 ## Run it
 
-Build the package if you want fresh local artifacts and tests, but the example page itself imports its runtime files from GitHub:
+## Mock page
+
+Build the package if you want fresh local artifacts and tests, but the mock example page itself imports its runtime files from GitHub:
 
 ```bash
 npm run build
@@ -49,3 +54,19 @@ Then open:
 - returns mock attachment ids from `uploadAttachment()`
 
 Everything runs in the browser with GitHub-hosted module files. No real backend connection is required.
+
+## Real runtime page
+
+`real-runtime.html` is different. It imports the local built widget bundle from `../dist/index.js`, so rebuild before serving it:
+
+```bash
+npm run real-runtime:prepare
+```
+
+Then serve the package directory and open:
+
+```text
+/example/real-runtime.html
+```
+
+The page also reads `../dist/build-info.json` and prints the exact bundle metadata, including the resolved `@cortex-suite/sdk` version used at build time, so stale or missing local `dist` is visible instead of silent.

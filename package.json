@@ -36,6 +36,7 @@
     "prebuild": "npm run sync:sdk",
     "build": "npm run clean && npm run build:types && npm run build:bundle",
     "build:bundle": "node ./scripts/build.mjs",
+    "real-runtime:prepare": "npm run build",
     "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
     "clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('dist', { recursive: true, force: true }))\"",
     "pretypecheck": "npm run sync:sdk",

@@ -3,6 +3,7 @@ import {
   baseChatState,
   changeInput,
   CustomClient,
+  flushAsyncWork,
   mountWidget,
   resetMocks,
   setFileInput,
@@ -81,6 +82,26 @@ describe('mountCortexChat', () => {
     });
 
     expect(__getLastSdkBrowserClient()?.options.workerRef).toBe('live-worker');
+  });
+
+  it('handleSend calls controller.sendMessage once', async () => {
+    mountWidget({
+      mode: 'floating',
+    });
+
+    const host = document.body.firstElementChild as HTMLElement;
+    const textarea = host.shadowRoot?.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const composer = host.shadowRoot?.querySelector('[data-testid="composer"]') as HTMLFormElement;
+
+    changeInput(textarea, 'Hello live runtime');
+    submitComposer(composer);
+    await flushAsyncWork();
+
+    const controller = __getLastController();
+    expect(controller?.sendCalls).toHaveLength(1);
+    expect(controller?.sendCalls[0]).toMatchObject({
+      content: ['Hello live runtime'],
+    });
   });
 
   it('renders attachment UI disabled when client has no upload capability', () => {

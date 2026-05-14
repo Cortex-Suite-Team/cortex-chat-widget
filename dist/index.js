@@ -1,3 +1,5 @@
+/* cortex-chat-widget build: sdk=1.1.2 builtAt=2026-05-14T08:39:55.961Z */
+
 // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://auth.cortexsuite.app";
 var AUTH_TOKEN_PATH = "/auth/token";
@@ -4264,11 +4266,17 @@ function createWidgetHandle(args) {
     const questionMeta = activeQuestion ? { question_id: activeQuestion.question_id, selected_option: "reply" } : void 0;
     try {
       await ensureConnected();
+      console.debug("[cortex-chat-widget] handleSend -> controller.sendMessage start", {
+        content: [content],
+        attachments: attachmentId ? [attachmentId] : void 0,
+        meta: questionMeta
+      });
       const result = await controller.sendMessage({
         content: [content],
         attachments: attachmentId ? [attachmentId] : void 0,
         meta: questionMeta
       });
+      console.debug("[cortex-chat-widget] handleSend -> controller.sendMessage done", result);
       if (!result.ok) {
         internal.isAwaitingAnswer = false;
         internal.isUploading = false;

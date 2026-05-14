@@ -427,11 +427,17 @@ export function createWidgetHandle(args: {
 
     try {
       await ensureConnected();
+      console.debug('[cortex-chat-widget] handleSend -> controller.sendMessage start', {
+        content: [content],
+        attachments: attachmentId ? [attachmentId] : undefined,
+        meta: questionMeta,
+      });
       const result = await controller.sendMessage({
         content: [content],
         attachments: attachmentId ? [attachmentId] : undefined,
         meta: questionMeta,
       });
+      console.debug('[cortex-chat-widget] handleSend -> controller.sendMessage done', result);
 
       if (!result.ok) {
         internal.isAwaitingAnswer = false;
