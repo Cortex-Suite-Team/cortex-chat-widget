@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.5 builtAt=2026-05-14T17:15:52.707Z */
+/* cortex-chat-widget build: sdk=1.1.5 builtAt=2026-05-14T17:43:16.121Z */
 
 // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://cortexsuite.app";
@@ -2676,6 +2676,16 @@ function buildAttachmentMeta(payload) {
 function getClientMsgId(meta) {
   return asNonEmptyString(meta["client_msg_id"]) ?? void 0;
 }
+function resolveVisibleContent(payload) {
+  if (payload["content"] !== void 0) {
+    return payload["content"];
+  }
+  const message = payload["message"];
+  if (isRecord(message) && message["text"] !== void 0) {
+    return message["text"];
+  }
+  return message ?? null;
+}
 function normalizeCortexMessage(message) {
   const payload = asPayload(message);
   const payloadMeta = isRecord(payload["meta"]) ? payload["meta"] : void 0;
@@ -2697,6 +2707,22 @@ function normalizeCortexMessage(message) {
         meta: {
           ...mergedMeta,
           ...buildAttachmentMeta(payload)
+        }
+      };
+    case "chat::echo":
+      return {
+        id: buildMessageId(message, "echo"),
+        seq: message.seq ?? null,
+        type: message.type,
+        role: mapRole(payload["role"], "user"),
+        content: resolveVisibleContent(payload),
+        status: "final",
+        ts: message.ts ?? null,
+        clientMsgId: getClientMsgId(mergedMeta),
+        meta: {
+          ...mergedMeta,
+          ...buildAttachmentMeta(payload),
+          ...asNonEmptyString(payload["turn_id"]) ? { turnId: asNonEmptyString(payload["turn_id"]) } : {}
         }
       };
     case "chat::partial":
@@ -2728,6 +2754,23 @@ function normalizeCortexMessage(message) {
           ...buildAttachmentMeta(payload),
           ...asNonEmptyString(payload["turn_id"]) ? { turnId: asNonEmptyString(payload["turn_id"]) } : {},
           ...asNonEmptyString(payload["answer_kind"]) ? { answerKind: asNonEmptyString(payload["answer_kind"]) } : {}
+        }
+      };
+    case "chat::forward":
+    case "chat::hail":
+      return {
+        id: buildMessageId(message, message.type === "chat::forward" ? "forward" : "hail"),
+        seq: message.seq ?? null,
+        type: message.type,
+        role: mapRole(payload["role"], "assistant"),
+        content: resolveVisibleContent(payload),
+        status: "final",
+        ts: message.ts ?? null,
+        clientMsgId: getClientMsgId(mergedMeta),
+        meta: {
+          ...mergedMeta,
+          ...buildAttachmentMeta(payload),
+          ...asNonEmptyString(payload["turn_id"]) ? { turnId: asNonEmptyString(payload["turn_id"]) } : {}
         }
       };
     case "escalation::request":
@@ -3074,7 +3117,7 @@ function createTranscriptStore(options = {}) {
       }
       const normalized = normalizeCortexMessage(message);
       const existingIndex = indexById.get(normalized.id);
-      const optimisticIndex = message.type === "chat::message" && normalized.role === "user" ? findMessageIndexByClientMsgId(normalized.clientMsgId) : void 0;
+      const optimisticIndex = message.type === "chat::echo" && normalized.role === "user" ? findMessageIndexByClientMsgId(normalized.clientMsgId) : void 0;
       if (message.type === "chat::partial" && existingIndex !== void 0) {
         const existing = transcript[existingIndex];
         const nextMessage = {
@@ -3170,42 +3213,23 @@ function generateClientMsgId() {
   }
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
-function getSessionCorrespondent(client) {
+function getSessionContextCorrespondent(client) {
   const rawSessionContext = client.sessionContext;
   if (isRecord(rawSessionContext) && isRecord(rawSessionContext["correspondent"])) {
     const contextCorrespondent = rawSessionContext["correspondent"];
-    const name2 = asNonEmptyString(contextCorrespondent["name"]);
-    if (name2) {
+    const name = asNonEmptyString(contextCorrespondent["name"]);
+    if (name) {
       return {
         kind: asNonEmptyString(contextCorrespondent["kind"]) ?? void 0,
         id: asNonEmptyString(contextCorrespondent["id"]) ?? null,
-        name: name2,
+        name,
         title: asNonEmptyString(contextCorrespondent["title"]) ?? null,
         subtitle: asNonEmptyString(contextCorrespondent["subtitle"]) ?? null,
         avatarUrl: asNonEmptyString(contextCorrespondent["avatarUrl"]) ?? null
       };
     }
   }
-  const rawMeta = client.sessionMeta;
-  if (!isRecord(rawMeta)) {
-    return null;
-  }
-  const rawCorrespondent = rawMeta["chat_correspondent"];
-  if (!isRecord(rawCorrespondent)) {
-    return null;
-  }
-  const name = asNonEmptyString(rawCorrespondent["name"]);
-  if (!name) {
-    return null;
-  }
-  return {
-    kind: asNonEmptyString(rawCorrespondent["kind"]) ?? void 0,
-    id: asNonEmptyString(rawCorrespondent["id"]) ?? null,
-    name,
-    title: asNonEmptyString(rawCorrespondent["title"]) ?? null,
-    subtitle: asNonEmptyString(rawCorrespondent["subtitle"]) ?? null,
-    avatarUrl: asNonEmptyString(rawCorrespondent["avatar_url"]) ?? null
-  };
+  return null;
 }
 function summarizeSendPayload2(payload) {
   return {
@@ -3228,7 +3252,7 @@ function createChatController(options) {
   let workerState = { state: "idle" };
   let workerStateTtlTimer = null;
   let awaitingAnswer = false;
-  let sessionCorrespondent = getSessionCorrespondent(options.client);
+  let sessionCorrespondent = null;
   let sessionStateOverride = null;
   const escalationController = createEscalationController({
     client: options.client,
@@ -3364,9 +3388,6 @@ function createChatController(options) {
     clearWorkerStateTtl();
     workerState = { state: "idle" };
   }
-  function refreshSessionSnapshot() {
-    sessionCorrespondent = getSessionCorrespondent(options.client);
-  }
   function applySessionStateOverride(nextState) {
     if (nextState === null) {
       sessionStateOverride = null;
@@ -3383,7 +3404,10 @@ function createChatController(options) {
     return (asNonEmptyString(payload["status"]) ?? asNonEmptyString(payload["state"]) ?? asNonEmptyString(payloadMeta?.["status"]) ?? asNonEmptyString(payloadMeta?.["state"]))?.toLowerCase() ?? null;
   }
   function handleSystemOpened() {
-    refreshSessionSnapshot();
+    const openedCorrespondent = getSessionContextCorrespondent(options.client);
+    if (openedCorrespondent) {
+      sessionCorrespondent = openedCorrespondent;
+    }
     applySessionStateOverride("ACTIVE");
   }
   function handleSystemLifecycle(message) {
