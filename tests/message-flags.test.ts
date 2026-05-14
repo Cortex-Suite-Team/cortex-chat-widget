@@ -1,4 +1,4 @@
-import { formatContent } from '../src/message-flags.js';
+import { formatContent, shouldHideTranscriptMessage } from '../src/message-flags.js';
 
 describe('formatContent', () => {
   it('returns plain string as contentText', () => {
@@ -41,5 +41,32 @@ describe('formatContent', () => {
     const result = formatContent({ key: 'value' });
     expect(result.contentText).toBeNull();
     expect(result.formattedContent).toBe(JSON.stringify({ key: 'value' }, null, 2));
+  });
+});
+
+describe('shouldHideTranscriptMessage', () => {
+  it('hides blocked protocol messages', () => {
+    expect(shouldHideTranscriptMessage({
+      id: '1',
+      type: 'system::opened',
+      role: 'system',
+      content: {},
+    })).toBe(true);
+
+    expect(shouldHideTranscriptMessage({
+      id: '2',
+      type: 'system::lifecycle',
+      role: 'system',
+      content: {},
+    })).toBe(true);
+  });
+
+  it('keeps system::error visible', () => {
+    expect(shouldHideTranscriptMessage({
+      id: '3',
+      type: 'system::error',
+      role: 'error',
+      content: 'Something failed',
+    })).toBe(false);
   });
 });

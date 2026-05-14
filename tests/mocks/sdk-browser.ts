@@ -4,6 +4,7 @@ interface CortexClientOptions {
   apiKey: string;
   workerRef?: string;
   authUrl?: string;
+  debug?: boolean;
   onMessage: (message: Record<string, unknown>) => void;
 }
 

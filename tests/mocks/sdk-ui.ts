@@ -185,7 +185,7 @@ export class MockChatController {
   }
 }
 
-export function createChatController(_options: { client: CortexClientLike }): MockChatController {
+export function createChatController(_options: { client: CortexClientLike; debug?: boolean }): MockChatController {
   const controller = new MockChatController();
   controllers.push(controller);
   return controller;

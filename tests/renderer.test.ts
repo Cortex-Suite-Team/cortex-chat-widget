@@ -488,6 +488,76 @@ describe('widget renderer behavior', () => {
     expect(avatar.textContent).toBe('');
   });
 
+  it('preserves absolute correspondent avatar urls exactly', () => {
+    mountWidget({
+      title: 'Fallback Title',
+      subtitle: 'Fallback Subtitle',
+      controlPlaneUrl: 'https://cortexsuite.app',
+    });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          avatarUrl: 'https://cortexsuite.app/static/workspace/img/digital_worker_default.png',
+        },
+      },
+    }));
+
+    const image = shadow.querySelector('[data-testid="header-avatar"] img') as HTMLImageElement;
+    expect(image.src).toBe('https://cortexsuite.app/static/workspace/img/digital_worker_default.png');
+  });
+
+  it('resolves relative correspondent avatar urls against controlPlaneUrl', () => {
+    mountWidget({
+      title: 'Fallback Title',
+      subtitle: 'Fallback Subtitle',
+      controlPlaneUrl: 'https://cortexsuite.app',
+    });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Robot Vasya',
+          avatarUrl: '/static/workspace/img/digital_worker_default.png',
+        },
+      },
+    }));
+
+    const image = shadow.querySelector('[data-testid="header-avatar"] img') as HTMLImageElement;
+    expect(image.src).toBe('https://cortexsuite.app/static/workspace/img/digital_worker_default.png');
+  });
+
+  it('resolves relative actor avatar urls against controlPlaneUrl for message bubbles', () => {
+    mountWidget({
+      controlPlaneUrl: 'https://cortexsuite.app',
+    });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_with_actor',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'Hello from Robot Vasya',
+        status: 'final',
+        meta: {
+          actor: {
+            kind: 'digital_worker',
+            id: 'proj_1',
+            name: 'Robot Vasya',
+            avatar_url: '/static/workspace/img/digital_worker_default.png',
+          },
+        },
+      }],
+    }));
+
+    const actorAvatar = shadow.querySelector('[data-testid="actor-avatar"]') as HTMLImageElement;
+    expect(actorAvatar.src).toBe('https://cortexsuite.app/static/workspace/img/digital_worker_default.png');
+  });
+
   it('restores initials when correspondent avatar disappears', () => {
     mountWidget({
       title: 'Fallback Title',

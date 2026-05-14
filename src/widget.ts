@@ -1,4 +1,5 @@
 import { createChatController, type ChatController, type ChatState } from '@cortex-suite/sdk-ui';
+import { createDebugLogger } from './debug.js';
 import { createWidgetError, toWidgetError } from './errors.js';
 import { createHistoryClient } from './history-client.js';
 import { createHistoryDom } from './history-dom.js';
@@ -136,7 +137,9 @@ export function createWidgetHandle(args: {
   let controller: ChatController = createChatController({
     client,
     mode: 'end_user',
+    debug: options.debug,
   });
+  const debug = createDebugLogger(options.debug);
   let liveChatState = controller.getState();
   let historicalTranscript: ChatMessageViewModel[] = [];
   let selectedHistorySessionId: string | null = null;
@@ -308,6 +311,7 @@ export function createWidgetHandle(args: {
     controller = createChatController({
       client,
       mode: 'end_user',
+      debug: options.debug,
     });
     liveChatState = controller.getState();
     internal.attachmentsAvailable = typeof client.uploadAttachment === 'function' || typeof client.uploadFile === 'function';
@@ -461,11 +465,11 @@ export function createWidgetHandle(args: {
         attachments: attachmentId ? [attachmentId] : undefined,
         meta: questionMeta,
       };
-      console.debug('[cortex-chat-widget] handleSend -> controller.sendMessage start', {
+      debug.log('[cortex-chat-widget] handleSend -> controller.sendMessage start', {
         ...summarizeSendPayload(sendRequest),
       });
       const result = await controller.sendMessage(sendRequest);
-      console.debug('[cortex-chat-widget] handleSend -> controller.sendMessage done', {
+      debug.log('[cortex-chat-widget] handleSend -> controller.sendMessage done', {
         ok: result.ok,
         clientMsgId: result.clientMsgId,
         messageId: result.messageId,

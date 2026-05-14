@@ -35,6 +35,30 @@ function getHeaderSubtitle(state: CortexChatWidgetState, options: NormalizedWidg
   return correspondent?.title ?? correspondent?.subtitle ?? options.subtitle;
 }
 
+function normalizeAvatarUrl(
+  avatarUrl: string | null,
+  options: NormalizedWidgetOptions,
+): string | null {
+  if (!avatarUrl) {
+    return null;
+  }
+
+  if (/^(https?:|data:)/i.test(avatarUrl)) {
+    return avatarUrl;
+  }
+
+  const baseUrl = options.controlPlaneUrl ?? options.authUrl;
+  if (!baseUrl) {
+    return null;
+  }
+
+  try {
+    return new URL(avatarUrl, baseUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
 function syncHeaderAvatar(
   avatarEl: HTMLElement,
   title: string,
@@ -246,6 +270,7 @@ function getMessageAttachments(message: ChatMessageViewModel): TranscriptAttachm
 function renderTranscript(
   transcriptEl: HTMLElement,
   state: CortexChatWidgetState,
+  options: NormalizedWidgetOptions,
 ) {
   transcriptEl.replaceChildren();
 
@@ -287,7 +312,7 @@ function renderTranscript(
       actorHeader.className = 'cortex-widget__actor';
       actorHeader.setAttribute('data-testid', 'actor-header');
 
-      const avatarUrl = toNonEmptyString(actor!['avatar_url']);
+      const avatarUrl = normalizeAvatarUrl(toNonEmptyString(actor!['avatar_url']), options);
       if (avatarUrl) {
         const img = document.createElement('img');
         img.className = 'cortex-widget__actor-avatar';
@@ -532,7 +557,7 @@ export function renderWidget(
   dom.status.textContent = state.isHistoricalView
     ? 'Viewing chat history'
     : buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
-  syncHeaderAvatar(dom.avatar, headerTitle, headerCorrespondent?.avatarUrl ?? null);
+  syncHeaderAvatar(dom.avatar, headerTitle, normalizeAvatarUrl(headerCorrespondent?.avatarUrl ?? null, options));
   dom.statusDot.dataset.state = state.isHistoricalView
     ? 'history'
     : state.chat.connection.isConnected
@@ -617,5 +642,5 @@ export function renderWidget(
     dom.fileChipRemove.disabled = true;
   }
 
-  renderTranscript(dom.transcript, state);
+  renderTranscript(dom.transcript, state, options);
 }

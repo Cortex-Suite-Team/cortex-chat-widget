@@ -68,6 +68,7 @@ function resolveOptions(
     placeholder: baseOptions.placeholder ?? 'Write your message...',
     launcherLabel: baseOptions.launcherLabel ?? 'Ask Cortex',
     initialOpen: baseOptions.initialOpen ?? false,
+    debug: baseOptions.debug,
   };
 }
 
@@ -130,12 +131,14 @@ function createClient(options: NormalizedWidgetOptions): WidgetClientLike {
     return options.client;
   }
 
-  return new CortexClient({
+  const client = new CortexClient({
     apiKey: options.apiKey,
     workerRef: options.workerRef,
     authUrl: options.authUrl,
+    debug: options.debug,
     onMessage: () => {},
-  }) as unknown as WidgetClientLike;
+  });
+  return client as unknown as WidgetClientLike;
 }
 
 export function mountCortexChat(

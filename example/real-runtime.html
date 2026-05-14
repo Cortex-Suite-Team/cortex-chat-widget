@@ -524,6 +524,8 @@
           apiKey: config.apiKey,
           workerRef: config.workerRef,
           authUrl: config.controlPlaneUrl,
+          controlPlaneUrl: config.controlPlaneUrl,
+          debug: window.localStorage.getItem("cortex_debug") === "1",
           mode: "embedded",
           target: "#chat-root",
           title: "Cortex Worker",

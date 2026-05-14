@@ -6,6 +6,14 @@ import type {
 } from './types.js';
 
 const TYPING_TYPES = new Set(['chat::typing', 'typing::start', 'typing::stop']);
+const HIDDEN_TRANSCRIPT_TYPES = new Set([
+  'system::opened',
+  'system::lifecycle',
+  'system::state',
+  'system::pong',
+  'system::telemetry',
+  'system::billing',
+]);
 const TERMINAL_SESSION_STATES = new Set([
   'COMPLETED',
   'FAILED',
@@ -38,7 +46,9 @@ export function isTypingMessageType(type: string): boolean {
 }
 
 export function shouldHideTranscriptMessage(message: ChatMessageViewModel): boolean {
-  return isTypingMessageType(message.type);
+  return isTypingMessageType(message.type)
+    || HIDDEN_TRANSCRIPT_TYPES.has(message.type)
+    || (message.type.startsWith('system::') && message.type !== 'system::error');
 }
 
 export function isTerminalSessionState(sessionState: string): boolean {

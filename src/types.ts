@@ -62,6 +62,7 @@ export interface CortexChatWidgetOptions {
   placeholder?: string;
   launcherLabel?: string;
   position?: 'bottom-right' | 'bottom-left';
+  debug?: boolean;
   theme?: {
     accentColor?: string;
     backgroundColor?: string;
@@ -107,6 +108,7 @@ export interface NormalizedWidgetOptions extends CortexChatWidgetOptions {
   placeholder: string;
   launcherLabel: string;
   initialOpen: boolean;
+  debug?: boolean;
 }
 
 export interface InternalWidgetState {

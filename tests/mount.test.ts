@@ -1,5 +1,7 @@
+import { jest } from '@jest/globals';
 import { __getLastController } from './mocks/sdk-ui.js';
 import {
+  applyChatState,
   baseChatState,
   changeInput,
   CustomClient,
@@ -134,6 +136,58 @@ describe('mountCortexChat', () => {
     });
 
     expect(__getLastSdkBrowserClient()?.options.workerRef).toBe('live-worker');
+  });
+
+  it('passes debug flag through to the SDK client when enabled', () => {
+    mountCortexChat({
+      apiKey: 'test-key',
+      workerRef: 'live-worker',
+      debug: true,
+    });
+
+    expect(__getLastSdkBrowserClient()?.options.debug).toBe(true);
+  });
+
+  it('does not emit console.debug by default during widget send', async () => {
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    mountWidget({
+      mode: 'floating',
+    });
+
+    const host = document.body.firstElementChild as HTMLElement;
+    const textarea = host.shadowRoot?.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const composer = host.shadowRoot?.querySelector('[data-testid="composer"]') as HTMLFormElement;
+
+    changeInput(textarea, 'Hello live runtime');
+    submitComposer(composer);
+    await flushAsyncWork();
+
+    expect(debugSpy).not.toHaveBeenCalled();
+    debugSpy.mockRestore();
+  });
+
+  it('draft input does not change header correspondent once session identity is set', () => {
+    mountWidget({
+      mode: 'floating',
+    });
+    const host = document.body.firstElementChild as HTMLElement;
+    const shadow = host.shadowRoot as ShadowRoot;
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const title = shadow.querySelector('.cortex-widget__title') as HTMLElement;
+
+    applyChatState(baseChatState({
+      session: {
+        correspondent: {
+          name: 'Echo Worker',
+          title: 'Tester',
+          avatarUrl: 'https://example.test/avatar.png',
+        },
+      },
+    }));
+
+    changeInput(textarea, 'draft text');
+
+    expect(title.textContent).toBe('Echo Worker');
   });
 
   it('handleSend calls controller.sendMessage once', async () => {
