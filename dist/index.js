@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.2 builtAt=2026-05-14T08:39:55.961Z */
+/* cortex-chat-widget build: sdk=1.1.2 builtAt=2026-05-14T08:54:21.399Z */
 
 // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://auth.cortexsuite.app";
@@ -3989,6 +3989,16 @@ function resolveRuntimeError(error, options, internal) {
   internal.error = toWidgetError(error, "widget_runtime_error", "Widget runtime error");
   options.onError?.(error);
 }
+function summarizeSendPayload(payload) {
+  return {
+    contentKind: Array.isArray(payload.content) ? "array" : typeof payload.content,
+    contentLength: Array.isArray(payload.content) ? payload.content.length : void 0,
+    hasAttachments: Boolean(payload.attachments?.length),
+    attachmentCount: payload.attachments?.length ?? 0,
+    metaKeys: payload.meta ? Object.keys(payload.meta) : [],
+    clientMsgId: payload.meta && typeof payload.meta.client_msg_id === "string" ? payload.meta.client_msg_id : void 0
+  };
+}
 function createWidgetHandle(args) {
   const { options, dom, mountTarget, historyTarget, createClient: createClient2 } = args;
   const historyDom = options.mode === "embedded" && historyTarget ? createHistoryDom() : null;
@@ -4266,17 +4276,20 @@ function createWidgetHandle(args) {
     const questionMeta = activeQuestion ? { question_id: activeQuestion.question_id, selected_option: "reply" } : void 0;
     try {
       await ensureConnected();
+      const sendRequest = {
+        content: [content],
+        attachments: attachmentId ? [attachmentId] : void 0,
+        meta: questionMeta
+      };
       console.debug("[cortex-chat-widget] handleSend -> controller.sendMessage start", {
-        content: [content],
-        attachments: attachmentId ? [attachmentId] : void 0,
-        meta: questionMeta
+        ...summarizeSendPayload(sendRequest)
       });
-      const result = await controller.sendMessage({
-        content: [content],
-        attachments: attachmentId ? [attachmentId] : void 0,
-        meta: questionMeta
+      const result = await controller.sendMessage(sendRequest);
+      console.debug("[cortex-chat-widget] handleSend -> controller.sendMessage done", {
+        ok: result.ok,
+        clientMsgId: result.clientMsgId,
+        messageId: result.messageId
       });
-      console.debug("[cortex-chat-widget] handleSend -> controller.sendMessage done", result);
       if (!result.ok) {
         internal.isAwaitingAnswer = false;
         internal.isUploading = false;

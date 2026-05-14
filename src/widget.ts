@@ -99,6 +99,24 @@ function resolveRuntimeError(
   options.onError?.(error);
 }
 
+function summarizeSendPayload(payload: {
+  content?: unknown;
+  attachments?: unknown[];
+  meta?: Record<string, unknown>;
+}) {
+  return {
+    contentKind: Array.isArray(payload.content) ? 'array' : typeof payload.content,
+    contentLength: Array.isArray(payload.content) ? payload.content.length : undefined,
+    hasAttachments: Boolean(payload.attachments?.length),
+    attachmentCount: payload.attachments?.length ?? 0,
+    metaKeys: payload.meta ? Object.keys(payload.meta) : [],
+    clientMsgId:
+      payload.meta && typeof payload.meta.client_msg_id === 'string'
+        ? payload.meta.client_msg_id
+        : undefined,
+  };
+}
+
 export function createWidgetHandle(args: {
   options: NormalizedWidgetOptions;
   dom: WidgetDom;
@@ -427,17 +445,20 @@ export function createWidgetHandle(args: {
 
     try {
       await ensureConnected();
+      const sendRequest = {
+        content: [content],
+        attachments: attachmentId ? [attachmentId] : undefined,
+        meta: questionMeta,
+      };
       console.debug('[cortex-chat-widget] handleSend -> controller.sendMessage start', {
-        content: [content],
-        attachments: attachmentId ? [attachmentId] : undefined,
-        meta: questionMeta,
+        ...summarizeSendPayload(sendRequest),
       });
-      const result = await controller.sendMessage({
-        content: [content],
-        attachments: attachmentId ? [attachmentId] : undefined,
-        meta: questionMeta,
+      const result = await controller.sendMessage(sendRequest);
+      console.debug('[cortex-chat-widget] handleSend -> controller.sendMessage done', {
+        ok: result.ok,
+        clientMsgId: result.clientMsgId,
+        messageId: result.messageId,
       });
-      console.debug('[cortex-chat-widget] handleSend -> controller.sendMessage done', result);
 
       if (!result.ok) {
         internal.isAwaitingAnswer = false;

@@ -60,15 +60,24 @@ async function resolveBuildInfo() {
     sdk: {
       name: sdkPackage.name,
       version: sdkPackage.version,
-      packageJsonPath: sdkPackagePath,
-      browserEntryPath: sdkBrowserEntry,
+      browserEntry: '@cortex-suite/sdk/browser',
+    },
+    sources: {
+      widget: 'https://github.com/Cortex-Suite-Team/cortex-chat-widget',
+      sdk: 'https://github.com/Cortex-Suite-Team/cortex-sdk',
+      sdkUi: 'https://github.com/Cortex-Suite-Team/cortex-sdk-ui',
     },
   };
 }
 
 const buildInfo = await resolveBuildInfo();
 console.log(`[chat-widget build] ${buildInfo.sdk.name} version: ${buildInfo.sdk.version}`);
-console.log(`[chat-widget build] ${buildInfo.sdk.name} browser entry: ${buildInfo.sdk.browserEntryPath}`);
+console.log(`[chat-widget build] ${buildInfo.sdk.name} browser entry: ${sdkBrowserEntryLabel()}`);
+console.log(`[chat-widget build] resolved browser entry path: ${require.resolve('@cortex-suite/sdk/browser')}`);
+
+function sdkBrowserEntryLabel() {
+  return '@cortex-suite/sdk/browser';
+}
 
 await build({
   entryPoints: ['src/index.ts'],
