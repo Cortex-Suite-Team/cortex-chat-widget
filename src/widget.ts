@@ -27,6 +27,8 @@ const EMPTY_CHAT_STATE: ChatState = {
   connection: {
     channelState: 'CLOSED',
     sessionState: 'CREATED',
+    sessionId: null,
+    isSessionReady: false,
     isConnected: false,
     isStale: false,
   },
@@ -143,6 +145,7 @@ export function createWidgetHandle(args: {
   let historyState: 'disabled' | 'loading' | 'loaded' | 'empty' | 'error' = historyClient ? 'loading' : 'disabled';
   let historyErrorMessage = '';
   let liveConnected = false;
+  let liveConnectPromise: Promise<void> | null = null;
 
   const internal: InternalWidgetState = {
     isOpen: options.mode === 'embedded' ? true : options.initialOpen,
@@ -309,6 +312,7 @@ export function createWidgetHandle(args: {
     liveChatState = controller.getState();
     internal.attachmentsAvailable = typeof client.uploadAttachment === 'function' || typeof client.uploadFile === 'function';
     liveConnected = false;
+    liveConnectPromise = null;
     bindControllerListeners();
   }
 
@@ -316,8 +320,16 @@ export function createWidgetHandle(args: {
     if (liveConnected) {
       return;
     }
-    await controller.connect();
-    liveConnected = true;
+    if (liveConnectPromise) {
+      return liveConnectPromise;
+    }
+    liveConnectPromise = (async () => {
+      await controller.connect();
+      liveConnected = true;
+    })().finally(() => {
+      liveConnectPromise = null;
+    });
+    return liveConnectPromise;
   }
 
   function setSelectedFile(file: File | null) {
@@ -444,7 +456,6 @@ export function createWidgetHandle(args: {
       : undefined;
 
     try {
-      await ensureConnected();
       const sendRequest = {
         content: [content],
         attachments: attachmentId ? [attachmentId] : undefined,
@@ -487,7 +498,6 @@ export function createWidgetHandle(args: {
       return;
     }
     try {
-      await ensureConnected();
       const result = await controller.sendMessage({
         content: [optionLabel],
         meta: { question_id: questionId, selected_option: optionId },
@@ -524,6 +534,12 @@ export function createWidgetHandle(args: {
     internal.isAwaitingAnswer = false;
     internal.isTyping = false;
     await resetLiveSession();
+    if (options.mode === 'embedded' || internal.isOpen) {
+      void ensureConnected().catch((error) => {
+        resolveRuntimeError(error, options, internal);
+        notifyAndRender();
+      });
+    }
     notifyAndRender();
   }
 
@@ -554,6 +570,12 @@ export function createWidgetHandle(args: {
       return;
     }
     internal.isOpen = nextOpen;
+    if (nextOpen) {
+      void ensureConnected().catch((error) => {
+        resolveRuntimeError(error, options, internal);
+        notifyAndRender();
+      });
+    }
     notifyAndRender();
   }
 
@@ -747,6 +769,13 @@ export function createWidgetHandle(args: {
   internal.isReady = true;
   notifyAndRender();
   options.onReady?.();
+
+  if (options.mode === 'embedded' || internal.isOpen) {
+    void ensureConnected().catch((error) => {
+      resolveRuntimeError(error, options, internal);
+      notifyAndRender();
+    });
+  }
 
   if (historyClient) {
     void refreshHistory();

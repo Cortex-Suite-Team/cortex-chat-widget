@@ -511,8 +511,11 @@
       }
 
       function updateDebugFromState(state) {
-        debugSession.textContent = state.chat?.connection?.sessionState ?? "—";
-        debugChannel.textContent = state.chat?.connection?.channelState ?? "—";
+        const connection = state.chat?.connection;
+        const sessionId = connection?.sessionId ?? "—";
+        const ready = connection?.isSessionReady ? "ready" : "opening";
+        debugSession.textContent = `${sessionId} (${ready})`;
+        debugChannel.textContent = connection?.channelState ?? "—";
         debugMessages.textContent = String(state.chat?.transcript?.length ?? 0);
       }
 

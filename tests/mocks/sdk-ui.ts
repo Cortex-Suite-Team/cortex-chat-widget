@@ -82,6 +82,8 @@ export interface ChatState {
   connection: {
     channelState: string;
     sessionState: string;
+    sessionId: string | null;
+    isSessionReady: boolean;
     isConnected: boolean;
     isStale: boolean;
   };
@@ -103,6 +105,11 @@ export interface CortexClientLike {
   onMessage(handler: (message: Record<string, unknown>) => void): () => void;
   sessionId?: string | null;
   sessionMeta?: Record<string, unknown> | null;
+  sessionContext?: {
+    sessionId: string;
+    identity?: Record<string, unknown> | null;
+    correspondent?: ChatCorrespondent | null;
+  } | null;
   sessionState?: string;
   channelState?: string;
 }
@@ -192,6 +199,8 @@ export function createMockChatState(
     connection: {
       channelState: 'OPEN',
       sessionState: 'ACTIVE',
+      sessionId: 'sess_mock',
+      isSessionReady: true,
       isConnected: true,
       isStale: false,
       ...(overrides.connection ?? {}),

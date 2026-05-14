@@ -45,6 +45,21 @@ describe('mountCortexChat', () => {
     expect(widget.getState().isOpen).toBe(true);
   });
 
+  it('embedded mode opens the session automatically on mount', async () => {
+    const target = document.createElement('div');
+    target.id = 'chat';
+    document.body.appendChild(target);
+
+    mountCortexChat('#chat', {
+      apiKey: 'test-key',
+      mode: 'embedded',
+    });
+
+    await flushAsyncWork();
+
+    expect(__getLastController()?.connectCalls).toBe(1);
+  });
+
   it('creates floating launcher and toggles panel', () => {
     const { widget } = mountWidget({
       mode: 'floating',
@@ -65,6 +80,27 @@ describe('mountCortexChat', () => {
 
     widget.close();
     expect(panel.hidden).toBe(true);
+  });
+
+  it('floating mode opens the session on first widget open, not during send', async () => {
+    const { widget } = mountWidget({
+      mode: 'floating',
+    });
+
+    expect(__getLastController()?.connectCalls).toBe(0);
+
+    widget.open();
+    await flushAsyncWork();
+    expect(__getLastController()?.connectCalls).toBe(1);
+
+    const host = document.body.firstElementChild as HTMLElement;
+    const textarea = host.shadowRoot?.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const composer = host.shadowRoot?.querySelector('[data-testid="composer"]') as HTMLFormElement;
+    changeInput(textarea, 'Hello after open');
+    submitComposer(composer);
+    await flushAsyncWork();
+
+    expect(__getLastController()?.connectCalls).toBe(1);
   });
 
   it('throws on missing apiKey', () => {
