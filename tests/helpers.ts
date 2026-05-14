@@ -1,4 +1,4 @@
-import type { ChatState, CortexTransportMessage } from '@cortex-suite/sdk-ui';
+import type { ChatState, CortexTransportMessage } from './mocks/sdk-ui.js';
 import { __getLastController, __resetSdkUiMock, createMockChatState } from './mocks/sdk-ui.js';
 import { __getLastSdkBrowserClient, __resetSdkBrowserMock } from './mocks/sdk-browser.js';
 import type { CortexChatWidgetOptions } from '../src/index.js';

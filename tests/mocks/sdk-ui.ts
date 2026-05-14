@@ -2,6 +2,17 @@ type Listener = (state: ChatState) => void;
 
 export type ChatMessageDeliveryStatus = 'sending' | 'sent' | 'delivered' | 'processed' | 'failed';
 
+export interface CortexTransportMessage {
+  type: string;
+  schema?: string;
+  session_id?: string;
+  seq?: number;
+  payload?: Record<string, unknown>;
+  meta?: Record<string, unknown>;
+  ts?: string;
+  [key: string]: unknown;
+}
+
 export type SendMessageResult =
   | { ok: true; messageId: string; clientMsgId: string }
   | { ok: false; messageId: string; clientMsgId: string; error: string };
@@ -102,7 +113,7 @@ export interface CortexClientLike {
   connect(): Promise<void>;
   disconnect?(): Promise<void>;
   sendMessage(options: { content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }): Promise<void>;
-  onMessage(handler: (message: Record<string, unknown>) => void): () => void;
+  onMessage(handler: (message: CortexTransportMessage) => void): () => void;
   sessionId?: string | null;
   sessionMeta?: Record<string, unknown> | null;
   sessionContext?: {
