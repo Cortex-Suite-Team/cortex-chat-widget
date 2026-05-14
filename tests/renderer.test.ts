@@ -736,6 +736,8 @@ describe('widget renderer behavior', () => {
       connection: {
         channelState: 'OPEN',
         sessionState: 'COMPLETED',
+        sessionId: 'sess_terminal',
+        isSessionReady: true,
         isConnected: true,
         isStale: false,
       },
