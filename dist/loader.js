@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.5 builtAt=2026-05-14T17:43:16.121Z */
+/* cortex-chat-widget loader build: sdk=1.1.5 builtAt=2026-05-14T18:09:22.969Z */
 "use strict";
 (() => {
   // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
@@ -2364,7 +2364,7 @@
   color: var(--cortex-muted-text);
 }
 
-.cortex-widget__message-status[data-status="read"] {
+.cortex-widget__message-status[data-status="processed"] {
   color: color-mix(in srgb, var(--cortex-accent-color) 72%, #38bdf8 28%);
 }
 
@@ -3060,7 +3060,7 @@
         ...normalized,
         id: normalized.id,
         clientMsgId: normalized.clientMsgId ?? existing.clientMsgId,
-        deliveryStatus: "sent",
+        deliveryStatus: "processed",
         retryable: false,
         sendError: void 0,
         originalPayload: existing.originalPayload,
@@ -3159,6 +3159,13 @@
         if (optimisticIndex !== void 0) {
           const existing = transcript[optimisticIndex];
           return updateMessage(optimisticIndex, reconcileOptimisticUserMessage(existing, normalized));
+        }
+        if (message.type === "chat::echo" && normalized.role === "user") {
+          return addMessage({
+            ...normalized,
+            deliveryStatus: "processed",
+            retryable: false
+          });
         }
         return addMessage(normalized);
       },
@@ -3602,6 +3609,12 @@
         try {
           debug.log("[sdk-ui] sendMessage -> client.sendMessage start", summarizeSendPayload2(sendPayload));
           await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
+          transcriptStore.upsertLocalMessage({
+            ...optimistic,
+            deliveryStatus: "sent",
+            retryable: false,
+            sendError: void 0
+          });
           awaitingAnswer = true;
           debug.log("[sdk-ui] sendMessage -> client.sendMessage done", {
             clientMsgId,
@@ -3638,6 +3651,12 @@
         try {
           debug.log("[sdk-ui] retryMessage -> client.sendMessage start", summarizeSendPayload2(msg.originalPayload));
           await withTimeout(options.client.sendMessage(msg.originalPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
+          transcriptStore.upsertLocalMessage({
+            ...updated,
+            deliveryStatus: "sent",
+            retryable: false,
+            sendError: void 0
+          });
           awaitingAnswer = true;
           debug.log("[sdk-ui] retryMessage -> client.sendMessage done", {
             clientMsgId,
@@ -4122,10 +4141,10 @@
     return value === "client" || value === "server" ? value : null;
   }
   function getDeliveryStatusIconName(status) {
-    if (status === "sending") {
+    if (status === "sending" || status === "sent") {
       return "check2";
     }
-    if (status === "sent" || status === "delivered" || status === "read") {
+    if (status === "delivered" || status === "processed") {
       return "check2-all";
     }
     return null;
@@ -4140,8 +4159,8 @@
     if (status === "delivered") {
       return "Delivered";
     }
-    if (status === "read") {
-      return "Read";
+    if (status === "processed") {
+      return "Processed by Runtime";
     }
     return "Failed";
   }
