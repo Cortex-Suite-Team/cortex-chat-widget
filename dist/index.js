@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.4 builtAt=2026-05-14T15:49:46.356Z */
+/* cortex-chat-widget build: sdk=1.1.4 builtAt=2026-05-14T16:19:05.947Z */
 
 // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://cortexsuite.app";
@@ -2542,6 +2542,23 @@ function errorFromUnknown(error, fallbackCode = "controller_error", source) {
   });
 }
 
+// ../sdk-ui/dist/src/debug.js
+function createDebugLogger(enabled) {
+  return {
+    enabled: enabled === true,
+    log(message, data) {
+      if (enabled !== true) {
+        return;
+      }
+      if (data === void 0) {
+        console.debug(message);
+        return;
+      }
+      console.debug(message, data);
+    }
+  };
+}
+
 // ../sdk-ui/dist/src/utils.js
 var TERMINAL_SESSION_STATES = /* @__PURE__ */ new Set([
   "COMPLETED",
@@ -2734,7 +2751,7 @@ function normalizeCortexMessage(message) {
         seq: message.seq ?? null,
         type: message.type,
         role: "error",
-        content: payload["message"] ?? payload,
+        content: asNonEmptyString(payload["message"]) ?? "Runtime error",
         status: "error",
         ts: message.ts ?? null,
         meta: {
@@ -2901,6 +2918,12 @@ function createEscalationController(options) {
 }
 
 // ../sdk-ui/dist/src/transcript-store.js
+function shouldStoreInTranscript(message) {
+  if (message.type === "system::error") {
+    return true;
+  }
+  return !message.type.startsWith("system::");
+}
 function createTranscriptStore(options = {}) {
   const transcript = (options.initialTranscript ?? []).map((message) => cloneMessage(message));
   const indexById = /* @__PURE__ */ new Map();
@@ -3016,6 +3039,11 @@ function createTranscriptStore(options = {}) {
       };
     },
     ingest(message) {
+      if (!shouldStoreInTranscript(message)) {
+        return {
+          transcript: snapshot()
+        };
+      }
       const payload = asPayload(message);
       if (message.type === "chat::partial" && !asNonEmptyString(payload["turn_id"])) {
         return buildMalformedPartialMessage(message);
@@ -3083,6 +3111,15 @@ function createTranscriptStore(options = {}) {
 
 // ../sdk-ui/dist/src/chat-controller.js
 var MESSAGE_SEND_TIMEOUT_MS = 15e3;
+var LIFECYCLE_SESSION_STATE_MAP = {
+  active: "ACTIVE",
+  waiting: "WAITING",
+  completed: "COMPLETED",
+  failed: "FAILED",
+  stopped: "STOPPED",
+  timeout: "TIMEOUT",
+  cancelled: "CANCELLED"
+};
 async function withTimeout(promise, timeoutMs, msg) {
   let timer;
   try {
@@ -3159,6 +3196,7 @@ function summarizeSendPayload2(payload) {
 function createChatController(options) {
   const listeners = /* @__PURE__ */ new Set();
   const transcriptStore = createTranscriptStore();
+  const debug = createDebugLogger(options.debug);
   let unsubscribeFromClient = null;
   let destroyed = false;
   let lastError = null;
@@ -3166,6 +3204,8 @@ function createChatController(options) {
   let workerState = { state: "idle" };
   let workerStateTtlTimer = null;
   let awaitingAnswer = false;
+  let sessionCorrespondent = getSessionCorrespondent(options.client);
+  let sessionStateOverride = null;
   const escalationController = createEscalationController({
     client: options.client,
     replyRequestBuilder: options.replyRequestBuilder,
@@ -3181,7 +3221,7 @@ function createChatController(options) {
     return options.client.channelState ?? "CLOSED";
   }
   function getSessionState() {
-    return options.client.sessionState ?? "CREATED";
+    return sessionStateOverride ?? options.client.sessionState ?? "CREATED";
   }
   function getSessionId() {
     return options.client.sessionId ?? options.client.sessionContext?.sessionId ?? null;
@@ -3240,7 +3280,7 @@ function createChatController(options) {
     }) : defaultInputLockPolicy();
     return {
       session: {
-        correspondent: getSessionCorrespondent(options.client)
+        correspondent: sessionCorrespondent ? { ...sessionCorrespondent } : null
       },
       connection: {
         channelState,
@@ -3300,6 +3340,60 @@ function createChatController(options) {
     clearWorkerStateTtl();
     workerState = { state: "idle" };
   }
+  function refreshSessionSnapshot() {
+    sessionCorrespondent = getSessionCorrespondent(options.client);
+  }
+  function applySessionStateOverride(nextState) {
+    if (nextState === null) {
+      sessionStateOverride = null;
+      return;
+    }
+    if (TERMINAL_SESSION_STATES.has(getSessionState()) && getSessionState() !== nextState) {
+      return;
+    }
+    sessionStateOverride = nextState;
+  }
+  function resolveLifecycleStatus(message) {
+    const payload = asPayload(message);
+    const payloadMeta = isRecord(payload["meta"]) ? payload["meta"] : null;
+    return (asNonEmptyString(payload["status"]) ?? asNonEmptyString(payload["state"]) ?? asNonEmptyString(payloadMeta?.["status"]) ?? asNonEmptyString(payloadMeta?.["state"]))?.toLowerCase() ?? null;
+  }
+  function handleSystemOpened() {
+    refreshSessionSnapshot();
+    applySessionStateOverride("ACTIVE");
+  }
+  function handleSystemLifecycle(message) {
+    const status = resolveLifecycleStatus(message);
+    if (!status) {
+      return false;
+    }
+    const nextSessionState = LIFECYCLE_SESSION_STATE_MAP[status] ?? null;
+    if (nextSessionState) {
+      applySessionStateOverride(nextSessionState);
+    }
+    if (status === "active") {
+      resetWorkerStateToIdle();
+      return true;
+    }
+    if (status === "busy") {
+      applyWorkerState({ state: "working" });
+      return true;
+    }
+    if (status === "idle") {
+      resetWorkerStateToIdle();
+      return true;
+    }
+    if (status === "waiting") {
+      applyWorkerState({ state: "waiting" });
+      return true;
+    }
+    if (TERMINAL_SESSION_STATES.has((nextSessionState ?? "").toUpperCase())) {
+      awaitingAnswer = false;
+      resetWorkerStateToIdle();
+      return true;
+    }
+    return nextSessionState !== null;
+  }
   function ensureClientSubscription() {
     if (destroyed || unsubscribeFromClient) {
       return;
@@ -3314,6 +3408,17 @@ function createChatController(options) {
     unsubscribeFromClient = null;
   }
   function handleMessage(message) {
+    if (message.type === "system::opened") {
+      handleSystemOpened();
+      emitStateChanged();
+      return;
+    }
+    if (message.type === "system::lifecycle") {
+      if (handleSystemLifecycle(message)) {
+        emitStateChanged();
+      }
+      return;
+    }
     if (message.type === "system::state") {
       const payload = asPayload(message);
       const meta = isRecord(payload["meta"]) ? payload["meta"] : null;
@@ -3324,6 +3429,9 @@ function createChatController(options) {
       const expiresAt = ttlMs !== void 0 ? Date.now() + ttlMs : void 0;
       applyWorkerState({ state: stateName, label, expiresAt, correlation_id: correlationId });
       emitStateChanged();
+      return;
+    }
+    if (message.type === "system::pong" || message.type === "system::telemetry" || message.type === "system::billing") {
       return;
     }
     const result = transcriptStore.ingest(message);
@@ -3403,6 +3511,7 @@ function createChatController(options) {
     },
     async disconnect() {
       awaitingAnswer = false;
+      sessionStateOverride = null;
       if (options.client.disconnect) {
         await options.client.disconnect();
       }
@@ -3442,10 +3551,10 @@ function createChatController(options) {
       transcriptStore.upsertLocalMessage(optimistic);
       emitStateChanged();
       try {
-        console.debug("[sdk-ui] sendMessage -> client.sendMessage start", summarizeSendPayload2(sendPayload));
+        debug.log("[sdk-ui] sendMessage -> client.sendMessage start", summarizeSendPayload2(sendPayload));
         await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
         awaitingAnswer = true;
-        console.debug("[sdk-ui] sendMessage -> client.sendMessage done", {
+        debug.log("[sdk-ui] sendMessage -> client.sendMessage done", {
           clientMsgId,
           ok: true
         });
@@ -3453,7 +3562,7 @@ function createChatController(options) {
         return { ok: true, messageId: id, clientMsgId };
       } catch (err) {
         awaitingAnswer = false;
-        console.debug("[sdk-ui] sendMessage -> client.sendMessage failed", {
+        debug.log("[sdk-ui] sendMessage -> client.sendMessage failed", {
           clientMsgId,
           error: err instanceof Error ? err.message : String(err)
         });
@@ -3478,10 +3587,10 @@ function createChatController(options) {
       transcriptStore.upsertLocalMessage(updated);
       emitStateChanged();
       try {
-        console.debug("[sdk-ui] retryMessage -> client.sendMessage start", summarizeSendPayload2(msg.originalPayload));
+        debug.log("[sdk-ui] retryMessage -> client.sendMessage start", summarizeSendPayload2(msg.originalPayload));
         await withTimeout(options.client.sendMessage(msg.originalPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
         awaitingAnswer = true;
-        console.debug("[sdk-ui] retryMessage -> client.sendMessage done", {
+        debug.log("[sdk-ui] retryMessage -> client.sendMessage done", {
           clientMsgId,
           ok: true
         });
@@ -3489,7 +3598,7 @@ function createChatController(options) {
         return { ok: true, messageId, clientMsgId };
       } catch (err) {
         awaitingAnswer = false;
-        console.debug("[sdk-ui] retryMessage -> client.sendMessage failed", {
+        debug.log("[sdk-ui] retryMessage -> client.sendMessage failed", {
           clientMsgId,
           error: err instanceof Error ? err.message : String(err)
         });
@@ -3519,6 +3628,31 @@ function createChatController(options) {
       clearWorkerStateTtl();
       teardownClientSubscription();
       listeners.clear();
+    }
+  };
+}
+
+// src/debug.ts
+function hasWindowLocalStorageDebugFlag() {
+  try {
+    return globalThis.localStorage?.getItem("cortex_debug") === "1";
+  } catch {
+    return false;
+  }
+}
+function createDebugLogger2(enabled) {
+  const active = enabled === true || hasWindowLocalStorageDebugFlag();
+  return {
+    enabled: active,
+    log(message, data) {
+      if (!active) {
+        return;
+      }
+      if (data === void 0) {
+        console.debug(message);
+        return;
+      }
+      console.debug(message, data);
     }
   };
 }
@@ -3718,6 +3852,14 @@ function renderHistoryList(dom, state) {
 
 // src/message-flags.ts
 var TYPING_TYPES = /* @__PURE__ */ new Set(["chat::typing", "typing::start", "typing::stop"]);
+var HIDDEN_TRANSCRIPT_TYPES = /* @__PURE__ */ new Set([
+  "system::opened",
+  "system::lifecycle",
+  "system::state",
+  "system::pong",
+  "system::telemetry",
+  "system::billing"
+]);
 var TERMINAL_SESSION_STATES2 = /* @__PURE__ */ new Set([
   "COMPLETED",
   "FAILED",
@@ -3745,7 +3887,7 @@ function isTypingMessageType(type) {
   return TYPING_TYPES.has(type);
 }
 function shouldHideTranscriptMessage(message) {
-  return isTypingMessageType(message.type);
+  return isTypingMessageType(message.type) || HIDDEN_TRANSCRIPT_TYPES.has(message.type) || message.type.startsWith("system::") && message.type !== "system::error";
 }
 function isTerminalSessionState(sessionState) {
   return TERMINAL_SESSION_STATES2.has(sessionState);
@@ -3810,6 +3952,23 @@ function getHeaderTitle(state, options) {
 function getHeaderSubtitle(state, options) {
   const correspondent = getHeaderCorrespondent(state);
   return correspondent?.title ?? correspondent?.subtitle ?? options.subtitle;
+}
+function normalizeAvatarUrl(avatarUrl, options) {
+  if (!avatarUrl) {
+    return null;
+  }
+  if (/^(https?:|data:)/i.test(avatarUrl)) {
+    return avatarUrl;
+  }
+  const baseUrl = options.controlPlaneUrl ?? options.authUrl;
+  if (!baseUrl) {
+    return null;
+  }
+  try {
+    return new URL(avatarUrl, baseUrl).toString();
+  } catch {
+    return null;
+  }
 }
 function syncHeaderAvatar(avatarEl, title, avatarUrl) {
   const existingImage = avatarEl.querySelector("img");
@@ -3980,7 +4139,7 @@ function getMessageAttachments(message) {
   }
   return attachments.map((attachment) => toAttachmentViewModel(attachment)).filter((attachment) => attachment !== null);
 }
-function renderTranscript(transcriptEl, state) {
+function renderTranscript(transcriptEl, state, options) {
   transcriptEl.replaceChildren();
   const visibleMessages = state.chat.transcript.filter((message) => !shouldHideTranscriptMessage(message));
   if (visibleMessages.length === 0) {
@@ -4009,7 +4168,7 @@ function renderTranscript(transcriptEl, state) {
       const actorHeader = document.createElement("div");
       actorHeader.className = "cortex-widget__actor";
       actorHeader.setAttribute("data-testid", "actor-header");
-      const avatarUrl = toNonEmptyString(actor["avatar_url"]);
+      const avatarUrl = normalizeAvatarUrl(toNonEmptyString(actor["avatar_url"]), options);
       if (avatarUrl) {
         const img = document.createElement("img");
         img.className = "cortex-widget__actor-avatar";
@@ -4213,7 +4372,7 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
   dom.title.textContent = headerTitle;
   dom.subtitle.textContent = headerSubtitle;
   dom.status.textContent = state.isHistoricalView ? "Viewing chat history" : buildStatusText(state.chat, state.isAwaitingAnswer, state.isTyping);
-  syncHeaderAvatar(dom.avatar, headerTitle, headerCorrespondent?.avatarUrl ?? null);
+  syncHeaderAvatar(dom.avatar, headerTitle, normalizeAvatarUrl(headerCorrespondent?.avatarUrl ?? null, options));
   dom.statusDot.dataset.state = state.isHistoricalView ? "history" : state.chat.connection.isConnected ? "online" : state.isAwaitingAnswer || state.isTyping || state.chat.workerState.state === "working" || state.chat.workerState.state === "waiting" ? "active" : "idle";
   const isPanelVisible = state.mode === "embedded" || state.isOpen;
   dom.panel.hidden = !isPanelVisible;
@@ -4270,7 +4429,7 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
     dom.fileChipMeta.textContent = "";
     dom.fileChipRemove.disabled = true;
   }
-  renderTranscript(dom.transcript, state);
+  renderTranscript(dom.transcript, state, options);
 }
 
 // src/widget.ts
@@ -4353,8 +4512,10 @@ function createWidgetHandle(args) {
   let client = createClient2();
   let controller = createChatController({
     client,
-    mode: "end_user"
+    mode: "end_user",
+    debug: options.debug
   });
+  const debug = createDebugLogger2(options.debug);
   let liveChatState = controller.getState();
   let historicalTranscript = [];
   let selectedHistorySessionId = null;
@@ -4505,7 +4666,8 @@ function createWidgetHandle(args) {
     client = options.client ?? createClient2();
     controller = createChatController({
       client,
-      mode: "end_user"
+      mode: "end_user",
+      debug: options.debug
     });
     liveChatState = controller.getState();
     internal.attachmentsAvailable = typeof client.uploadAttachment === "function" || typeof client.uploadFile === "function";
@@ -4637,11 +4799,11 @@ function createWidgetHandle(args) {
         attachments: attachmentId ? [attachmentId] : void 0,
         meta: questionMeta
       };
-      console.debug("[cortex-chat-widget] handleSend -> controller.sendMessage start", {
+      debug.log("[cortex-chat-widget] handleSend -> controller.sendMessage start", {
         ...summarizeSendPayload3(sendRequest)
       });
       const result = await controller.sendMessage(sendRequest);
-      console.debug("[cortex-chat-widget] handleSend -> controller.sendMessage done", {
+      debug.log("[cortex-chat-widget] handleSend -> controller.sendMessage done", {
         ok: result.ok,
         clientMsgId: result.clientMsgId,
         messageId: result.messageId
@@ -4996,7 +5158,8 @@ function resolveOptions(targetOrOptions, maybeOptions) {
     subtitle: baseOptions.subtitle ?? "Your Digital Worker is here to help.",
     placeholder: baseOptions.placeholder ?? "Write your message...",
     launcherLabel: baseOptions.launcherLabel ?? "Ask Cortex",
-    initialOpen: baseOptions.initialOpen ?? false
+    initialOpen: baseOptions.initialOpen ?? false,
+    debug: baseOptions.debug
   };
 }
 function resolveMountTarget(options) {
@@ -5052,13 +5215,15 @@ function createClient(options) {
   if (options.client) {
     return options.client;
   }
-  return new CortexBrowserClient({
+  const client = new CortexBrowserClient({
     apiKey: options.apiKey,
     workerRef: options.workerRef,
     authUrl: options.authUrl,
+    debug: options.debug,
     onMessage: () => {
     }
   });
+  return client;
 }
 function mountCortexChat(targetOrOptions, maybeOptions) {
   const partialOptions = typeof targetOrOptions === "object" && targetOrOptions !== null && !isHTMLElement(targetOrOptions) ? targetOrOptions : maybeOptions ?? {};
