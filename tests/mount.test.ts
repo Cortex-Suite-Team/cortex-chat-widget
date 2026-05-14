@@ -103,6 +103,22 @@ describe('mountCortexChat', () => {
     expect(__getLastController()?.connectCalls).toBe(1);
   });
 
+  it('floating launcher click opens the session on first open', async () => {
+    mountWidget({
+      mode: 'floating',
+    });
+
+    const host = document.body.firstElementChild as HTMLElement;
+    const launcher = host.shadowRoot?.querySelector('[data-testid="launcher"]') as HTMLButtonElement;
+
+    expect(__getLastController()?.connectCalls).toBe(0);
+
+    launcher.click();
+    await flushAsyncWork();
+
+    expect(__getLastController()?.connectCalls).toBe(1);
+  });
+
   it('throws on missing apiKey', () => {
     expect(() => {
       mountCortexChat({

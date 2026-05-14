@@ -636,8 +636,7 @@ export function createWidgetHandle(args: {
     if (options.mode !== 'floating') {
       return;
     }
-    internal.isOpen = !internal.isOpen;
-    notifyAndRender();
+    setOpen(!internal.isOpen);
   };
 
   const onTranscriptClick = (event: MouseEvent) => {
