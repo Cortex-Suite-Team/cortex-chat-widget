@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-15T10:35:58.786Z */
+/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-15T10:50:01.829Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -1747,7 +1747,7 @@ var layoutStyles = `
   max-width: min(82%, 560px);
   padding: 9px 12px;
   border-radius: 16px;
-  white-space: pre-wrap;
+  /* white-space: pre-wrap; */
   word-break: break-word;
 }
 
@@ -2112,7 +2112,7 @@ var typographyStyles = `
 }
 
 .cortex-widget__bubble-text {
-  white-space: pre-wrap;
+  /* white-space: pre-wrap; */
   text-wrap: pretty;
 }
 
