@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.6 builtAt=2026-05-15T10:50:01.829Z */
+/* cortex-chat-widget loader build: sdk=1.1.6 builtAt=2026-05-15T10:57:48.495Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -1749,8 +1749,12 @@
   max-width: min(82%, 560px);
   padding: 9px 12px;
   border-radius: 16px;
-  /* white-space: pre-wrap; */
+  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.cortex-widget__bubble.cortex-widget__bubble--markdown {
+  white-space: normal;
 }
 
 .cortex-widget__message[data-role="assistant"] .cortex-widget__bubble,
@@ -2114,11 +2118,15 @@
 }
 
 .cortex-widget__bubble-text {
-  /* white-space: pre-wrap; */
   text-wrap: pretty;
 }
 
+.cortex-widget__bubble-text:not(.cortex-widget__markdown) {
+  white-space: pre-wrap;
+}
+
 .cortex-widget__bubble-text.cortex-widget__markdown {
+  white-space: normal;
   line-height: 1.35;
 }
 
@@ -10967,6 +10975,7 @@
       if (rendered.format === "html") {
         const htmlContent = rendered.html.trim();
         if (htmlContent.length > 0) {
+          bubble.classList.add("cortex-widget__bubble--markdown");
           const text3 = document.createElement("div");
           text3.className = "cortex-widget__bubble-text cortex-widget__markdown";
           text3.innerHTML = rendered.html;
