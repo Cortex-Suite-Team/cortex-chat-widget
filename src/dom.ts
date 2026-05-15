@@ -69,6 +69,30 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   const escalation = createElement('div', 'cortex-widget__escalation');
   escalation.setAttribute('data-testid', 'escalation-card');
 
+  const authGate = createElement('div', 'cortex-widget__auth-gate');
+  authGate.setAttribute('data-testid', 'auth-gate');
+  authGate.setAttribute('role', 'form');
+  authGate.setAttribute('aria-label', 'Sign in');
+  const authMessage = createElement('p', 'cortex-widget__auth-message');
+  authMessage.setAttribute('data-testid', 'auth-message');
+  const authFields = createElement('div', 'cortex-widget__auth-fields');
+  const authLoginInput = createElement('input', 'cortex-widget__auth-login') as HTMLInputElement;
+  authLoginInput.type = 'text';
+  authLoginInput.autocomplete = 'username';
+  authLoginInput.placeholder = 'Username';
+  authLoginInput.setAttribute('data-testid', 'auth-login-input');
+  const authPasswordInput = createElement('input', 'cortex-widget__auth-password') as HTMLInputElement;
+  authPasswordInput.type = 'password';
+  authPasswordInput.autocomplete = 'current-password';
+  authPasswordInput.placeholder = 'Password';
+  authPasswordInput.setAttribute('data-testid', 'auth-password-input');
+  const authSubmitButton = createElement('button', 'cortex-widget__auth-submit') as HTMLButtonElement;
+  authSubmitButton.type = 'button';
+  authSubmitButton.textContent = 'Sign in';
+  authSubmitButton.setAttribute('data-testid', 'auth-submit-button');
+  authFields.append(authLoginInput, authPasswordInput);
+  authGate.append(authMessage, authFields, authSubmitButton);
+
   const composer = createElement('form', 'cortex-widget__composer') as HTMLFormElement;
   composer.setAttribute('data-testid', 'composer');
   const composerRow = createElement('div', 'cortex-widget__composer-row');
@@ -115,7 +139,7 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   headerText.append(title, subtitle, statusWrap);
   headerMain.append(avatar, headerText);
   header.append(headerMain);
-  body.append(errorBanner, transcript, workerStatus, typing, escalation, composer);
+  body.append(errorBanner, transcript, workerStatus, typing, escalation, authGate, composer);
   panel.append(header, body);
 
   if (options.mode === 'floating') {
@@ -142,6 +166,11 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
     workerStatus,
     typing,
     escalation,
+    authGate,
+    authMessage,
+    authLoginInput,
+    authPasswordInput,
+    authSubmitButton,
     composer,
     textarea,
     sendButton,

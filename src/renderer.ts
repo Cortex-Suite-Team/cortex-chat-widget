@@ -652,6 +652,22 @@ export function renderWidget(
     dom.escalation.textContent = '';
   }
 
+  const authState = state.chat.auth?.state ?? 'none';
+  const showAuthGate = authState === 'required' || authState === 'submitting' || authState === 'denied';
+  dom.authGate.dataset.visible = showAuthGate ? 'true' : 'false';
+  dom.authGate.dataset.state = authState;
+  dom.composer.hidden = showAuthGate;
+  if (showAuthGate) {
+    const authMsg = state.chat.auth.message
+      ?? (authState === 'denied' ? 'Invalid credentials. Please try again.' : 'Please sign in to continue.');
+    dom.authMessage.textContent = authMsg;
+    const isSubmitting = authState === 'submitting';
+    dom.authLoginInput.disabled = isSubmitting;
+    dom.authPasswordInput.disabled = isSubmitting;
+    dom.authSubmitButton.disabled = isSubmitting;
+    dom.authSubmitButton.textContent = isSubmitting ? 'Signing in…' : 'Sign in';
+  }
+
   if (state.isDestroyed) {
     dom.textarea.value = '';
   }

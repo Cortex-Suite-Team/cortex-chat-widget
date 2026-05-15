@@ -88,6 +88,12 @@ export interface ChatSessionState {
   correspondent: ChatCorrespondent | null;
 }
 
+export interface ChatAuthState {
+  state: 'none' | 'required' | 'submitting' | 'denied' | 'accepted';
+  message?: string;
+  method?: 'login_password';
+}
+
 export interface ChatState {
   session: ChatSessionState;
   connection: {
@@ -103,6 +109,7 @@ export interface ChatState {
     locked: boolean;
     reason?: string;
   };
+  auth: ChatAuthState;
   escalation: EscalationState | null;
   lastError: ChatErrorViewModel | null;
   activeQuestion: QuestionState | null;
@@ -223,11 +230,13 @@ export class MockChatController {
   state: ChatState = createMockChatState();
   readonly subscribers = new Set<Listener>();
   readonly sendCalls: Array<{ content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }> = [];
+  readonly loginCalls: Array<{ login: string; password: string }> = [];
   connectCalls = 0;
   disconnectCalls = 0;
   destroyCalls = 0;
   nextSendError: Error | null = null;
   nextRetryError: Error | null = null;
+  nextLoginResult: { ok: boolean; error?: string } = { ok: true };
 
   getState(): ChatState {
     return this.state;
@@ -266,6 +275,11 @@ export class MockChatController {
     }
     return { ok: true, messageId: _messageId, clientMsgId: 'mock' };
   }
+  async submitLogin(credentials: { login: string; password: string }): Promise<{ ok: boolean; error?: string }> {
+    this.loginCalls.push({ login: credentials.login, password: credentials.password });
+    return this.nextLoginResult;
+  }
+
   async replyToUser(): Promise<void> {}
   async returnToWorker(): Promise<void> {}
   async continueWorker(): Promise<void> {}
@@ -308,6 +322,7 @@ export function createMockChatState(
       locked: false,
       ...(overrides.input ?? {}),
     },
+    auth: overrides.auth ?? { state: 'none' },
     escalation: overrides.escalation ?? null,
     lastError: overrides.lastError ?? null,
     activeQuestion: overrides.activeQuestion ?? null,

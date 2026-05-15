@@ -1,3 +1,4 @@
+import { authStyles } from './auth.js';
 import { historyStyles } from './history.js';
 import { layoutStyles } from './layout.js';
 import { messageStyles } from './messages.js';
@@ -10,4 +11,5 @@ export const widgetStyles = [
   typographyStyles,
   messageStyles,
   historyStyles,
+  authStyles,
 ].join('\n');

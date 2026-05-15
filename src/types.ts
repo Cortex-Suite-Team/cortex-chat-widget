@@ -144,6 +144,11 @@ export interface WidgetDom {
   workerStatus: HTMLElement;
   typing: HTMLElement;
   escalation: HTMLElement;
+  authGate: HTMLElement;
+  authMessage: HTMLElement;
+  authLoginInput: HTMLInputElement;
+  authPasswordInput: HTMLInputElement;
+  authSubmitButton: HTMLButtonElement;
   composer: HTMLFormElement;
   textarea: HTMLTextAreaElement;
   sendButton: HTMLButtonElement;

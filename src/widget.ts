@@ -37,6 +37,7 @@ const EMPTY_CHAT_STATE: ChatState = {
   input: {
     locked: false,
   },
+  auth: { state: 'none' },
   escalation: null,
   lastError: null,
   activeQuestion: null,
@@ -51,6 +52,7 @@ function cloneChatState(state: ChatState): ChatState {
     connection: { ...state.connection },
     transcript: [...state.transcript],
     input: { ...state.input },
+    auth: { ...state.auth },
     escalation: state.escalation ? { ...state.escalation } : null,
     lastError: state.lastError ? { ...state.lastError } : null,
     activeQuestion: state.activeQuestion
@@ -497,6 +499,24 @@ export function createWidgetHandle(args: {
     }
   }
 
+  async function handleLoginSubmit() {
+    if (internal.isDestroyed) {
+      return;
+    }
+    const login = dom.authLoginInput.value.trim();
+    const password = dom.authPasswordInput.value;
+    if (!login || !password) {
+      return;
+    }
+    dom.authPasswordInput.value = '';
+    try {
+      await controller.submitLogin({ login, password });
+    } catch {
+      // auth state transitions are driven by the controller; errors surface via state
+    }
+    notifyAndRender();
+  }
+
   async function handleOptionSelect(questionId: string, optionId: string, optionLabel: string) {
     if (internal.isDestroyed || internal.isAwaitingAnswer || internal.viewMode === 'historical') {
       return;
@@ -636,6 +656,17 @@ export function createWidgetHandle(args: {
     notifyAndRender();
   };
 
+  const onAuthSubmitClick = () => {
+    void handleLoginSubmit();
+  };
+
+  const onAuthPasswordKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      void handleLoginSubmit();
+    }
+  };
+
   const onLauncherClick = () => {
     if (options.mode !== 'floating') {
       return;
@@ -745,6 +776,8 @@ export function createWidgetHandle(args: {
   dom.attachButton.addEventListener('click', onAttachClick);
   dom.fileInput.addEventListener('change', onFileChange);
   dom.fileChipRemove.addEventListener('click', onRemoveFile);
+  dom.authSubmitButton.addEventListener('click', onAuthSubmitClick);
+  dom.authPasswordInput.addEventListener('keydown', onAuthPasswordKeyDown);
   dom.launcher.addEventListener('click', onLauncherClick);
   dom.transcript.addEventListener('click', onTranscriptClick);
 
@@ -754,6 +787,8 @@ export function createWidgetHandle(args: {
   domCleanup.add(() => dom.attachButton.removeEventListener('click', onAttachClick));
   domCleanup.add(() => dom.fileInput.removeEventListener('change', onFileChange));
   domCleanup.add(() => dom.fileChipRemove.removeEventListener('click', onRemoveFile));
+  domCleanup.add(() => dom.authSubmitButton.removeEventListener('click', onAuthSubmitClick));
+  domCleanup.add(() => dom.authPasswordInput.removeEventListener('keydown', onAuthPasswordKeyDown));
   domCleanup.add(() => dom.launcher.removeEventListener('click', onLauncherClick));
   domCleanup.add(() => dom.transcript.removeEventListener('click', onTranscriptClick));
 
