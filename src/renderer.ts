@@ -382,6 +382,7 @@ function renderTranscript(
     if (rendered.format === 'html') {
       const htmlContent = rendered.html.trim();
       if (htmlContent.length > 0) {
+        bubble.classList.add('cortex-widget__bubble--markdown');
         const text = document.createElement('div');
         text.className = 'cortex-widget__bubble-text cortex-widget__markdown';
         text.innerHTML = rendered.html;

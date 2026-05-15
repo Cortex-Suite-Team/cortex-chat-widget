@@ -210,8 +210,12 @@ export const layoutStyles = `
   max-width: min(82%, 560px);
   padding: 9px 12px;
   border-radius: 16px;
-  /* white-space: pre-wrap; */
+  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.cortex-widget__bubble.cortex-widget__bubble--markdown {
+  white-space: normal;
 }
 
 .cortex-widget__message[data-role="assistant"] .cortex-widget__bubble,

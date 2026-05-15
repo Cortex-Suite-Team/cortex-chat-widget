@@ -50,11 +50,15 @@ export const typographyStyles = `
 }
 
 .cortex-widget__bubble-text {
-  /* white-space: pre-wrap; */
   text-wrap: pretty;
 }
 
+.cortex-widget__bubble-text:not(.cortex-widget__markdown) {
+  white-space: pre-wrap;
+}
+
 .cortex-widget__bubble-text.cortex-widget__markdown {
+  white-space: normal;
   line-height: 1.35;
 }
 
