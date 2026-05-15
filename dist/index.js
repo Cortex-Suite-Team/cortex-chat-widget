@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-14T18:58:53.402Z */
+/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-15T09:29:41.108Z */
 
 // node_modules/@cortex-suite/sdk/dist/browser/generated/constants.js
 var DEFAULT_AUTH_URL = "https://cortexsuite.app";
@@ -4400,8 +4400,11 @@ function renderTranscript(transcriptEl, state, options) {
     if (hasActorHeader) {
       metaText.textContent = timestampText ?? (message.status === "streaming" ? "streaming" : "");
     } else {
-      const displayName = message.role === "user" ? "You" : message.role === "assistant" ? "Assistant" : message.role;
-      const metaParts = [displayName];
+      const metaParts = [];
+      if (message.role !== "user") {
+        const displayName = message.role === "assistant" ? "Assistant" : message.role;
+        metaParts.push(displayName);
+      }
       if (timestampText) {
         metaParts.push(timestampText);
       }
