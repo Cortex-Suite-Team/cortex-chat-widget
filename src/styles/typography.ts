@@ -54,6 +54,65 @@ export const typographyStyles = `
   text-wrap: pretty;
 }
 
+.cortex-widget__markdown p,
+.cortex-widget__markdown ul,
+.cortex-widget__markdown ol,
+.cortex-widget__markdown blockquote,
+.cortex-widget__markdown pre {
+  margin: 0;
+}
+
+.cortex-widget__markdown > * + * {
+  margin-top: 0.7em;
+}
+
+.cortex-widget__markdown ul,
+.cortex-widget__markdown ol {
+  padding-inline-start: 1.35rem;
+}
+
+.cortex-widget__markdown li + li {
+  margin-top: 0.25em;
+}
+
+.cortex-widget__markdown a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
+}
+
+.cortex-widget__markdown blockquote {
+  padding-inline-start: 0.85rem;
+  border-inline-start: 3px solid color-mix(in srgb, var(--cortex-text-color) 18%, transparent);
+  color: var(--cortex-subtle-text);
+}
+
+.cortex-widget__markdown code,
+.cortex-widget__markdown pre {
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.cortex-widget__markdown code {
+  font-size: 0.92em;
+  padding: 0.1em 0.32em;
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--cortex-text-color) 8%, transparent);
+}
+
+.cortex-widget__markdown pre {
+  white-space: pre-wrap;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.8rem;
+  overflow-x: auto;
+  background: color-mix(in srgb, var(--cortex-text-color) 6%, transparent);
+}
+
+.cortex-widget__markdown pre code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .cortex-widget__meta {
   display: inline-flex;
   align-items: center;

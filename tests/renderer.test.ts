@@ -345,6 +345,72 @@ describe('widget renderer behavior', () => {
     expect(link.textContent).toContain('application/pdf');
   });
 
+  it('renders assistant final answers through the html markdown branch', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_markdown',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: '**Bold**',
+        status: 'final',
+      }],
+    }));
+
+    const markdown = shadow.querySelector('.cortex-widget__markdown') as HTMLElement;
+    expect(markdown).toBeTruthy();
+    expect(markdown.className).toContain('cortex-widget__bubble-text');
+    expect(markdown.innerHTML).toContain('<p>');
+  });
+
+  it('keeps user markdown-looking text literal', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_user_markdown',
+        type: 'chat::message',
+        role: 'user',
+        content: '# Not a heading\n- not a list',
+        status: 'final',
+      }],
+    }));
+
+    const markdown = shadow.querySelector('.cortex-widget__markdown');
+    const bubble = shadow.querySelector('[data-testid="message-bubble"]') as HTMLElement;
+    expect(markdown).toBeNull();
+    expect(bubble.textContent).toContain('# Not a heading');
+    expect(bubble.textContent).toContain('- not a list');
+  });
+
+  it('keeps structured payload fallback as preformatted text', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_structured',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: {
+          debug: true,
+          nested: {
+            value: 1,
+          },
+        },
+        status: 'final',
+      }],
+    }));
+
+    const pre = shadow.querySelector('.cortex-widget__formatted') as HTMLElement;
+    expect(pre).toBeTruthy();
+    expect(pre.textContent).toContain('"debug": true');
+    expect(pre.textContent).toContain('"value": 1');
+  });
+
   it('falls back to a visible chip for assistant attachments without download url', () => {
     mountWidget();
     const shadow = getShadow();

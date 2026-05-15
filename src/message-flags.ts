@@ -55,26 +55,6 @@ export function isTerminalSessionState(sessionState: string): boolean {
   return TERMINAL_SESSION_STATES.has(sessionState);
 }
 
-export function formatContent(value: unknown): { contentText: string | null; formattedContent: string | null } {
-  if (typeof value === 'string') {
-    return { contentText: value, formattedContent: null };
-  }
-
-  if (Array.isArray(value) && value.every((item) => typeof item === 'string')) {
-    return { contentText: (value as string[]).join('\n'), formattedContent: null };
-  }
-
-  if (value === null || value === undefined) {
-    return { contentText: '', formattedContent: null };
-  }
-
-  try {
-    return { contentText: null, formattedContent: JSON.stringify(value, null, 2) };
-  } catch {
-    return { contentText: null, formattedContent: String(value) };
-  }
-}
-
 export function buildStatusText(state: ChatState, isAwaitingAnswer: boolean, isTyping: boolean): string {
   if (state.lastError) {
     return state.lastError.message;

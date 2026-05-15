@@ -109,6 +109,93 @@ export interface ChatState {
   workerState: WorkerState;
 }
 
+export type RenderedChatContent =
+  | { format: 'html'; html: string; kind: 'assistant_markdown' }
+  | {
+    format: 'text';
+    text: string;
+    style: 'plain' | 'preformatted';
+    kind: 'plain_text' | 'structured_fallback';
+  };
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function toTextualContent(source: unknown): string | null {
+  if (typeof source === 'string') {
+    return source;
+  }
+  if (isStringArray(source)) {
+    return source.join('\n');
+  }
+  if (source === null || source === undefined) {
+    return '';
+  }
+  return null;
+}
+
+function toStructuredText(source: unknown): string {
+  if (source === null || source === undefined) {
+    return '';
+  }
+  try {
+    return JSON.stringify(source, null, 2);
+  } catch {
+    return String(source);
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function renderAssistantMarkdown(source: unknown): string {
+  const text = toTextualContent(source) ?? '';
+  return `<p>${escapeHtml(text)}</p>\n`;
+}
+
+export function renderUserText(source: unknown): string {
+  return toTextualContent(source) ?? toStructuredText(source);
+}
+
+export function renderChatMessageContent(message: ChatMessageViewModel): RenderedChatContent {
+  const text = toTextualContent(message.content);
+  if (
+    message.role === 'assistant'
+    && message.type === 'chat::answer'
+    && message.status === 'final'
+    && text !== null
+  ) {
+    return {
+      format: 'html',
+      html: renderAssistantMarkdown(message.content),
+      kind: 'assistant_markdown',
+    };
+  }
+
+  if (text !== null) {
+    return {
+      format: 'text',
+      text: renderUserText(message.content),
+      style: 'plain',
+      kind: 'plain_text',
+    };
+  }
+
+  return {
+    format: 'text',
+    text: toStructuredText(message.content),
+    style: 'preformatted',
+    kind: 'structured_fallback',
+  };
+}
+
 export interface CortexClientLike {
   connect(): Promise<void>;
   disconnect?(): Promise<void>;

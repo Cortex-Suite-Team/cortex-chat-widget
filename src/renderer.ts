@@ -1,7 +1,7 @@
 import { getIconSvg } from './icons.js';
+import { renderChatMessageContent } from '@cortex-suite/sdk-ui';
 import {
   buildStatusText,
-  formatContent,
   shouldHideTranscriptMessage,
 } from './message-flags.js';
 import type {
@@ -312,11 +312,11 @@ function renderTranscript(
   }
 
   for (const message of visibleMessages) {
-    const content = formatContent(message.content);
+    const rendered = renderChatMessageContent(message);
     const attachments = getMessageAttachments(message);
-    const hasTextContent = content.contentText !== null
-      ? content.contentText.trim().length > 0
-      : (content.formattedContent ?? '').trim().length > 0;
+    const hasTextContent = rendered.format === 'html'
+      ? rendered.html.trim().length > 0
+      : rendered.text.trim().length > 0;
     const hasQuestionOptions = message.type === 'chat::question'
       && Array.isArray(message.meta?.['options'])
       && (message.meta['options'] as unknown[]).length > 0;
@@ -379,12 +379,25 @@ function renderTranscript(
       bubble.dataset.status = message.status;
     }
 
-    if (content.contentText !== null) {
-      const textContent = content.contentText.trim();
+    if (rendered.format === 'html') {
+      const htmlContent = rendered.html.trim();
+      if (htmlContent.length > 0) {
+        const text = document.createElement('div');
+        text.className = 'cortex-widget__bubble-text cortex-widget__markdown';
+        text.innerHTML = rendered.html;
+        bubble.appendChild(text);
+      } else if (attachments.length > 0) {
+        const fallback = document.createElement('div');
+        fallback.className = 'cortex-widget__bubble-text';
+        fallback.textContent = 'Attachment sent';
+        bubble.appendChild(fallback);
+      }
+    } else if (rendered.style === 'plain') {
+      const textContent = rendered.text.trim();
       if (textContent.length > 0) {
         const text = document.createElement('div');
         text.className = 'cortex-widget__bubble-text';
-        text.textContent = textContent;
+        text.textContent = rendered.text;
         bubble.appendChild(text);
       } else if (attachments.length > 0) {
         const fallback = document.createElement('div');
@@ -395,7 +408,7 @@ function renderTranscript(
     } else {
       const pre = document.createElement('pre');
       pre.className = 'cortex-widget__formatted';
-      pre.textContent = content.formattedContent ?? '';
+      pre.textContent = rendered.text;
       bubble.appendChild(pre);
     }
 
