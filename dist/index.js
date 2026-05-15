@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-15T10:12:03.642Z */
+/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-15T10:21:14.346Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -2116,25 +2116,51 @@ var typographyStyles = `
   text-wrap: pretty;
 }
 
-.cortex-widget__markdown p,
-.cortex-widget__markdown ul,
-.cortex-widget__markdown ol,
-.cortex-widget__markdown blockquote,
-.cortex-widget__markdown pre {
-  margin: 0;
+.cortex-widget__markdown {
+  line-height: 1.35;
 }
 
-.cortex-widget__markdown > * + * {
-  margin-top: 0.7em;
+.cortex-widget__markdown > :first-child {
+  margin-top: 0;
+}
+
+.cortex-widget__markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.cortex-widget__markdown h1,
+.cortex-widget__markdown h2,
+.cortex-widget__markdown h3 {
+  margin: 0 0 0.45em;
+  font-size: 1em;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.cortex-widget__markdown p,
+.cortex-widget__markdown h4,
+.cortex-widget__markdown h5,
+.cortex-widget__markdown h6 {
+  margin: 0 0 0.45em;
+}
+
+.cortex-widget__markdown p {
+  margin: 0 0 0.45em;
 }
 
 .cortex-widget__markdown ul,
 .cortex-widget__markdown ol {
-  padding-inline-start: 1.35rem;
+  margin: 0.35em 0 0.45em;
+  padding-left: 1.25em;
+}
+
+.cortex-widget__markdown li {
+  margin: 0.15em 0;
+  padding-left: 0.1em;
 }
 
 .cortex-widget__markdown li + li {
-  margin-top: 0.25em;
+  margin-top: 0.15em;
 }
 
 .cortex-widget__markdown a {
@@ -2144,14 +2170,15 @@ var typographyStyles = `
 }
 
 .cortex-widget__markdown blockquote {
-  padding-inline-start: 0.85rem;
-  border-inline-start: 3px solid color-mix(in srgb, var(--cortex-text-color) 18%, transparent);
-  color: var(--cortex-subtle-text);
+  margin: 0.45em 0;
+  padding-left: 0.75em;
+  border-left: 2px solid currentColor;
+  opacity: 0.85;
 }
 
 .cortex-widget__markdown code,
 .cortex-widget__markdown pre {
-  font-family: Consolas, "Courier New", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .cortex-widget__markdown code {
@@ -2162,14 +2189,16 @@ var typographyStyles = `
 }
 
 .cortex-widget__markdown pre {
+  margin: 0.5em 0;
   white-space: pre-wrap;
-  padding: 0.75rem 0.9rem;
+  padding: 0.6em 0.75em;
   border-radius: 0.8rem;
   overflow-x: auto;
   background: color-mix(in srgb, var(--cortex-text-color) 6%, transparent);
 }
 
 .cortex-widget__markdown pre code {
+  font-size: 0.9em;
   padding: 0;
   border-radius: 0;
   background: transparent;
