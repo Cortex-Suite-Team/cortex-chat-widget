@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-15T10:57:48.495Z */
+/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-15T20:03:00.520Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -1366,6 +1366,96 @@ function getIconSvg(name) {
   return ICONS[name];
 }
 
+// src/styles/auth.ts
+var authStyles = `
+.cortex-widget__auth-gate {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px 12px;
+  border-top: 1px solid var(--cortex-border-color);
+  background: color-mix(in srgb, var(--cortex-composer-bg) 92%, #ffffff 8%);
+  flex: 0 0 auto;
+}
+
+.cortex-widget__auth-gate[data-visible="true"] {
+  display: flex;
+}
+
+.cortex-widget__composer[hidden] {
+  display: none !important;
+}
+
+.cortex-widget__auth-message {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--cortex-subtle-text);
+}
+
+.cortex-widget__auth-gate[data-state="denied"] .cortex-widget__auth-message {
+  color: #ef4444;
+}
+
+.cortex-widget__auth-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cortex-widget__auth-login,
+.cortex-widget__auth-password {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--cortex-border-color);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.875rem;
+  background: var(--cortex-control-bg);
+  color: var(--cortex-text-color);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cortex-widget__auth-login:focus,
+.cortex-widget__auth-password:focus {
+  border-color: var(--cortex-accent-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cortex-accent-color) 20%, transparent);
+}
+
+.cortex-widget__auth-login:disabled,
+.cortex-widget__auth-password:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cortex-widget__auth-submit {
+  align-self: flex-end;
+  padding: 8px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--cortex-accent-color), color-mix(in srgb, var(--cortex-accent-color) 52%, #0f172a 48%));
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.cortex-widget__auth-submit:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.cortex-widget__auth-submit:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.cortex-widget__auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+`;
+
 // src/styles/history.ts
 var historyStyles = `
 .cortex-widget-history {
@@ -2494,7 +2584,8 @@ var widgetStyles = [
   layoutStyles,
   typographyStyles,
   messageStyles,
-  historyStyles
+  historyStyles,
+  authStyles
 ].join("\n");
 
 // src/dom.ts
@@ -2554,6 +2645,29 @@ function createWidgetDom(options) {
   typing.setAttribute("data-testid", "typing-indicator");
   const escalation = createElement("div", "cortex-widget__escalation");
   escalation.setAttribute("data-testid", "escalation-card");
+  const authGate = createElement("div", "cortex-widget__auth-gate");
+  authGate.setAttribute("data-testid", "auth-gate");
+  authGate.setAttribute("role", "form");
+  authGate.setAttribute("aria-label", "Sign in");
+  const authMessage = createElement("p", "cortex-widget__auth-message");
+  authMessage.setAttribute("data-testid", "auth-message");
+  const authFields = createElement("div", "cortex-widget__auth-fields");
+  const authLoginInput = createElement("input", "cortex-widget__auth-login");
+  authLoginInput.type = "text";
+  authLoginInput.autocomplete = "username";
+  authLoginInput.placeholder = "Username";
+  authLoginInput.setAttribute("data-testid", "auth-login-input");
+  const authPasswordInput = createElement("input", "cortex-widget__auth-password");
+  authPasswordInput.type = "password";
+  authPasswordInput.autocomplete = "current-password";
+  authPasswordInput.placeholder = "Password";
+  authPasswordInput.setAttribute("data-testid", "auth-password-input");
+  const authSubmitButton = createElement("button", "cortex-widget__auth-submit");
+  authSubmitButton.type = "button";
+  authSubmitButton.textContent = "Sign in";
+  authSubmitButton.setAttribute("data-testid", "auth-submit-button");
+  authFields.append(authLoginInput, authPasswordInput);
+  authGate.append(authMessage, authFields, authSubmitButton);
   const composer = createElement("form", "cortex-widget__composer");
   composer.setAttribute("data-testid", "composer");
   const composerRow = createElement("div", "cortex-widget__composer-row");
@@ -2596,7 +2710,7 @@ function createWidgetDom(options) {
   headerText.append(title, subtitle, statusWrap);
   headerMain.append(avatar, headerText);
   header.append(headerMain);
-  body.append(errorBanner, transcript, workerStatus, typing, escalation, composer);
+  body.append(errorBanner, transcript, workerStatus, typing, escalation, authGate, composer);
   panel.append(header, body);
   if (options.mode === "floating") {
     root.append(panel, launcher);
@@ -2620,6 +2734,11 @@ function createWidgetDom(options) {
     workerStatus,
     typing,
     escalation,
+    authGate,
+    authMessage,
+    authLoginInput,
+    authPasswordInput,
+    authSubmitButton,
     composer,
     textarea,
     sendButton,
@@ -3363,6 +3482,7 @@ function createChatController(options) {
   let awaitingAnswer = false;
   let sessionCorrespondent = null;
   let sessionStateOverride = null;
+  let authState = { state: "none" };
   const escalationController = createEscalationController({
     client: options.client,
     replyRequestBuilder: options.replyRequestBuilder,
@@ -3387,6 +3507,9 @@ function createChatController(options) {
     return getChannelState() === "OPEN" && getSessionId() !== null;
   }
   function defaultInputLockPolicy() {
+    if (authState.state === "required" || authState.state === "submitting" || authState.state === "denied") {
+      return { locked: true, reason: "auth_required" };
+    }
     const sessionState = getSessionState();
     const escalation = escalationController.getState();
     if (getChannelState() === "CONNECTING" || getChannelState() === "RECONNECTING") {
@@ -3449,6 +3572,7 @@ function createChatController(options) {
       },
       transcript: transcriptStore.getSnapshot().map((message) => cloneMessage(message)),
       input,
+      auth: { ...authState },
       escalation: cloneEscalation(escalation),
       lastError,
       activeQuestion: activeQuestion ? { ...activeQuestion, options: [...activeQuestion.options] } : null,
@@ -3591,6 +3715,21 @@ function createChatController(options) {
     if (message.type === "system::pong" || message.type === "system::telemetry" || message.type === "system::billing") {
       return;
     }
+    if (message.type === "system::auth") {
+      const payload = asPayload(message);
+      const state = asNonEmptyString(payload["state"]);
+      if (state === "required" || state === "denied" || state === "accepted") {
+        const msg = asNonEmptyString(payload["message"]) ?? void 0;
+        const method = asNonEmptyString(payload["method"]);
+        authState = {
+          state,
+          message: msg,
+          method: method === "login_password" ? "login_password" : void 0
+        };
+        emitStateChanged();
+      }
+      return;
+    }
     const result = transcriptStore.ingest(message);
     if (result.mutation) {
       emit({
@@ -3669,6 +3808,7 @@ function createChatController(options) {
     async disconnect() {
       awaitingAnswer = false;
       sessionStateOverride = null;
+      authState = { state: "none" };
       if (options.client.disconnect) {
         await options.client.disconnect();
       }
@@ -3775,6 +3915,25 @@ function createChatController(options) {
         transcriptStore.upsertLocalMessage({ ...updated, deliveryStatus: "failed", retryable: true, sendError });
         emitStateChanged();
         return { ok: false, messageId, clientMsgId, error: sendError };
+      }
+    },
+    async submitLogin(credentials) {
+      if (!options.client.sendLogin) {
+        return { ok: false, error: "auth_not_supported" };
+      }
+      authState = { ...authState, state: "submitting" };
+      emitStateChanged();
+      try {
+        await options.client.sendLogin(credentials);
+        return { ok: true };
+      } catch (err) {
+        authState = {
+          state: "denied",
+          message: "Login failed",
+          method: authState.method
+        };
+        emitStateChanged();
+        return { ok: false, error: err instanceof Error ? err.message : "Login failed" };
       }
     },
     async replyToUser(content) {
@@ -11192,6 +11351,20 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
     dom.escalation.dataset.visible = "false";
     dom.escalation.textContent = "";
   }
+  const authState = state.chat.auth?.state ?? "none";
+  const showAuthGate = authState === "required" || authState === "submitting" || authState === "denied";
+  dom.authGate.dataset.visible = showAuthGate ? "true" : "false";
+  dom.authGate.dataset.state = authState;
+  dom.composer.hidden = showAuthGate;
+  if (showAuthGate) {
+    const authMsg = state.chat.auth.message ?? (authState === "denied" ? "Invalid credentials. Please try again." : "Please sign in to continue.");
+    dom.authMessage.textContent = authMsg;
+    const isSubmitting = authState === "submitting";
+    dom.authLoginInput.disabled = isSubmitting;
+    dom.authPasswordInput.disabled = isSubmitting;
+    dom.authSubmitButton.disabled = isSubmitting;
+    dom.authSubmitButton.textContent = isSubmitting ? "Signing in\u2026" : "Sign in";
+  }
   if (state.isDestroyed) {
     dom.textarea.value = "";
   }
@@ -11239,6 +11412,7 @@ var EMPTY_CHAT_STATE = {
   input: {
     locked: false
   },
+  auth: { state: "none" },
   escalation: null,
   lastError: null,
   activeQuestion: null,
@@ -11252,6 +11426,7 @@ function cloneChatState(state) {
     connection: { ...state.connection },
     transcript: [...state.transcript],
     input: { ...state.input },
+    auth: { ...state.auth },
     escalation: state.escalation ? { ...state.escalation } : null,
     lastError: state.lastError ? { ...state.lastError } : null,
     activeQuestion: state.activeQuestion ? { ...state.activeQuestion, options: [...state.activeQuestion.options] } : null,
@@ -11618,6 +11793,22 @@ function createWidgetHandle(args) {
       notifyAndRender();
     }
   }
+  async function handleLoginSubmit() {
+    if (internal.isDestroyed) {
+      return;
+    }
+    const login = dom.authLoginInput.value.trim();
+    const password = dom.authPasswordInput.value;
+    if (!login || !password) {
+      return;
+    }
+    dom.authPasswordInput.value = "";
+    try {
+      await controller.submitLogin({ login, password });
+    } catch {
+    }
+    notifyAndRender();
+  }
   async function handleOptionSelect(questionId, optionId, optionLabel) {
     if (internal.isDestroyed || internal.isAwaitingAnswer || internal.viewMode === "historical") {
       return;
@@ -11744,6 +11935,15 @@ function createWidgetHandle(args) {
     clearSelectedFile();
     notifyAndRender();
   };
+  const onAuthSubmitClick = () => {
+    void handleLoginSubmit();
+  };
+  const onAuthPasswordKeyDown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void handleLoginSubmit();
+    }
+  };
   const onLauncherClick = () => {
     if (options.mode !== "floating") {
       return;
@@ -11840,6 +12040,8 @@ function createWidgetHandle(args) {
   dom.attachButton.addEventListener("click", onAttachClick);
   dom.fileInput.addEventListener("change", onFileChange);
   dom.fileChipRemove.addEventListener("click", onRemoveFile);
+  dom.authSubmitButton.addEventListener("click", onAuthSubmitClick);
+  dom.authPasswordInput.addEventListener("keydown", onAuthPasswordKeyDown);
   dom.launcher.addEventListener("click", onLauncherClick);
   dom.transcript.addEventListener("click", onTranscriptClick);
   domCleanup.add(() => dom.textarea.removeEventListener("input", onTextareaInput));
@@ -11848,6 +12050,8 @@ function createWidgetHandle(args) {
   domCleanup.add(() => dom.attachButton.removeEventListener("click", onAttachClick));
   domCleanup.add(() => dom.fileInput.removeEventListener("change", onFileChange));
   domCleanup.add(() => dom.fileChipRemove.removeEventListener("click", onRemoveFile));
+  domCleanup.add(() => dom.authSubmitButton.removeEventListener("click", onAuthSubmitClick));
+  domCleanup.add(() => dom.authPasswordInput.removeEventListener("keydown", onAuthPasswordKeyDown));
   domCleanup.add(() => dom.launcher.removeEventListener("click", onLauncherClick));
   domCleanup.add(() => dom.transcript.removeEventListener("click", onTranscriptClick));
   mountTarget.appendChild(dom.host);
