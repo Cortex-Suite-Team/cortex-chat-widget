@@ -210,7 +210,7 @@ export const layoutStyles = `
   max-width: min(82%, 560px);
   padding: 9px 12px;
   border-radius: 16px;
-  white-space: pre-wrap;
+  /* white-space: pre-wrap; */
   word-break: break-word;
 }
 

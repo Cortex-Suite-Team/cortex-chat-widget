@@ -50,7 +50,7 @@ export const typographyStyles = `
 }
 
 .cortex-widget__bubble-text {
-  white-space: pre-wrap;
+  /* white-space: pre-wrap; */
   text-wrap: pretty;
 }
 
