@@ -501,10 +501,11 @@ function renderTranscript(
     if (hasActorHeader) {
       metaText.textContent = timestampText ?? (message.status === 'streaming' ? 'streaming' : '');
     } else {
-      const displayName = message.role === 'user' ? 'You'
-        : message.role === 'assistant' ? 'Assistant'
-        : message.role;
-      const metaParts: string[] = [displayName];
+      const metaParts: string[] = [];
+      if (message.role !== 'user') {
+        const displayName = message.role === 'assistant' ? 'Assistant' : message.role;
+        metaParts.push(displayName);
+      }
       if (timestampText) {
         metaParts.push(timestampText);
       }
