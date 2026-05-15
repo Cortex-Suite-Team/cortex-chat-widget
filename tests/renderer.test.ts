@@ -1395,7 +1395,8 @@ describe('message delivery status rendering', () => {
     expect(statusEl.dataset.status).toBe('processed');
     expect(icon.innerHTML).toContain('bi-check2-all');
     expect(metaText.dataset.timestampSource).toBe('server');
-    expect(metaText.textContent).toContain('You');
+    expect(metaText.textContent).not.toContain('You');
+    expect(metaText.textContent).toBeTruthy();
   });
 
   it('renders timestamp text in the same meta row as the delivery status icon', () => {
@@ -1418,7 +1419,8 @@ describe('message delivery status rendering', () => {
 
     expect(meta).toBeTruthy();
     expect(meta.querySelector('[data-testid="message-delivery-status"]')).toBeTruthy();
-    expect(metaText.textContent).toContain('You');
+    expect(metaText.textContent).not.toContain('You');
+    expect(metaText.textContent).toBeTruthy();
   });
 
   it('user message with deliveryStatus=failed renders compact retry control without text banner', () => {
