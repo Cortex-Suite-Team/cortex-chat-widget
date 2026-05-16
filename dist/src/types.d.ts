@@ -75,6 +75,8 @@ export interface WidgetClientLike extends CortexClientLike {
     uploadFile?(file: File | Blob | ArrayBuffer | Uint8Array | string, options?: {
         sessionId?: string;
     }): Promise<string>;
+    readonly accessToken?: string | null;
+    readonly cpApiUrl?: string | null;
 }
 export type { ChatController, ChatMessageViewModel, ChatState, CortexClientLike, CortexTransportMessage, } from '@cortex-suite/sdk-ui';
 export interface NormalizedWidgetOptions extends CortexChatWidgetOptions {

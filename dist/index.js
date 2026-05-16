@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.7 builtAt=2026-05-16T08:15:05.416Z */
+/* cortex-chat-widget build: sdk=1.1.7 builtAt=2026-05-16T15:00:04.192Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -10613,11 +10613,11 @@ function createDebugLogger2(enabled) {
 }
 
 // src/history-client.ts
-async function requestJson(url, apiKey, init) {
+async function requestJson(url, bearerToken, init) {
   const response = await fetch(url, {
     ...init,
     headers: {
-      Authorization: `ApiKey ${apiKey}`,
+      Authorization: `Bearer ${bearerToken}`,
       "Content-Type": "application/json",
       ...init?.headers ?? {}
     }
@@ -10632,16 +10632,16 @@ async function requestJson(url, apiKey, init) {
 }
 function createHistoryClient(args) {
   const baseUrl = args.controlPlaneUrl.replace(/\/+$/, "");
-  const apiKey = args.apiKey;
+  const bearerToken = args.bearerToken;
   return {
     async listConversations() {
-      const body = await requestJson(`${baseUrl}/api/chat/conversations/`, apiKey);
+      const body = await requestJson(`${baseUrl}/api/chat/conversations/`, bearerToken);
       return body.data?.conversations ?? [];
     },
     async getMessages(sessionId) {
       const body = await requestJson(
         `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/messages/`,
-        apiKey
+        bearerToken
       );
       return (body.data?.messages ?? []).map((message) => ({
         id: message.id,
@@ -10656,7 +10656,7 @@ function createHistoryClient(args) {
     async renameConversation(sessionId, title) {
       await requestJson(
         `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/rename/`,
-        apiKey,
+        bearerToken,
         {
           method: "POST",
           body: JSON.stringify({ title })
@@ -10666,21 +10666,21 @@ function createHistoryClient(args) {
     async pinConversation(sessionId) {
       await requestJson(
         `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/pin/`,
-        apiKey,
+        bearerToken,
         { method: "POST" }
       );
     },
     async unpinConversation(sessionId) {
       await requestJson(
         `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/unpin/`,
-        apiKey,
+        bearerToken,
         { method: "POST" }
       );
     },
     async deleteConversation(sessionId) {
       await requestJson(
         `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/`,
-        apiKey,
+        bearerToken,
         { method: "DELETE" }
       );
     }
@@ -11504,7 +11504,7 @@ function summarizeSendPayload3(payload) {
 function createWidgetHandle(args) {
   const { options, dom, mountTarget, historyTarget, createClient: createClient2 } = args;
   const historyDom = options.mode === "embedded" && historyTarget ? createHistoryDom() : null;
-  const historyClient = historyDom && options.controlPlaneUrl ? createHistoryClient({ controlPlaneUrl: options.controlPlaneUrl, apiKey: options.apiKey }) : null;
+  let historyClient = null;
   let client = createClient2();
   let controller = createChatController({
     client,
@@ -11517,7 +11517,7 @@ function createWidgetHandle(args) {
   let selectedHistorySessionId = null;
   let historyMenuSessionId = null;
   let historyItems = [];
-  let historyState = historyClient ? "loading" : "disabled";
+  let historyState = historyDom && options.controlPlaneUrl ? "loading" : "disabled";
   let historyErrorMessage = "";
   let liveConnected = false;
   let liveConnectPromise = null;
@@ -11604,6 +11604,14 @@ function createWidgetHandle(args) {
   function bindControllerListeners() {
     unsubscribeController = controller.subscribe((nextState) => {
       liveChatState = nextState;
+      if (historyDom && !historyClient && nextState.connection.isSessionReady) {
+        const token = client.accessToken ?? null;
+        const cpUrl = client.cpApiUrl ?? options.controlPlaneUrl ?? null;
+        if (token && cpUrl) {
+          historyClient = createHistoryClient({ controlPlaneUrl: cpUrl, bearerToken: token });
+          void refreshHistory();
+        }
+      }
       if (nextState.lastError) {
         internal.error = null;
         internal.isAwaitingAnswer = false;
@@ -12104,9 +12112,6 @@ function createWidgetHandle(args) {
       resolveRuntimeError(error2, options, internal);
       notifyAndRender();
     });
-  }
-  if (historyClient) {
-    void refreshHistory();
   }
   return {
     destroy() {
