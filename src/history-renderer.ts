@@ -5,9 +5,11 @@ export type HistoryRenderState =
   | { kind: 'loading' }
   | { kind: 'empty' }
   | { kind: 'error'; message: string }
-  | { kind: 'loaded'; items: HistoryConversationSummary[]; selectedSessionId: string | null; menuSessionId: string | null; draftSelected: boolean };
+  | { kind: 'loaded'; items: HistoryConversationSummary[]; selectedSessionId: string | null; menuSessionId: string | null; draftSelected: boolean; liveSessionId?: string | null };
 
 export function renderHistoryList(dom: HistoryDom, state: HistoryRenderState): void {
+  // Preserve scroll position so a background re-render does not jump the panel to the top.
+  const savedScroll = state.kind === 'loaded' ? dom.list.scrollTop : 0;
   dom.list.replaceChildren();
   dom.status.textContent = state.kind === 'loading' ? 'Loading chats…' : '';
 
@@ -53,7 +55,9 @@ export function renderHistoryList(dom: HistoryDom, state: HistoryRenderState): v
     row.type = 'button';
     row.className = 'cortex-widget-history__row';
     row.dataset.sessionId = item.session_id;
-    row.dataset.active = String(state.selectedSessionId === item.session_id);
+    const isHistoricallySelected = state.selectedSessionId === item.session_id;
+    const isLiveSelected = !state.draftSelected && state.selectedSessionId === null && state.liveSessionId === item.session_id;
+    row.dataset.active = String(isHistoricallySelected || isLiveSelected);
     row.dataset.menuOpen = String(state.menuSessionId === item.session_id);
     row.setAttribute('data-testid', 'history-row');
 
@@ -87,4 +91,6 @@ export function renderHistoryList(dom: HistoryDom, state: HistoryRenderState): v
     row.append(title, menuToggle, menu);
     dom.list.appendChild(row);
   }
+
+  dom.list.scrollTop = savedScroll;
 }

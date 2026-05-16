@@ -160,28 +160,18 @@ describe('widget history', () => {
     expect(textarea.placeholder).toContain('read-only');
   });
 
-  it('new chat stays local draft only, and first real send refreshes history', async () => {
+  it('new chat stays local draft only, and send does not trigger additional history refresh', async () => {
     installTargets();
     const client = new CustomClient();
     client.uploadAttachmentImpl = async (file) => `attachment:${file.name}`;
-    getFetchMock()
-      .mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        data: {
-          conversations: [
-            { session_id: 'sess_hist', title: 'Existing chat', renamed: false, pinned: false, last_message_at: '2026-05-11T10:00:00Z', created_at: '2026-05-11T09:00:00Z' },
-          ],
-        },
-      }))
-      .mockResolvedValueOnce(mockJsonResponse({
-        ok: true,
-        data: {
-          conversations: [
-            { session_id: 'sess_real', title: 'New chat', renamed: false, pinned: false, last_message_at: '2026-05-11T10:01:00Z', created_at: '2026-05-11T10:01:00Z' },
-            { session_id: 'sess_hist', title: 'Existing chat', renamed: false, pinned: false, last_message_at: '2026-05-11T10:00:00Z', created_at: '2026-05-11T09:00:00Z' },
-          ],
-        },
-      }));
+    getFetchMock().mockResolvedValueOnce(mockJsonResponse({
+      ok: true,
+      data: {
+        conversations: [
+          { session_id: 'sess_hist', title: 'Existing chat', renamed: false, pinned: false, last_message_at: '2026-05-11T10:00:00Z', created_at: '2026-05-11T09:00:00Z' },
+        ],
+      },
+    }));
 
     mountCortexChat({
       apiKey: 'test-key',
@@ -211,7 +201,8 @@ describe('widget history', () => {
     await flushAsyncWork();
 
     expect(__getLastController()?.sendCalls).toHaveLength(1);
-    expect(getFetchMock().mock.calls.filter((call: any[]) => String(call[0]).includes('/api/chat/conversations/'))).toHaveLength(2);
+    // Send must NOT trigger a history refresh — only the initial session-ready load fires.
+    expect(getFetchMock().mock.calls.filter((call: any[]) => String(call[0]).includes('/api/chat/conversations/'))).toHaveLength(1);
   });
 
   it('delete removes item after backend success', async () => {

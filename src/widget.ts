@@ -229,6 +229,7 @@ export function createWidgetHandle(args: {
       selectedSessionId: selectedHistorySessionId,
       menuSessionId: historyMenuSessionId,
       draftSelected: internal.viewMode === 'draft',
+      liveSessionId: liveChatState.connection.sessionId,
     });
   }
 
@@ -498,7 +499,6 @@ export function createWidgetHandle(args: {
       internal.error = null;
       internal.isAwaitingAnswer = true;
       notifyAndRender();
-      void refreshHistory();
     } catch (error) {
       resolveRuntimeError(error, options, internal);
       notifyAndRender();
@@ -547,7 +547,6 @@ export function createWidgetHandle(args: {
       internal.error = null;
       internal.isAwaitingAnswer = true;
       notifyAndRender();
-      void refreshHistory();
     } catch (error) {
       resolveRuntimeError(error, options, internal);
       notifyAndRender();
@@ -575,6 +574,15 @@ export function createWidgetHandle(args: {
 
   async function selectHistoricalConversation(sessionId: string) {
     if (!historyClient) {
+      return;
+    }
+    // Clicking the current live session must not switch to read-only historical mode.
+    if (sessionId === liveChatState.connection.sessionId) {
+      selectedHistorySessionId = null;
+      historicalTranscript = [];
+      historyMenuSessionId = null;
+      internal.viewMode = liveChatState.transcript.length > 0 ? 'live' : 'draft';
+      notifyAndRender();
       return;
     }
     internal.error = null;
