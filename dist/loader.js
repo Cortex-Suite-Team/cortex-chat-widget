@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-16T17:44:26.009Z */
+/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-16T18:48:34.526Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -11358,7 +11358,7 @@
     }
     transcriptEl.scrollTop = transcriptEl.scrollHeight;
   }
-  function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
+  function renderWidget(dom, state, options, attachmentsAvailable, isUploading, opts) {
     applyResolvedTheme(dom.host, dom.root, options.theme, {
       dark: "cortex-widget--dark",
       light: "cortex-widget--light"
@@ -11444,7 +11444,9 @@
       dom.fileChipMeta.textContent = "";
       dom.fileChipRemove.disabled = true;
     }
-    renderTranscript(dom.transcript, state, options);
+    if (!opts?.skipTranscript) {
+      renderTranscript(dom.transcript, state, options);
+    }
   }
 
   // src/widget.ts
@@ -11558,11 +11560,33 @@
       error: null,
       viewMode: "draft"
     };
+    let lastTranscriptRenderKey = "";
+    let lastHistoryRenderKey = "";
     const domCleanup = /* @__PURE__ */ new Set();
     let unsubscribeController = null;
     let unsubscribeRawMessages = null;
     function draftHasLiveData(state) {
       return state.transcript.length > 0 || state.activeQuestion !== null || state.escalation !== null || state.lastError !== null || state.workerState.state !== "idle" || state.connection.isConnected || state.connection.isStale || state.connection.sessionState !== EMPTY_CHAT_STATE.connection.sessionState || state.connection.channelState !== EMPTY_CHAT_STATE.connection.channelState;
+    }
+    function getLiveSessionId() {
+      return liveChatState.connection.sessionId ?? client.sessionId ?? null;
+    }
+    function computeTranscriptKey(state) {
+      const msgs = state.chat.transcript;
+      if (msgs.length === 0) {
+        return `${state.isHistoricalView ? "1" : "0"}:0:`;
+      }
+      const msgSig = msgs.map((m) => {
+        const content = m.content;
+        const cLen = Array.isArray(content) ? content.join("").length : String(content ?? "").length;
+        return `${m.id}|${m.type}|${m.status ?? ""}|${String(m.deliveryStatus ?? "")}|${m.ts ?? ""}|${cLen}`;
+      }).join(";");
+      return `${state.isHistoricalView ? "1" : "0"}:${msgs.length}:${msgSig}`;
+    }
+    function computeHistoryKey() {
+      const liveId = getLiveSessionId() ?? "";
+      const itemsSig = historyItems.map((i) => `${i.session_id}:${i.title}:${i.pinned ? "1" : "0"}`).join(",");
+      return `${historyState}:${itemsSig}:${selectedHistorySessionId ?? ""}:${historyMenuSessionId ?? ""}:${internal.viewMode}:${liveId}`;
     }
     function getDisplayedChatState() {
       if (internal.viewMode === "historical") {
@@ -11607,20 +11631,29 @@
         selectedSessionId: selectedHistorySessionId,
         menuSessionId: historyMenuSessionId,
         draftSelected: internal.viewMode === "draft",
-        liveSessionId: liveChatState.connection.sessionId
+        liveSessionId: getLiveSessionId()
       });
     }
     function notifyAndRender() {
       syncTextareaValue();
       const state = getPublicState();
-      renderWidget(dom, state, options, internal.attachmentsAvailable, internal.isUploading);
+      const transcriptKey = computeTranscriptKey(state);
+      const skipTranscript = transcriptKey === lastTranscriptRenderKey;
+      if (!skipTranscript) {
+        lastTranscriptRenderKey = transcriptKey;
+      }
+      renderWidget(dom, state, options, internal.attachmentsAvailable, internal.isUploading, { skipTranscript });
       if (historyDom) {
         applyResolvedTheme(historyDom.host, historyDom.root, options.theme, {
           dark: "cortex-widget-history--dark",
           light: "cortex-widget-history--light"
         });
+        const historyKey = computeHistoryKey();
+        if (historyKey !== lastHistoryRenderKey) {
+          lastHistoryRenderKey = historyKey;
+          renderHistory();
+        }
       }
-      renderHistory();
       options.onStateChange?.(state);
     }
     function bindControllerListeners() {
@@ -11918,7 +11951,8 @@
       if (!historyClient) {
         return;
       }
-      if (sessionId === liveChatState.connection.sessionId) {
+      const liveSessionId = getLiveSessionId();
+      if (sessionId === liveSessionId) {
         selectedHistorySessionId = null;
         historicalTranscript = [];
         historyMenuSessionId = null;

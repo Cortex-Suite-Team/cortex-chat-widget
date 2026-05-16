@@ -3,5 +3,7 @@ export declare function applyResolvedTheme(host: HTMLElement, root: HTMLElement,
     light: string;
     dark: string;
 }): boolean;
-export declare function renderWidget(dom: WidgetDom, state: CortexChatWidgetState, options: NormalizedWidgetOptions, attachmentsAvailable: boolean, isUploading: boolean): void;
+export declare function renderWidget(dom: WidgetDom, state: CortexChatWidgetState, options: NormalizedWidgetOptions, attachmentsAvailable: boolean, isUploading: boolean, opts?: {
+    skipTranscript?: boolean;
+}): void;
 //# sourceMappingURL=renderer.d.ts.map
