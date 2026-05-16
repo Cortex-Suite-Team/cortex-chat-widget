@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-16T17:20:13.567Z */
+/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-16T17:44:26.009Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -10752,6 +10752,7 @@
 
   // src/history-renderer.ts
   function renderHistoryList(dom, state) {
+    const savedScroll = state.kind === "loaded" ? dom.list.scrollTop : 0;
     dom.list.replaceChildren();
     dom.status.textContent = state.kind === "loading" ? "Loading chats\u2026" : "";
     if (state.kind === "loading") {
@@ -10791,7 +10792,9 @@
       row.type = "button";
       row.className = "cortex-widget-history__row";
       row.dataset.sessionId = item.session_id;
-      row.dataset.active = String(state.selectedSessionId === item.session_id);
+      const isHistoricallySelected = state.selectedSessionId === item.session_id;
+      const isLiveSelected = !state.draftSelected && state.selectedSessionId === null && state.liveSessionId === item.session_id;
+      row.dataset.active = String(isHistoricallySelected || isLiveSelected);
       row.dataset.menuOpen = String(state.menuSessionId === item.session_id);
       row.setAttribute("data-testid", "history-row");
       const title = document.createElement("span");
@@ -10820,6 +10823,7 @@
       row.append(title, menuToggle, menu);
       dom.list.appendChild(row);
     }
+    dom.list.scrollTop = savedScroll;
   }
 
   // src/message-flags.ts
@@ -11602,7 +11606,8 @@
         items: historyItems,
         selectedSessionId: selectedHistorySessionId,
         menuSessionId: historyMenuSessionId,
-        draftSelected: internal.viewMode === "draft"
+        draftSelected: internal.viewMode === "draft",
+        liveSessionId: liveChatState.connection.sessionId
       });
     }
     function notifyAndRender() {
@@ -11843,7 +11848,6 @@
         internal.error = null;
         internal.isAwaitingAnswer = true;
         notifyAndRender();
-        void refreshHistory();
       } catch (error2) {
         resolveRuntimeError(error2, options, internal);
         notifyAndRender();
@@ -11887,7 +11891,6 @@
         internal.error = null;
         internal.isAwaitingAnswer = true;
         notifyAndRender();
-        void refreshHistory();
       } catch (error2) {
         resolveRuntimeError(error2, options, internal);
         notifyAndRender();
@@ -11913,6 +11916,14 @@
     }
     async function selectHistoricalConversation(sessionId) {
       if (!historyClient) {
+        return;
+      }
+      if (sessionId === liveChatState.connection.sessionId) {
+        selectedHistorySessionId = null;
+        historicalTranscript = [];
+        historyMenuSessionId = null;
+        internal.viewMode = liveChatState.transcript.length > 0 ? "live" : "draft";
+        notifyAndRender();
         return;
       }
       internal.error = null;

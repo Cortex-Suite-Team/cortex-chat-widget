@@ -12,6 +12,7 @@ export type HistoryRenderState = {
     selectedSessionId: string | null;
     menuSessionId: string | null;
     draftSelected: boolean;
+    liveSessionId?: string | null;
 };
 export declare function renderHistoryList(dom: HistoryDom, state: HistoryRenderState): void;
 //# sourceMappingURL=history-renderer.d.ts.map
