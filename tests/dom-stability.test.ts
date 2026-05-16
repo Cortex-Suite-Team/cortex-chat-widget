@@ -198,66 +198,6 @@ describe('DOM stability — render gating', () => {
     expect(historyShadow.textContent).not.toContain('Original Title');
   });
 
-  it('clicking live session via client.sessionId fallback does not call getMessages or enter historical mode', async () => {
-    installTargets();
-    const client = new CustomClient();
-    // client.sessionId is the live session, but connection.sessionId will be null
-    client.sessionId = 'sess_client_live';
-
-    getFetchMock().mockResolvedValueOnce(mockJsonResponse({
-      ok: true,
-      data: { conversations: [
-        {
-          session_id: 'sess_client_live',
-          title: 'Live Chat',
-          renamed: false,
-          pinned: false,
-          last_message_at: '2026-05-16T10:00:00Z',
-          created_at: '2026-05-16T09:00:00Z',
-        },
-      ] },
-    }));
-
-    mountCortexChat({
-      apiKey: 'test-key',
-      mode: 'embedded',
-      target: '#chat',
-      historyTarget: '#history',
-      controlPlaneUrl: 'https://cp.example.test',
-      client,
-    });
-
-    // isSessionReady=true triggers historyClient creation, but sessionId is null
-    __getLastController()!.setState(createMockChatState({
-      connection: {
-        channelState: 'OPEN',
-        sessionState: 'ACTIVE',
-        sessionId: null,
-        isSessionReady: true,
-        isConnected: true,
-        isStale: false,
-      },
-    }));
-    await flushAsyncWork();
-
-    expect(getFetchMock()).toHaveBeenCalledTimes(1);
-
-    const historyShadow = getHistoryShadow();
-    const liveRow = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
-    expect(liveRow.dataset.sessionId).toBe('sess_client_live');
-    liveRow.click();
-    await flushAsyncWork();
-
-    // No getMessages fetch — total stays at 1
-    expect(getFetchMock()).toHaveBeenCalledTimes(1);
-
-    // Composer not disabled — did not enter historical mode
-    const chatShadow = getChatShadow();
-    const textarea = chatShadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
-    expect(textarea.disabled).toBe(false);
-    expect(textarea.placeholder).not.toContain('read-only');
-  });
-
   it('clicking a different historical session loads read-only transcript', async () => {
     installTargets();
     getFetchMock()
@@ -302,5 +242,249 @@ describe('DOM stability — render gating', () => {
     expect(textarea.disabled).toBe(true);
     expect(textarea.placeholder).toContain('read-only');
     expect(transcriptEl.textContent).toContain('Historical answer');
+  });
+});
+
+describe('live session selection', () => {
+  beforeEach(() => {
+    resetMocks();
+    global.fetch = jest.fn() as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('getLiveSessionId uses connection.sessionId, not client.sessionId', async () => {
+    // client.sessionId differs from connection.sessionId; clicking client.sessionId row goes historical
+    installTargets();
+    const client = new CustomClient();
+    client.sessionId = 'sess_client_only'; // NOT in connection
+
+    getFetchMock()
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: { conversations: [
+          { session_id: 'sess_client_only', title: 'Client Only', renamed: false, pinned: false, last_message_at: '2026-05-16T10:00:00Z', created_at: '2026-05-16T09:00:00Z' },
+        ] },
+      }))
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: { session_id: 'sess_client_only', messages: [] },
+      }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+      client,
+    });
+
+    // connection.sessionId is 'sess_mock' (from createMockChatState), NOT 'sess_client_only'
+    __getLastController()!.setState(createMockChatState());
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const row = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    expect(row.dataset.sessionId).toBe('sess_client_only');
+    row.click();
+    await flushAsyncWork();
+
+    // getMessages WAS called — treated as historical, not live
+    expect(getFetchMock()).toHaveBeenCalledTimes(2);
+
+    // Composer is disabled (historical mode)
+    const chatShadow = getChatShadow();
+    const textarea = chatShadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(true);
+  });
+
+  it('clicking the live session sets viewMode=live (row marked active, textarea enabled)', async () => {
+    installTargets();
+    getFetchMock().mockResolvedValueOnce(mockJsonResponse({
+      ok: true,
+      data: { conversations: [
+        { session_id: 'sess_mock', title: 'Live Session', renamed: false, pinned: false, last_message_at: '2026-05-16T10:00:00Z', created_at: '2026-05-16T09:00:00Z' },
+      ] },
+    }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+
+    // createMockChatState sets connection.sessionId = 'sess_mock'
+    __getLastController()!.setState(createMockChatState());
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const liveRow = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    expect(liveRow.dataset.sessionId).toBe('sess_mock');
+    liveRow.click();
+    await flushAsyncWork();
+
+    // No getMessages call
+    expect(getFetchMock()).toHaveBeenCalledTimes(1);
+
+    const chatShadow = getChatShadow();
+    const textarea = chatShadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(false);
+    expect(textarea.placeholder).not.toContain('read-only');
+  });
+
+  it('clicking the live session does not call getMessages', async () => {
+    installTargets();
+    getFetchMock().mockResolvedValueOnce(mockJsonResponse({
+      ok: true,
+      data: { conversations: [
+        { session_id: 'sess_mock', title: 'Live', renamed: false, pinned: false, last_message_at: '2026-05-16T10:00:00Z', created_at: '2026-05-16T09:00:00Z' },
+      ] },
+    }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+    __getLastController()!.setState(createMockChatState());
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const liveRow = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    liveRow.click();
+    await flushAsyncWork();
+
+    // Only the initial list fetch — no getMessages call
+    expect(getFetchMock()).toHaveBeenCalledTimes(1);
+  });
+
+  it('clicking live session preserves live transcript', async () => {
+    installTargets();
+    getFetchMock().mockResolvedValueOnce(mockJsonResponse({
+      ok: true,
+      data: { conversations: [
+        { session_id: 'sess_mock', title: 'Live', renamed: false, pinned: false, last_message_at: '2026-05-16T10:00:00Z', created_at: '2026-05-16T09:00:00Z' },
+      ] },
+    }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+    __getLastController()!.setState(createMockChatState({
+      transcript: [ASSISTANT_MSG],
+    }));
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const liveRow = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    liveRow.click();
+    await flushAsyncWork();
+
+    const chatShadow = getChatShadow();
+    const transcriptEl = chatShadow.querySelector('[data-testid="transcript"]') as HTMLElement;
+    expect(transcriptEl.textContent).toContain('Hello from assistant');
+  });
+
+  it('clicking live session with empty transcript shows live empty view, not historical read-only', async () => {
+    installTargets();
+    getFetchMock().mockResolvedValueOnce(mockJsonResponse({
+      ok: true,
+      data: { conversations: [
+        { session_id: 'sess_mock', title: 'Live Empty', renamed: false, pinned: false, last_message_at: '2026-05-16T10:00:00Z', created_at: '2026-05-16T09:00:00Z' },
+      ] },
+    }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+    // Live session with empty transcript
+    __getLastController()!.setState(createMockChatState({
+      transcript: [],
+    }));
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const liveRow = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    liveRow.click();
+    await flushAsyncWork();
+
+    const chatShadow = getChatShadow();
+    const textarea = chatShadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+
+    // Must be live mode — composer enabled, no read-only placeholder
+    expect(textarea.disabled).toBe(false);
+    expect(textarea.placeholder).not.toContain('read-only');
+  });
+
+  it('after viewing historical session, clicking live session restores live mode', async () => {
+    installTargets();
+    getFetchMock()
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: { conversations: [
+          { session_id: 'sess_old', title: 'Old Chat', renamed: false, pinned: false, last_message_at: '2026-05-10T10:00:00Z', created_at: '2026-05-10T09:00:00Z' },
+          { session_id: 'sess_mock', title: 'Live', renamed: false, pinned: false, last_message_at: '2026-05-16T10:00:00Z', created_at: '2026-05-16T09:00:00Z' },
+        ] },
+      }))
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: { session_id: 'sess_old', messages: [{ id: 'm1', type: 'chat::answer', role: 'assistant', content: 'Old answer', status: 'final', ts: '2026-05-10T10:00:00Z', meta: {} }] },
+      }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+    __getLastController()!.setState(createMockChatState({
+      transcript: [ASSISTANT_MSG],
+    }));
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const rows = historyShadow.querySelectorAll('[data-testid="history-row"]') as NodeListOf<HTMLButtonElement>;
+    const oldRow = Array.from(rows).find((r) => r.dataset.sessionId === 'sess_old')!;
+    const liveRow = Array.from(rows).find((r) => r.dataset.sessionId === 'sess_mock')!;
+
+    // Go to historical
+    oldRow.click();
+    await flushAsyncWork();
+
+    const chatShadow = getChatShadow();
+    let textarea = chatShadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(true);
+
+    // Re-query after history re-render (viewMode change invalidates history key → replaceChildren)
+    const liveRowAfter = Array.from(historyShadow.querySelectorAll('[data-testid="history-row"]') as NodeListOf<HTMLButtonElement>)
+      .find((r) => r.dataset.sessionId === 'sess_mock')!;
+
+    // Go back to live
+    liveRowAfter.click();
+    await flushAsyncWork();
+
+    textarea = chatShadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(false);
+    expect(textarea.placeholder).not.toContain('read-only');
+
+    // Live transcript still present
+    const transcriptEl = chatShadow.querySelector('[data-testid="transcript"]') as HTMLElement;
+    expect(transcriptEl.textContent).toContain('Hello from assistant');
   });
 });

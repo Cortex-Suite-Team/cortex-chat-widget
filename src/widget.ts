@@ -187,7 +187,7 @@ export function createWidgetHandle(args: {
   }
 
   function getLiveSessionId(): string | null {
-    return liveChatState.connection.sessionId ?? client.sessionId ?? null;
+    return liveChatState.connection.sessionId;
   }
 
   function computeTranscriptKey(state: CortexChatWidgetState): string {
@@ -624,7 +624,7 @@ export function createWidgetHandle(args: {
       selectedHistorySessionId = null;
       historicalTranscript = [];
       historyMenuSessionId = null;
-      internal.viewMode = liveChatState.transcript.length > 0 ? 'live' : 'draft';
+      internal.viewMode = 'live';
       notifyAndRender();
       return;
     }
