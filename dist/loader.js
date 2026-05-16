@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-16T19:04:26.184Z */
+/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-16T20:20:29.794Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -10787,7 +10787,22 @@
     draftTitle.textContent = "New chat";
     draftRow.appendChild(draftTitle);
     dom.list.appendChild(draftRow);
-    for (const item of state.items) {
+    if (state.liveSessionId) {
+      const currentRow = document.createElement("button");
+      currentRow.type = "button";
+      currentRow.className = "cortex-widget-history__row";
+      currentRow.dataset.sessionId = state.liveSessionId;
+      currentRow.dataset.liveCurrent = "true";
+      currentRow.dataset.active = String(!state.draftSelected && state.selectedSessionId === null);
+      currentRow.setAttribute("data-testid", "history-current-row");
+      const currentTitle = document.createElement("span");
+      currentTitle.className = "cortex-widget-history__row-title";
+      currentTitle.textContent = "Current chat";
+      currentRow.appendChild(currentTitle);
+      dom.list.appendChild(currentRow);
+    }
+    const filteredItems = state.liveSessionId ? state.items.filter((item) => item.session_id !== state.liveSessionId) : state.items;
+    for (const item of filteredItems) {
       const row = document.createElement("button");
       row.type = "button";
       row.className = "cortex-widget-history__row";
@@ -11613,6 +11628,7 @@
       if (!historyDom) {
         return;
       }
+      const liveSessionId = getLiveSessionId();
       if (historyState === "loading") {
         renderHistoryList(historyDom, { kind: "loading" });
         return;
@@ -11622,7 +11638,18 @@
         return;
       }
       if (historyState === "empty") {
-        renderHistoryList(historyDom, { kind: "empty" });
+        if (liveSessionId) {
+          renderHistoryList(historyDom, {
+            kind: "loaded",
+            items: [],
+            selectedSessionId: selectedHistorySessionId,
+            menuSessionId: historyMenuSessionId,
+            draftSelected: internal.viewMode === "draft",
+            liveSessionId
+          });
+        } else {
+          renderHistoryList(historyDom, { kind: "empty" });
+        }
         return;
       }
       renderHistoryList(historyDom, {
@@ -11631,7 +11658,7 @@
         selectedSessionId: selectedHistorySessionId,
         menuSessionId: historyMenuSessionId,
         draftSelected: internal.viewMode === "draft",
-        liveSessionId: getLiveSessionId()
+        liveSessionId
       });
     }
     function notifyAndRender() {
