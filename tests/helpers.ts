@@ -14,6 +14,8 @@ export class CustomClient implements WidgetClientLike {
   sessionState = 'ACTIVE';
   channelState = 'OPEN';
   sessionId = 'sess_custom';
+  accessToken: string | null = 'mock-access-token';
+  cpApiUrl: string | null = null;
   uploadAttachmentImpl?: (file: File) => Promise<string>;
   uploadFileImpl?: (file: File) => Promise<string>;
 

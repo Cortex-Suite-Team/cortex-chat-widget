@@ -57,6 +57,9 @@ describe('loader', () => {
     });
 
     await import('../src/loader.js');
+
+    const { __getLastController: getCtrl, createMockChatState } = await import('./mocks/sdk-ui.js');
+    getCtrl()!.setState(createMockChatState());
     await Promise.resolve();
 
     expect(historyTarget.firstElementChild).toBeTruthy();

@@ -217,6 +217,8 @@ export interface CortexClientLike {
   } | null;
   sessionState?: string;
   channelState?: string;
+  accessToken?: string | null;
+  cpApiUrl?: string | null;
 }
 
 declare global {

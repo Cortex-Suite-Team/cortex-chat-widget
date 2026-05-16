@@ -90,6 +90,8 @@ export interface WidgetClientLike extends CortexClientLike {
     file: File | Blob | ArrayBuffer | Uint8Array | string,
     options?: { sessionId?: string },
   ): Promise<string>;
+  readonly accessToken?: string | null;
+  readonly cpApiUrl?: string | null;
 }
 
 export type {

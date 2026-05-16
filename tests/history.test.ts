@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import { changeInput, CustomClient, flushAsyncWork, resetMocks, submitComposer } from './helpers.js';
 import { mountCortexChat } from '../src/index.js';
-import { __getLastController } from './mocks/sdk-ui.js';
+import { __getLastController, createMockChatState } from './mocks/sdk-ui.js';
 
 function mockJsonResponse(body: unknown, status = 200): Response {
   return {
@@ -94,6 +94,7 @@ describe('widget history', () => {
       controlPlaneUrl: 'https://cp.example.test',
     });
 
+    __getLastController()!.setState(createMockChatState());
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();
@@ -140,6 +141,7 @@ describe('widget history', () => {
       controlPlaneUrl: 'https://cp.example.test',
     });
 
+    __getLastController()!.setState(createMockChatState());
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();
@@ -190,6 +192,7 @@ describe('widget history', () => {
       client,
     });
 
+    __getLastController()!.setState(createMockChatState());
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();
@@ -238,6 +241,7 @@ describe('widget history', () => {
       controlPlaneUrl: 'https://cp.example.test',
     });
 
+    __getLastController()!.setState(createMockChatState());
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();
@@ -273,6 +277,7 @@ describe('widget history', () => {
       },
     });
 
+    __getLastController()!.setState(createMockChatState());
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();

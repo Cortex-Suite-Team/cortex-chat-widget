@@ -25,13 +25,13 @@ interface HistoryMessagesResponse {
 
 async function requestJson<T>(
   url: string,
-  apiKey: string,
+  bearerToken: string,
   init?: RequestInit,
 ): Promise<T> {
   const response = await fetch(url, {
     ...init,
     headers: {
-      Authorization: `ApiKey ${apiKey}`,
+      Authorization: `Bearer ${bearerToken}`,
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
     },
@@ -45,19 +45,19 @@ async function requestJson<T>(
   return response.json() as Promise<T>;
 }
 
-export function createHistoryClient(args: { controlPlaneUrl: string; apiKey: string }) {
+export function createHistoryClient(args: { controlPlaneUrl: string; bearerToken: string }) {
   const baseUrl = args.controlPlaneUrl.replace(/\/+$/, '');
-  const apiKey = args.apiKey;
+  const bearerToken = args.bearerToken;
 
   return {
     async listConversations(): Promise<HistoryConversationSummary[]> {
-      const body = await requestJson<HistoryListResponse>(`${baseUrl}/api/chat/conversations/`, apiKey);
+      const body = await requestJson<HistoryListResponse>(`${baseUrl}/api/chat/conversations/`, bearerToken);
       return body.data?.conversations ?? [];
     },
     async getMessages(sessionId: string): Promise<ChatMessageViewModel[]> {
       const body = await requestJson<HistoryMessagesResponse>(
         `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/messages/`,
-        apiKey,
+        bearerToken,
       );
       return (body.data?.messages ?? []).map((message) => ({
         id: message.id,
@@ -72,7 +72,7 @@ export function createHistoryClient(args: { controlPlaneUrl: string; apiKey: str
     async renameConversation(sessionId: string, title: string): Promise<void> {
       await requestJson(
         `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/rename/`,
-        apiKey,
+        bearerToken,
         {
           method: 'POST',
           body: JSON.stringify({ title }),
@@ -82,21 +82,21 @@ export function createHistoryClient(args: { controlPlaneUrl: string; apiKey: str
     async pinConversation(sessionId: string): Promise<void> {
       await requestJson(
         `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/pin/`,
-        apiKey,
+        bearerToken,
         { method: 'POST' },
       );
     },
     async unpinConversation(sessionId: string): Promise<void> {
       await requestJson(
         `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/unpin/`,
-        apiKey,
+        bearerToken,
         { method: 'POST' },
       );
     },
     async deleteConversation(sessionId: string): Promise<void> {
       await requestJson(
         `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/`,
-        apiKey,
+        bearerToken,
         { method: 'DELETE' },
       );
     },

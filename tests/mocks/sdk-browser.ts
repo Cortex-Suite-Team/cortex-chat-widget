@@ -36,6 +36,8 @@ export class CortexClient {
   sessionState = 'ACTIVE';
   channelState = 'OPEN';
   sessionId = 'sess_mock';
+  accessToken: string | null = 'mock-access-token';
+  cpApiUrl: string | null = null;
   uploadAttachmentEnabled = true;
   uploadFileEnabled = true;
 

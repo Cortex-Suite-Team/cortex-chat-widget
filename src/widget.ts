@@ -131,9 +131,7 @@ export function createWidgetHandle(args: {
 }): CortexChatWidgetHandle {
   const { options, dom, mountTarget, historyTarget, createClient } = args;
   const historyDom = options.mode === 'embedded' && historyTarget ? createHistoryDom() : null;
-  const historyClient = historyDom && options.controlPlaneUrl
-    ? createHistoryClient({ controlPlaneUrl: options.controlPlaneUrl, apiKey: options.apiKey })
-    : null;
+  let historyClient: ReturnType<typeof createHistoryClient> | null = null;
 
   let client = createClient();
   let controller: ChatController = createChatController({
@@ -147,7 +145,7 @@ export function createWidgetHandle(args: {
   let selectedHistorySessionId: string | null = null;
   let historyMenuSessionId: string | null = null;
   let historyItems: HistoryConversationSummary[] = [];
-  let historyState: 'disabled' | 'loading' | 'loaded' | 'empty' | 'error' = historyClient ? 'loading' : 'disabled';
+  let historyState: 'disabled' | 'loading' | 'loaded' | 'empty' | 'error' = historyDom && options.controlPlaneUrl ? 'loading' : 'disabled';
   let historyErrorMessage = '';
   let liveConnected = false;
   let liveConnectPromise: Promise<void> | null = null;
@@ -251,6 +249,14 @@ export function createWidgetHandle(args: {
   function bindControllerListeners() {
     unsubscribeController = controller.subscribe((nextState: ChatState) => {
       liveChatState = nextState;
+      if (historyDom && !historyClient && nextState.connection.isSessionReady) {
+        const token = client.accessToken ?? null;
+        const cpUrl = client.cpApiUrl ?? options.controlPlaneUrl ?? null;
+        if (token && cpUrl) {
+          historyClient = createHistoryClient({ controlPlaneUrl: cpUrl, bearerToken: token });
+          void refreshHistory();
+        }
+      }
       if (nextState.lastError) {
         internal.error = null;
         internal.isAwaitingAnswer = false;
@@ -813,10 +819,6 @@ export function createWidgetHandle(args: {
       resolveRuntimeError(error, options, internal);
       notifyAndRender();
     });
-  }
-
-  if (historyClient) {
-    void refreshHistory();
   }
 
   return {
