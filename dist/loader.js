@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.7 builtAt=2026-05-16T15:00:04.192Z */
+/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-16T17:02:23.767Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -734,6 +734,12 @@
     get sessionContext() {
       return this._sessionContext;
     }
+    get accessToken() {
+      return this._accessToken;
+    }
+    get cpApiUrl() {
+      return this._cpApiUrl;
+    }
     onMessage(handler) {
       this._messageHandlers.add(handler);
       return () => {
@@ -978,6 +984,15 @@
       if (msg.type === "system::pong" && typeof msg.payload["heartbeat_id"] === "string") {
         this._liveness?.handlePong(msg.payload["heartbeat_id"]);
         return;
+      }
+      if (msg.type === "system::auth" && msg.payload["state"] === "accepted") {
+        const p = msg.payload;
+        if (typeof p["access_token"] === "string" && p["access_token"]) {
+          this._accessToken = p["access_token"];
+        }
+        if (typeof p["refresh_token"] === "string" && p["refresh_token"]) {
+          this._refreshToken = p["refresh_token"];
+        }
       }
       if (msg.type === "system::opened") {
         const sessionContext = extractSessionContext(msg);
