@@ -167,6 +167,9 @@ export function createWidgetHandle(args: {
     viewMode: 'draft',
   };
 
+  let lastTranscriptRenderKey = '';
+  let lastHistoryRenderKey = '';
+
   const domCleanup = new Set<() => void>();
   let unsubscribeController: (() => void) | null = null;
   let unsubscribeRawMessages: (() => void) | null = null;
@@ -181,6 +184,33 @@ export function createWidgetHandle(args: {
       || state.connection.isStale
       || state.connection.sessionState !== EMPTY_CHAT_STATE.connection.sessionState
       || state.connection.channelState !== EMPTY_CHAT_STATE.connection.channelState;
+  }
+
+  function getLiveSessionId(): string | null {
+    return liveChatState.connection.sessionId ?? client.sessionId ?? null;
+  }
+
+  function computeTranscriptKey(state: CortexChatWidgetState): string {
+    const msgs = state.chat.transcript;
+    if (msgs.length === 0) {
+      return `${state.isHistoricalView ? '1' : '0'}:0:`;
+    }
+    const msgSig = msgs.map((m) => {
+      const content = m.content;
+      const cLen = Array.isArray(content)
+        ? (content as string[]).join('').length
+        : String(content ?? '').length;
+      return `${m.id}|${m.type}|${m.status ?? ''}|${String(m.deliveryStatus ?? '')}|${m.ts ?? ''}|${cLen}`;
+    }).join(';');
+    return `${state.isHistoricalView ? '1' : '0'}:${msgs.length}:${msgSig}`;
+  }
+
+  function computeHistoryKey(): string {
+    const liveId = getLiveSessionId() ?? '';
+    const itemsSig = historyItems
+      .map((i) => `${i.session_id}:${i.title}:${i.pinned ? '1' : '0'}`)
+      .join(',');
+    return `${historyState}:${itemsSig}:${selectedHistorySessionId ?? ''}:${historyMenuSessionId ?? ''}:${internal.viewMode}:${liveId}`;
   }
 
   function getDisplayedChatState(): ChatState {
@@ -229,21 +259,33 @@ export function createWidgetHandle(args: {
       selectedSessionId: selectedHistorySessionId,
       menuSessionId: historyMenuSessionId,
       draftSelected: internal.viewMode === 'draft',
-      liveSessionId: liveChatState.connection.sessionId,
+      liveSessionId: getLiveSessionId(),
     });
   }
 
   function notifyAndRender() {
     syncTextareaValue();
     const state = getPublicState();
-    renderWidget(dom, state, options, internal.attachmentsAvailable, internal.isUploading);
+
+    const transcriptKey = computeTranscriptKey(state);
+    const skipTranscript = transcriptKey === lastTranscriptRenderKey;
+    if (!skipTranscript) {
+      lastTranscriptRenderKey = transcriptKey;
+    }
+    renderWidget(dom, state, options, internal.attachmentsAvailable, internal.isUploading, { skipTranscript });
+
     if (historyDom) {
       applyResolvedTheme(historyDom.host, historyDom.root, options.theme, {
         dark: 'cortex-widget-history--dark',
         light: 'cortex-widget-history--light',
       });
+      const historyKey = computeHistoryKey();
+      if (historyKey !== lastHistoryRenderKey) {
+        lastHistoryRenderKey = historyKey;
+        renderHistory();
+      }
     }
-    renderHistory();
+
     options.onStateChange?.(state);
   }
 
@@ -577,7 +619,8 @@ export function createWidgetHandle(args: {
       return;
     }
     // Clicking the current live session must not switch to read-only historical mode.
-    if (sessionId === liveChatState.connection.sessionId) {
+    const liveSessionId = getLiveSessionId();
+    if (sessionId === liveSessionId) {
       selectedHistorySessionId = null;
       historicalTranscript = [];
       historyMenuSessionId = null;

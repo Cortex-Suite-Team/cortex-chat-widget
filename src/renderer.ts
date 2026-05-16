@@ -586,6 +586,7 @@ export function renderWidget(
   options: NormalizedWidgetOptions,
   attachmentsAvailable: boolean,
   isUploading: boolean,
+  opts?: { skipTranscript?: boolean },
 ): void {
   applyResolvedTheme(dom.host, dom.root, options.theme, {
     dark: 'cortex-widget--dark',
@@ -705,5 +706,7 @@ export function renderWidget(
     dom.fileChipRemove.disabled = true;
   }
 
-  renderTranscript(dom.transcript, state, options);
+  if (!opts?.skipTranscript) {
+    renderTranscript(dom.transcript, state, options);
+  }
 }
