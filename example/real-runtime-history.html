@@ -683,6 +683,7 @@
         if (widgetHandle) {
           widgetHandle.destroy();
           widgetHandle = null;
+          window.__cortexWidgetHandle = null;
         }
 
         wasSessionReady = false;
@@ -700,6 +701,7 @@
 
         try {
           widgetHandle = mountCortexChat(buildWidgetOptions(config));
+          window.__cortexWidgetHandle = widgetHandle;
         } catch (error) {
           setStatus("error", "error");
           writeLog("Mount failed.", {
@@ -729,6 +731,7 @@
         if (widgetHandle) {
           widgetHandle.destroy();
           widgetHandle = null;
+          window.__cortexWidgetHandle = null;
         }
         clearConfig();
       });

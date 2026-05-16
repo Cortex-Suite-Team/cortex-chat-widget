@@ -50,7 +50,27 @@ export function renderHistoryList(dom: HistoryDom, state: HistoryRenderState): v
   draftRow.appendChild(draftTitle);
   dom.list.appendChild(draftRow);
 
-  for (const item of state.items) {
+  if (state.liveSessionId) {
+    const currentRow = document.createElement('button');
+    currentRow.type = 'button';
+    currentRow.className = 'cortex-widget-history__row';
+    currentRow.dataset.sessionId = state.liveSessionId;
+    currentRow.dataset.liveCurrent = 'true';
+    currentRow.dataset.active = String(!state.draftSelected && state.selectedSessionId === null);
+    currentRow.setAttribute('data-testid', 'history-current-row');
+
+    const currentTitle = document.createElement('span');
+    currentTitle.className = 'cortex-widget-history__row-title';
+    currentTitle.textContent = 'Current chat';
+    currentRow.appendChild(currentTitle);
+    dom.list.appendChild(currentRow);
+  }
+
+  const filteredItems = state.liveSessionId
+    ? state.items.filter((item) => item.session_id !== state.liveSessionId)
+    : state.items;
+
+  for (const item of filteredItems) {
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'cortex-widget-history__row';

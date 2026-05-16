@@ -323,7 +323,7 @@ describe('live session selection', () => {
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();
-    const liveRow = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    const liveRow = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
     expect(liveRow.dataset.sessionId).toBe('sess_mock');
     liveRow.click();
     await flushAsyncWork();
@@ -357,7 +357,7 @@ describe('live session selection', () => {
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();
-    const liveRow = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    const liveRow = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
     liveRow.click();
     await flushAsyncWork();
 
@@ -387,7 +387,7 @@ describe('live session selection', () => {
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();
-    const liveRow = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    const liveRow = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
     liveRow.click();
     await flushAsyncWork();
 
@@ -419,7 +419,7 @@ describe('live session selection', () => {
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();
-    const liveRow = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    const liveRow = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
     liveRow.click();
     await flushAsyncWork();
 
@@ -459,9 +459,9 @@ describe('live session selection', () => {
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();
-    const rows = historyShadow.querySelectorAll('[data-testid="history-row"]') as NodeListOf<HTMLButtonElement>;
-    const oldRow = Array.from(rows).find((r) => r.dataset.sessionId === 'sess_old')!;
-    const liveRow = Array.from(rows).find((r) => r.dataset.sessionId === 'sess_mock')!;
+    const oldRow = historyShadow.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    expect(oldRow.dataset.sessionId).toBe('sess_old');
+    const liveRow = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
 
     // Go to historical
     oldRow.click();
@@ -472,8 +472,7 @@ describe('live session selection', () => {
     expect(textarea.disabled).toBe(true);
 
     // Re-query after history re-render (viewMode change invalidates history key → replaceChildren)
-    const liveRowAfter = Array.from(historyShadow.querySelectorAll('[data-testid="history-row"]') as NodeListOf<HTMLButtonElement>)
-      .find((r) => r.dataset.sessionId === 'sess_mock')!;
+    const liveRowAfter = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
 
     // Go back to live
     liveRowAfter.click();

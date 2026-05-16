@@ -241,6 +241,7 @@ export function createWidgetHandle(args: {
     if (!historyDom) {
       return;
     }
+    const liveSessionId = getLiveSessionId();
     if (historyState === 'loading') {
       renderHistoryList(historyDom, { kind: 'loading' });
       return;
@@ -250,7 +251,19 @@ export function createWidgetHandle(args: {
       return;
     }
     if (historyState === 'empty') {
-      renderHistoryList(historyDom, { kind: 'empty' });
+      if (liveSessionId) {
+        // Render loaded state with empty items so Current Chat row still appears
+        renderHistoryList(historyDom, {
+          kind: 'loaded',
+          items: [],
+          selectedSessionId: selectedHistorySessionId,
+          menuSessionId: historyMenuSessionId,
+          draftSelected: internal.viewMode === 'draft',
+          liveSessionId,
+        });
+      } else {
+        renderHistoryList(historyDom, { kind: 'empty' });
+      }
       return;
     }
     renderHistoryList(historyDom, {
@@ -259,7 +272,7 @@ export function createWidgetHandle(args: {
       selectedSessionId: selectedHistorySessionId,
       menuSessionId: historyMenuSessionId,
       draftSelected: internal.viewMode === 'draft',
-      liveSessionId: getLiveSessionId(),
+      liveSessionId,
     });
   }
 
