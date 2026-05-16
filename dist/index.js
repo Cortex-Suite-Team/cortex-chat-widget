@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.8 builtAt=2026-05-16T18:48:34.526Z */
+/* cortex-chat-widget build: sdk=1.1.8 builtAt=2026-05-16T19:04:26.184Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -11567,7 +11567,7 @@ function createWidgetHandle(args) {
     return state.transcript.length > 0 || state.activeQuestion !== null || state.escalation !== null || state.lastError !== null || state.workerState.state !== "idle" || state.connection.isConnected || state.connection.isStale || state.connection.sessionState !== EMPTY_CHAT_STATE.connection.sessionState || state.connection.channelState !== EMPTY_CHAT_STATE.connection.channelState;
   }
   function getLiveSessionId() {
-    return liveChatState.connection.sessionId ?? client.sessionId ?? null;
+    return liveChatState.connection.sessionId;
   }
   function computeTranscriptKey(state) {
     const msgs = state.chat.transcript;
@@ -11954,7 +11954,7 @@ function createWidgetHandle(args) {
       selectedHistorySessionId = null;
       historicalTranscript = [];
       historyMenuSessionId = null;
-      internal.viewMode = liveChatState.transcript.length > 0 ? "live" : "draft";
+      internal.viewMode = "live";
       notifyAndRender();
       return;
     }
