@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.6 builtAt=2026-05-15T20:03:00.520Z */
+/* cortex-chat-widget build: sdk=1.1.7 builtAt=2026-05-16T08:15:05.416Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -551,6 +551,17 @@ function createSession(callbacks) {
     sendChatMessage(content, attachments, meta) {
       return send(buildEnvelope("chat::message", buildMessagePayload(content, attachments, meta)));
     },
+    sendSystemLogin(login, password) {
+      const envelope = {
+        type: "system::login",
+        schema: SCHEMA_VERSION,
+        payload: { login, password },
+        ts: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      if (_tenantId)
+        envelope["tenant_id"] = _tenantId;
+      return send(envelope);
+    },
     sendEscalationReply(escalationId, waitToken, action, content, meta) {
       return send(buildEnvelope("escalation::reply", buildEscalationReplyPayload(escalationId, waitToken, action, content, meta)));
     },
@@ -588,7 +599,7 @@ function createSession(callbacks) {
           if (!TERMINAL_STATES.has(_sessionState)) {
             _sessionState = "ACTIVE";
           }
-        } else if (msg.type !== "system::error") {
+        } else if (msg.type !== "system::error" && msg.type !== "system::auth") {
           callbacks.onFatalError(makeError("transport_protocol_violation", `Received ${msg.type} before system::opened`));
           return;
         }
@@ -668,6 +679,7 @@ var CortexClient = class {
     this._sessionMeta = null;
     this._sessionContext = null;
     this._bootstrapMeta = null;
+    this._authRequired = false;
     this._channelId = `ch_${Math.random().toString(36).slice(2, 10)}`;
     this._reconnectAttempt = 0;
     this._disconnectRequested = false;
@@ -752,6 +764,9 @@ var CortexClient = class {
     this._requireActiveSessionId();
     await this._session.sendChatMessage(options.content, options.attachments, options.meta);
     debugLog(this._debugEnabled, "[sdk] CortexClient.sendMessage done");
+  }
+  async sendLogin(credentials) {
+    await this._session.sendSystemLogin(credentials.login, credentials.password);
   }
   setDebugLoggingEnabled(enabled) {
     this._debugEnabled = enabled || readSdkDebugFlag();
@@ -843,12 +858,21 @@ var CortexClient = class {
     this._runtimeHttpBaseUrl = deriveRuntimeHttpBaseUrl(authResponse.ws_url);
     this._runtimeHttpBaseUrl = deriveRuntimeHttpBaseUrlFromHttpUrl(this._platform.uploadUrl) ?? this._runtimeHttpBaseUrl;
     this._cpApiUrl = normalizeOptionalBaseUrl(authResponse.cp_api_url);
-    this._bootstrapMeta = asRecord(asRecord(authResponse.runtime_bootstrap?.trigger_payload)?.meta);
+    if (authResponse.auth_required === true) {
+      this._authRequired = true;
+      await this._openChannel();
+      this._session.setTransport(this._transport, this._options.sendTimeout);
+      this._startLiveness();
+      this._scheduleTokenRefresh();
+      return;
+    }
+    const normalResponse = authResponse;
+    this._bootstrapMeta = asRecord(asRecord(normalResponse.runtime_bootstrap?.trigger_payload)?.meta);
     this._sessionMeta = this._bootstrapMeta;
     await this._openChannel();
     this._session.setTransport(this._transport, this._options.sendTimeout);
     const openWaiter = this._createSessionOpenWaiter();
-    await this._session.sendInit(authResponse.runtime_bootstrap);
+    await this._session.sendInit(normalResponse.runtime_bootstrap);
     await openWaiter;
     this._startLiveness();
     this._scheduleTokenRefresh();
@@ -922,6 +946,12 @@ var CortexClient = class {
     if (this._suppressNextReconnect) {
       this._suppressNextReconnect = false;
       this._channelState = "CLOSED";
+      return;
+    }
+    if (this._authRequired && !this._session.sessionId) {
+      this._authRequired = false;
+      this._channelState = "CLOSED";
+      this._stopBackgroundActivity();
       return;
     }
     if (this._sessionOpenWaiter) {
@@ -1107,6 +1137,7 @@ var CortexClient = class {
     this._sessionContext = null;
     this._sessionMeta = null;
     this._bootstrapMeta = null;
+    this._authRequired = false;
   }
   _resetConnectionRuntimeState() {
     this._resetSessionRuntimeState();
