@@ -244,7 +244,10 @@ describe('widget history', () => {
     await flushAsyncWork();
     await flushAsyncWork();
 
-    expect(historyShadow.textContent).toContain('No chats yet');
+    // After deleting the only history item, the Current Chat row remains visible
+    // (live session still exists), so "No chats yet" is not shown.
+    expect(historyShadow.querySelectorAll('[data-testid="history-row"]')).toHaveLength(0);
+    expect(historyShadow.querySelector('[data-testid="history-current-row"]')).not.toBeNull();
   });
 
   it('syncs dark theme classes to history shadow root when theme background is dark', async () => {
