@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-17T10:11:25.941Z */
+/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-17T10:30:26.201Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -1406,6 +1406,12 @@
     "arrow-clockwise": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>`,
     "plus-lg": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 2.5a.5.5 0 0 1 .5.5v4.5H13a.5.5 0 0 1 0 1H8.5V13a.5.5 0 0 1-1 0V8.5H3a.5.5 0 0 1 0-1h4.5V3a.5.5 0 0 1 .5-.5"/></svg>`,
     "three-dots": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M3 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3m5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3m5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/></svg>`,
+    "pin": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.146.146A.5.5 0 0 1 4.5 0h7a.5.5 0 0 1 .5.5c0 .68-.342 1.174-.646 1.479-.126.125-.25.224-.354.298v4.431l.078.048c.203.127.476.314.751.555C12.36 7.775 13 8.527 13 9.5a.5.5 0 0 1-.5.5h-4v4.5c0 .276-.224 1.5-.5 1.5s-.5-1.224-.5-1.5V10h-4a.5.5 0 0 1-.5-.5c0-.973.64-1.725 1.17-2.189.276-.24.548-.428.752-.555L5 6.708V2.277a3 3 0 0 1-.354-.298C4.342 1.674 4 1.179 4 .5a.5.5 0 0 1 .146-.354M5.08 1c.07.162.186.329.334.477.17.17.37.294.586.365V7.3l-.318.16a3 3 0 0 0-.852.577c-.247.216-.505.504-.667.858h7.674c-.162-.354-.42-.642-.667-.858a3 3 0 0 0-.852-.578L10 7.3V1.842a1.8 1.8 0 0 0 .586-.365c.148-.148.264-.315.334-.477z"/></svg>`,
+    "pin-fill": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.146.146A.5.5 0 0 1 4.5 0h7a.5.5 0 0 1 .5.5c0 .68-.342 1.174-.646 1.479-.126.125-.25.224-.354.298v4.431l.078.048c.203.127.476.314.751.555C12.36 7.775 13 8.527 13 9.5a.5.5 0 0 1-.5.5h-4v4.5c0 .276-.224 1.5-.5 1.5s-.5-1.224-.5-1.5V10h-4a.5.5 0 0 1-.5-.5c0-.973.64-1.725 1.17-2.189.276-.24.548-.428.752-.555L5 6.708V2.277a3 3 0 0 1-.354-.298C4.342 1.674 4 1.179 4 .5a.5.5 0 0 1 .146-.354"/></svg>`,
+    "pin-angle": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M9.828.722a.5.5 0 0 1 .354.146l4.95 4.95a.5.5 0 0 1 0 .707c-.48.48-1.072.588-1.503.588-.177 0-.335-.018-.46-.039l-3.134 3.134a3 3 0 0 1 .04.46c0 .43-.108 1.022-.589 1.503a.5.5 0 0 1-.707 0l-2.829-2.828-3.182 3.182c-.195.195-1.219.536-1.414.34s.145-1.218.34-1.413l3.182-3.182-2.828-2.829a.5.5 0 0 1 0-.707c.48-.48 1.072-.588 1.503-.588.177 0 .335.018.46.039L7.145 1.05a3 3 0 0 1-.04-.46c0-.43.108-1.022.588-1.503a.5.5 0 0 1 .707 0l4.95 4.95a.5.5 0 0 1 .146.354m-3.182 6.01.707.707L4.172 10.62a.5.5 0 0 0-.354.146l-.178.178a1.6 1.6 0 0 0-.35.556l6.01-6.01a1.6 1.6 0 0 0-.556.35l-.178.178a.5.5 0 0 0-.146.354"/></svg>`,
+    "pin-angle-fill": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M9.828.722a.5.5 0 0 1 .354.146l4.95 4.95a.5.5 0 0 1 0 .707c-.48.48-1.072.588-1.503.588-.177 0-.335-.018-.46-.039l-3.134 3.134a3 3 0 0 1 .04.46c0 .43-.108 1.022-.589 1.503a.5.5 0 0 1-.707 0L6.646 10.04l-3.182 3.182c-.195.195-1.219.536-1.414.34s.145-1.218.34-1.413l3.182-3.182-2.121-2.122a.5.5 0 0 1 0-.707c.48-.48 1.072-.588 1.503-.588.177 0 .335.018.46.039L8.548 2.456a3 3 0 0 1-.04-.46c0-.43.108-1.022.588-1.503a.5.5 0 0 1 .707 0"/></svg>`,
+    "pencil-square": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706l-1 1a.5.5 0 0 1-.707 0l-2.121-2.121a.5.5 0 0 1 0-.707l1-1a.5.5 0 0 1 .707 0zm-1.75 2.456-2.121-2.121L4.939 8.967a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12zm-2.828 2.828L8.354 4.646l-1.414 1.414 2.57 2.57z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/></svg>`,
+    "trash": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1 0-2H5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1h2.5a1 1 0 0 1 1 1M4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>`,
     "check": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"/></svg>`,
     "check2": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0"/></svg>`,
     "check2-all": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check2-all" viewBox="0 0 16 16"><path d="M12.354 4.354a.5.5 0 0 0-.708-.708L5 10.293 1.854 7.146a.5.5 0 1 0-.708.708l3.5 3.5a.5.5 0 0 0 .708 0zm-4.208 7-.896-.897.707-.707.543.543 6.646-6.647a.5.5 0 0 1 .708.708l-7 7a.5.5 0 0 1-.708 0"/><path d="m5.354 7.146.896.897-.707.707-.897-.896a.5.5 0 1 1 .708-.708"/></svg>`
@@ -1617,12 +1623,36 @@
   background: color-mix(in srgb, var(--cortex-accent-color) 10%, var(--cortex-background-color) 90%);
 }
 
+.cortex-widget-history__row[data-pinned="true"] {
+  border-color: color-mix(in srgb, var(--cortex-accent-color) 16%, transparent);
+}
+
 .cortex-widget-history__row-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cortex-widget-history__row-pin {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cortex-accent-color);
+  opacity: 0.9;
+}
+
+.cortex-widget-history__row-pin:empty {
+  display: none;
+}
+
+.cortex-widget-history__row-pin svg {
+  width: 14px;
+  height: 14px;
 }
 
 .cortex-widget-history__menu-toggle {
@@ -1674,6 +1704,23 @@
   text-align: left;
   padding: 8px 10px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cortex-widget-history__menu-action-icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cortex-muted-text);
+}
+
+.cortex-widget-history__menu-action-label {
+  min-width: 0;
 }
 
 .cortex-widget-history__menu-action:hover {
@@ -10767,11 +10814,19 @@
       row.dataset.sessionId = item.session_id;
       row.dataset.active = String(state.selectedHistoricalSessionId === item.session_id);
       row.dataset.menuOpen = String(state.menuSessionId === item.session_id);
+      row.dataset.pinned = String(item.pinned);
       row.setAttribute("data-testid", "history-row");
       const title = document.createElement("span");
       title.className = "cortex-widget-history__row-title";
       title.textContent = item.title;
       title.setAttribute("data-testid", "history-row-title");
+      const pinIndicator = document.createElement("span");
+      pinIndicator.className = "cortex-widget-history__row-pin";
+      pinIndicator.setAttribute("aria-hidden", "true");
+      if (item.pinned) {
+        pinIndicator.innerHTML = getIconSvg("pin-angle-fill");
+        pinIndicator.setAttribute("data-testid", "history-pinned-icon");
+      }
       const menuToggle = document.createElement("button");
       menuToggle.type = "button";
       menuToggle.className = "cortex-widget-history__menu-toggle";
@@ -10782,22 +10837,110 @@
       const menu = document.createElement("div");
       menu.className = "cortex-widget-history__menu";
       menu.setAttribute("data-testid", "history-menu");
-      for (const action of ["Pin", "Rename", "Delete"]) {
+      const actions = [
+        {
+          action: "pin",
+          label: item.pinned ? "Unpin" : "Pin",
+          icon: item.pinned ? "pin-angle" : "pin-angle-fill"
+        },
+        { action: "rename", label: "Rename", icon: "pencil-square" },
+        { action: "delete", label: "Delete", icon: "trash" }
+      ];
+      for (const action of actions) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "cortex-widget-history__menu-action";
         button.dataset.sessionId = item.session_id;
-        button.dataset.action = action.toLowerCase();
-        button.textContent = action;
+        button.dataset.action = action.action;
+        const icon = document.createElement("span");
+        icon.className = "cortex-widget-history__menu-action-icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.setAttribute("data-testid", "history-menu-action-icon");
+        icon.innerHTML = getIconSvg(action.icon);
+        const label = document.createElement("span");
+        label.className = "cortex-widget-history__menu-action-label";
+        label.textContent = action.label;
+        button.append(icon, label);
         menu.appendChild(button);
       }
-      row.append(title, menuToggle, menu);
+      row.append(title, pinIndicator, menuToggle, menu);
       dom.list.appendChild(row);
     }
     dom.list.scrollTop = savedScroll;
   }
 
   // src/history-controller.ts
+  var HISTORY_PIN_STORAGE_KEY = "cortex-chat-widget:history-pins:v1";
+  var HistoryPinStore = class {
+    constructor(storage, key) {
+      this.memoryPins = {};
+      this.storage = storage;
+      this.key = key;
+      this.memoryPins = this.readPins();
+    }
+    isPinned(sessionId) {
+      return this.memoryPins[sessionId] === true;
+    }
+    setPinned(sessionId, pinned) {
+      if (!sessionId) {
+        return;
+      }
+      if (pinned) {
+        this.memoryPins[sessionId] = true;
+      } else {
+        delete this.memoryPins[sessionId];
+      }
+      this.writePins();
+    }
+    toggle(sessionId) {
+      const nextPinned = !this.isPinned(sessionId);
+      this.setPinned(sessionId, nextPinned);
+      return nextPinned;
+    }
+    snapshot() {
+      return { ...this.memoryPins };
+    }
+    readPins() {
+      if (!this.storage) {
+        return {};
+      }
+      try {
+        const raw = this.storage.getItem(this.key);
+        if (!raw) {
+          return {};
+        }
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          return {};
+        }
+        const pins = {};
+        for (const [sessionId, value] of Object.entries(parsed)) {
+          if (value === true) {
+            pins[sessionId] = true;
+          }
+        }
+        return pins;
+      } catch {
+        return {};
+      }
+    }
+    writePins() {
+      if (!this.storage) {
+        return;
+      }
+      try {
+        this.storage.setItem(this.key, JSON.stringify(this.memoryPins));
+      } catch {
+      }
+    }
+  };
+  function getLocalStorage() {
+    try {
+      return globalThis.localStorage ?? null;
+    } catch {
+      return null;
+    }
+  }
   var HistoryController = class {
     constructor(args) {
       this.client = null;
@@ -10824,6 +10967,7 @@
       this.options = args.options;
       this.callbacks = args.callbacks;
       this.debug = args.debug;
+      this.pinStore = args.pinStore ?? new HistoryPinStore(getLocalStorage(), HISTORY_PIN_STORAGE_KEY);
     }
     mount() {
       if (this.mounted || this.destroyed) {
@@ -10950,7 +11094,7 @@
       }
       renderHistoryList(this.dom, {
         kind: "loaded",
-        items: this.state.items,
+        items: this.getRenderItems(),
         liveSessionId: this.state.liveSessionId,
         liveSelected,
         selectedHistoricalSessionId: this.state.selection.kind === "historical" ? this.state.selection.sessionId : null,
@@ -11055,13 +11199,8 @@
           }
           await this.refresh();
         } else if (action === "pin") {
-          const current = this.state.items.find((item) => item.session_id === sessionId);
-          if (current?.pinned) {
-            await this.client.unpinConversation(sessionId);
-          } else {
-            await this.client.pinConversation(sessionId);
-          }
-          await this.refresh();
+          this.pinStore.toggle(sessionId);
+          this.render();
         }
       } catch (error2) {
         this.callbacks.onError(error2, `history_${action || "action"}_failed`, "Chat update failed");
@@ -11069,7 +11208,7 @@
       }
     }
     computeRenderKey() {
-      const itemsSig = this.state.items.map((item) => `${item.session_id}:${item.title}:${item.pinned ? "1" : "0"}`).join(",");
+      const itemsSig = this.getRenderItems().map((item) => `${item.session_id}:${item.title}:${item.pinned ? "1" : "0"}`).join(",");
       const selectionSig = this.state.selection.kind === "historical" ? `historical:${this.state.selection.sessionId}` : this.state.selection.kind;
       return [
         this.state.status,
@@ -11078,8 +11217,25 @@
         this.state.menuSessionId ?? "",
         this.state.errorMessage ?? "",
         itemsSig,
+        Object.keys(this.pinStore.snapshot()).sort().join(","),
         this.options.mode
       ].join("|");
+    }
+    getRenderItems() {
+      const derived = this.state.items.map((item) => ({
+        ...item,
+        pinned: this.pinStore.isPinned(item.session_id)
+      }));
+      const pinned = [];
+      const unpinned = [];
+      for (const item of derived) {
+        if (item.pinned) {
+          pinned.push(item);
+        } else {
+          unpinned.push(item);
+        }
+      }
+      return [...pinned, ...unpinned];
     }
   };
 

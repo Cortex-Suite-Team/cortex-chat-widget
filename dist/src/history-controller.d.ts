@@ -7,6 +7,18 @@ export interface HistoryControllerCallbacks {
     onStartNewChat(): Promise<void>;
     onError(error: unknown, code: string, message: string): void;
 }
+export declare class HistoryPinStore {
+    private readonly storage;
+    private readonly key;
+    private memoryPins;
+    constructor(storage: Storage | null, key: string);
+    isPinned(sessionId: string): boolean;
+    setPinned(sessionId: string, pinned: boolean): void;
+    toggle(sessionId: string): boolean;
+    snapshot(): Record<string, true>;
+    private readPins;
+    private writePins;
+}
 export declare class HistoryController {
     private readonly dom;
     private readonly options;
@@ -18,6 +30,7 @@ export declare class HistoryController {
     private lastRenderKey;
     private refreshGeneration;
     private messagesGeneration;
+    private readonly pinStore;
     private readonly state;
     private readonly onNewChatClick;
     private readonly onListClick;
@@ -26,6 +39,7 @@ export declare class HistoryController {
         options: NormalizedWidgetOptions;
         callbacks: HistoryControllerCallbacks;
         debug?: DebugLogger;
+        pinStore?: HistoryPinStore;
     });
     mount(): void;
     destroy(): void;
@@ -38,5 +52,6 @@ export declare class HistoryController {
     private openHistorical;
     private handleMenuAction;
     private computeRenderKey;
+    private getRenderItems;
 }
 //# sourceMappingURL=history-controller.d.ts.map
