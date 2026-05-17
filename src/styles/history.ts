@@ -41,10 +41,10 @@ export const historyStyles = `
 
 .cortex-widget-history__search {
   border: 1px dashed rgba(226, 232, 240, 0.18);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: 8px;
+  padding: 7px 9px;
   color: var(--cortex-muted-text);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .cortex-widget-history__new-chat {
