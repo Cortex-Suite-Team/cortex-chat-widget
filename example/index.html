@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cortex Chat Widget Mock Example</title>
+    <title>Cortex Chat Widget Examples</title>
     <style>
       :root {
         color-scheme: light;
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         background:
-          radial-gradient(circle at top, rgba(14, 165, 233, 0.14), transparent 34%),
+          radial-gradient(circle at top left, rgba(14, 165, 233, 0.14), transparent 34%),
           linear-gradient(180deg, #f8fbff 0%, #eef4f8 100%);
         color: #163045;
       }
@@ -19,19 +19,20 @@
       }
 
       body {
-        margin: 0;
         min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
       }
 
       main {
-        width: min(100%, 1120px);
-        margin: 0 auto;
-        padding: 48px 24px 72px;
-      }
-
-      .intro {
-        max-width: 760px;
-        margin-bottom: 28px;
+        width: min(100%, 720px);
+        padding: 28px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 20px 48px rgba(15, 23, 42, 0.09);
       }
 
       .eyebrow {
@@ -47,114 +48,61 @@
       }
 
       h1 {
-        margin: 14px 0 12px;
-        font-size: clamp(2rem, 5vw, 3.5rem);
+        margin: 14px 0 10px;
+        font-size: clamp(2rem, 5vw, 3rem);
         line-height: 1.05;
       }
 
       p {
-        margin: 0 0 12px;
+        margin: 0;
+        color: #587084;
         line-height: 1.6;
       }
 
-      .layout {
+      nav {
         display: grid;
-        grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
-        gap: 24px;
-        align-items: start;
+        gap: 12px;
+        margin-top: 24px;
       }
 
-      .card {
-        background: rgba(255, 255, 255, 0.88);
+      a {
+        display: block;
+        padding: 16px 18px;
         border: 1px solid rgba(148, 163, 184, 0.28);
-        border-radius: 24px;
-        box-shadow: 0 22px 54px rgba(15, 23, 42, 0.1);
-        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        background: #ffffff;
+        color: #075985;
+        text-decoration: none;
+        font-weight: 700;
       }
 
-      .notes {
-        padding: 24px;
-      }
-
-      .notes h2 {
-        margin: 0 0 14px;
-        font-size: 1.15rem;
-      }
-
-      .notes ul {
-        margin: 0;
-        padding-left: 20px;
-        line-height: 1.7;
-      }
-
-      .widget-shell {
-        padding: 18px;
-      }
-
-      #chat-root {
-        min-height: 640px;
-      }
-
-      code {
-        font-family: Consolas, "Courier New", monospace;
-        font-size: 0.95em;
-      }
-
-      @media (max-width: 900px) {
-        .layout {
-          grid-template-columns: 1fr;
-        }
-
-        main {
-          padding: 32px 16px 48px;
-        }
+      a span {
+        display: block;
+        margin-top: 4px;
+        color: #64748b;
+        font-size: 0.92rem;
+        font-weight: 400;
       }
     </style>
   </head>
   <body>
     <main>
-      <section class="intro">
-        <span class="eyebrow">Mock Example</span>
-        <h1>Cortex Chat Widget</h1>
-        <p>
-          This page mounts the real widget bundle from the GitHub-hosted repository build and wires
-          it to a mock client instead of a live Runtime.
-        </p>
-        <p>
-          No real API key, Control Plane, Runtime, or Digital Worker is required. Text replies,
-          typing state, and attachment uploads are simulated in-browser.
-        </p>
-      </section>
+      <span class="eyebrow">Runtime Examples</span>
+      <h1>Cortex Chat Widget</h1>
+      <p>
+        Use these pages to smoke-test the built widget bundle against the live Control Plane flow.
+      </p>
 
-      <section class="layout">
-        <aside class="card notes">
-          <h2>What to try</h2>
-          <ul>
-            <li>Send a message and watch the partial response stream into a final answer.</li>
-            <li>Attach one file to exercise the mocked <code>uploadAttachment()</code> path.</li>
-            <li>Refresh the page and rerun the demo without any backend setup.</li>
-          </ul>
-        </aside>
-
-        <section class="card widget-shell">
-          <div id="chat-root" aria-label="Embedded Cortex Chat Widget example"></div>
-        </section>
-      </section>
+      <nav aria-label="Cortex Chat Widget examples">
+        <a href="./real-runtime.html">
+          Chat only
+          <span>Rail + chat shell. No historyTarget is passed.</span>
+        </a>
+        <a href="./real-runtime-history.html">
+          Chat with integrated history
+          <span>History is rendered inside the widget shell after system::opened.</span>
+        </a>
+      </nav>
     </main>
-
-    <script type="module">
-      //import { mountCortexChat } from "https://cdn.jsdelivr.net/gh/Cortex-Suite-Team/cortex-chat-widget@main/dist/index.js";
-      //import { createMockCortexClient } from "https://cdn.jsdelivr.net/gh/Cortex-Suite-Team/cortex-chat-widget@main/example/mock-client.js";
-      import { mountCortexChat } from "../dist/index.js";
-      import { createMockCortexClient } from "./mock-client.js";
-
-      mountCortexChat("#chat-root", {
-        apiKey: "mock-api-key",
-        mode: "embedded",
-        title: "Cortex Chat Widget",
-        subtitle: "Mock Digital Worker",
-        client: createMockCortexClient()
-      });
-    </script>
   </body>
 </html>

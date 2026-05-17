@@ -40,7 +40,7 @@
       }
 
       main {
-        width: min(100%, 1460px);
+        width: min(100%, 1180px);
         min-height: 100%;
         margin: 0 auto;
         padding: 28px 24px;
@@ -89,12 +89,11 @@
         backdrop-filter: blur(10px);
       }
 
-      /* Three-column workbench: config | history | chat */
       .workbench {
         flex: 1 1 auto;
         min-height: 0;
         display: grid;
-        grid-template-columns: minmax(260px, 300px) minmax(260px, 340px) minmax(380px, 1fr);
+        grid-template-columns: minmax(280px, 340px) minmax(420px, 1fr);
         gap: 18px;
         align-items: stretch;
         height: min(760px, calc(100vh - 180px));
@@ -272,45 +271,10 @@
         white-space: pre-wrap;
       }
 
-      /* History gate notice */
-      .history-gate-notice {
-        margin: 0 0 12px;
-        padding: 10px 14px;
-        border-radius: 12px;
-        background: rgba(14, 165, 233, 0.08);
-        border: 1px solid rgba(14, 165, 233, 0.22);
-        color: #0369a1;
-        font-size: 0.85rem;
-        line-height: 1.5;
-      }
-
-      .history-panel-body {
-        padding: 14px 0 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-      }
-
-      .history-gate-notice-wrap {
-        padding: 0 14px;
-      }
-
       .chat-panel,
-      #chat-root,
-      #history-root {
+      #chat-root {
         min-height: 0;
         height: 100%;
-      }
-
-      /* history-root fills its panel body */
-      .history-panel .panel-body {
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-      }
-
-      .history-notice-inner {
-        padding: 14px 14px 0;
       }
 
       @media (max-width: 1180px) {
@@ -326,11 +290,6 @@
 
         .config-panel {
           min-height: 320px;
-        }
-
-        .history-panel {
-          height: min(480px, 60vh);
-          min-height: 340px;
         }
 
         .chat-panel {
@@ -351,6 +310,7 @@
             <code>system::opened</code> fires, and the widget creates a history client
             using the runtime Bearer token. History API calls use
             <code>Authorization: Bearer &lt;token&gt;</code>, never <code>ApiKey</code>.
+            History is rendered inside the widget shell after <code>system::opened</code>.
           </p>
         </div>
       </section>
@@ -434,39 +394,21 @@
           </div>
         </aside>
 
-        <!-- Middle: history -->
-        <section class="card panel history-panel">
-          <div class="panel-header">
-            <h2>History</h2>
-            <p>Populated only after <code>system::opened</code>.</p>
-          </div>
-          <div class="panel-body">
-            <div class="history-notice-inner">
-              <p class="history-gate-notice">
-                History loads only after <code>system::opened</code>.<br>
-                Before that, no <code>/api/chat/conversations/</code> request is made.<br>
-                For <code>login_required</code> projects: history fires only after successful login.
-              </p>
-            </div>
-            <div
-              id="history-root"
-              style="flex: 1 1 auto; min-height: 0;"
-              aria-label="Cortex Chat history panel"
-            ></div>
-          </div>
-        </section>
-
-        <!-- Right: chat -->
+        <!-- Right: integrated widget shell -->
         <section class="card panel chat-panel">
           <div class="panel-header">
-            <h2>Live Chat</h2>
-            <p>After first message, check debug log for Bearer history request.</p>
+            <h2>Live Chat + Integrated History</h2>
+            <p>
+              The widget shell owns the History column. Before <code>system::opened</code>,
+              no <code>/api/chat/conversations/</code> request is made.
+            </p>
           </div>
           <div
             id="chat-root"
             style="height: 100%;"
             aria-label="Embedded Cortex Chat Widget"
           ></div>
+          <div id="history-root" hidden></div>
         </section>
       </section>
     </main>
@@ -692,10 +634,10 @@
 
         setStatus("mounting");
         saveConfig(config);
-        writeLog("Mounting widget with history panel.", {
+        writeLog("Mounting widget with integrated history.", {
           workerRef: config.workerRef,
           controlPlaneUrl: config.controlPlaneUrl,
-          historyTarget: "#history-root",
+          historyTarget: "#history-root (hidden enabling hook)",
           hasApiKey: true
         });
 
