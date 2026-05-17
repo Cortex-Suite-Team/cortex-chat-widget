@@ -160,7 +160,14 @@ describe('history stability', () => {
     const items = [
       { session_id: 's1', title: 'Scroll Test', renamed: false, pinned: false, last_message_at: '2026-01-01T00:00:00Z', created_at: '2026-01-01T00:00:00Z' },
     ];
-    const state = { kind: 'loaded' as const, items, selectedSessionId: null, menuSessionId: null, draftSelected: true };
+    const state = {
+      kind: 'loaded' as const,
+      items,
+      liveSessionId: null,
+      liveSelected: false,
+      selectedHistoricalSessionId: null,
+      menuSessionId: null,
+    };
 
     // Initial render
     renderHistoryList(dom, state);
@@ -257,16 +264,14 @@ describe('Current Chat row', () => {
     // Visible despite empty history
     const currentRow = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
     expect(currentRow).not.toBeNull();
-    expect(currentRow.dataset.active).toBe('false'); // still draft mode initially
+    expect(currentRow.dataset.active).toBe('true');
 
-    // Click Current Chat row → viewMode becomes 'live'
     currentRow.click();
     await flushAsyncWork();
 
     const updatedCurrentRow = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
     expect(updatedCurrentRow.dataset.active).toBe('true');
-    const draftRow = historyShadow.querySelector('[data-testid="history-draft-row"]') as HTMLButtonElement;
-    expect(draftRow.dataset.active).toBe('false');
+    expect(historyShadow.querySelector('[data-testid="history-draft-row"]')).toBeNull();
   });
 
   it('duplicate history item with same session_id as live is not rendered twice', async () => {
@@ -357,7 +362,7 @@ describe('Current Chat row', () => {
     expect(chatShadow.querySelector('[data-testid="transcript"]')!.textContent).toContain('Old answer');
   });
 
-  it('header New Chat button currently sets draft mode independently of Current Chat row', async () => {
+  it('header New Chat button starts a fresh live chat and keeps Current Chat selected', async () => {
     installTargets();
     getFetchMock().mockResolvedValueOnce(mockJson({ ok: true, data: { conversations: [] } }));
 
@@ -373,20 +378,22 @@ describe('Current Chat row', () => {
     await flushAsyncWork();
     expect(historyShadow.querySelector('[data-testid="history-current-row"]')!.getAttribute('data-active')).toBe('true');
 
-    // Then click New Chat button in header
+    const firstController = __getLastController()!;
+
     const newChatBtn = historyShadow.querySelector('[data-testid="history-new-chat"]') as HTMLButtonElement;
     newChatBtn.click();
     await flushAsyncWork();
 
-    const draftRow = historyShadow.querySelector('[data-testid="history-draft-row"]') as HTMLButtonElement;
-    expect(draftRow.dataset.active).toBe('true');
-    expect(historyShadow.querySelector('[data-testid="history-current-row"]')!.getAttribute('data-active')).toBe('false');
+    expect(firstController.destroyCalls).toBe(1);
+    expect(__getLastController()).not.toBe(firstController);
+    expect(historyShadow.querySelector('[data-testid="history-draft-row"]')).toBeNull();
+    expect(historyShadow.querySelector('[data-testid="history-current-row"]')!.getAttribute('data-active')).toBe('true');
 
     const textarea = getChatShadow().querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(false);
   });
 
-  it('legacy scrollable draft row currently sets draft mode independently of Current Chat row', async () => {
+  it('does not render legacy scrollable draft row', async () => {
     installTargets();
     getFetchMock().mockResolvedValueOnce(mockJson({ ok: true, data: { conversations: [] } }));
 
@@ -395,20 +402,6 @@ describe('Current Chat row', () => {
     await flushAsyncWork();
 
     const historyShadow = getHistoryShadow();
-
-    const currentRow = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
-    currentRow.click();
-    await flushAsyncWork();
-    expect((historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement).dataset.active).toBe('true');
-
-    const draftRow = historyShadow.querySelector('[data-testid="history-draft-row"]') as HTMLButtonElement;
-    draftRow.click();
-    await flushAsyncWork();
-
-    expect((historyShadow.querySelector('[data-testid="history-draft-row"]') as HTMLButtonElement).dataset.active).toBe('true');
-    expect((historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement).dataset.active).toBe('false');
-
-    const textarea = getChatShadow().querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
-    expect(textarea.disabled).toBe(false);
+    expect(historyShadow.querySelector('[data-testid="history-draft-row"]')).toBeNull();
   });
 });

@@ -2,68 +2,81 @@ import { getIconSvg } from './icons.js';
 import type { HistoryConversationSummary, HistoryDom } from './types.js';
 
 export type HistoryRenderState =
-  | { kind: 'loading' }
-  | { kind: 'empty' }
-  | { kind: 'error'; message: string }
-  | { kind: 'loaded'; items: HistoryConversationSummary[]; selectedSessionId: string | null; menuSessionId: string | null; draftSelected: boolean; liveSessionId?: string | null };
+  | {
+      kind: 'loading';
+      liveSessionId: string | null;
+      liveSelected: boolean;
+    }
+  | {
+      kind: 'empty';
+      liveSessionId: string | null;
+      liveSelected: boolean;
+    }
+  | {
+      kind: 'error';
+      message: string;
+      liveSessionId: string | null;
+      liveSelected: boolean;
+    }
+  | {
+      kind: 'loaded';
+      items: HistoryConversationSummary[];
+      liveSessionId: string | null;
+      liveSelected: boolean;
+      selectedHistoricalSessionId: string | null;
+      menuSessionId: string | null;
+    };
+
+function appendCurrentRow(dom: HistoryDom, state: { liveSessionId: string | null; liveSelected: boolean }): void {
+  if (!state.liveSessionId) {
+    return;
+  }
+
+  const currentRow = document.createElement('button');
+  currentRow.type = 'button';
+  currentRow.className = 'cortex-widget-history__row';
+  currentRow.dataset.sessionId = state.liveSessionId;
+  currentRow.dataset.liveCurrent = 'true';
+  currentRow.dataset.active = String(state.liveSelected);
+  currentRow.setAttribute('data-testid', 'history-current-row');
+
+  const currentTitle = document.createElement('span');
+  currentTitle.className = 'cortex-widget-history__row-title';
+  currentTitle.textContent = 'Current chat';
+  currentRow.appendChild(currentTitle);
+  dom.list.appendChild(currentRow);
+}
+
+function appendStatusRow(dom: HistoryDom, className: string, text: string): void {
+  const row = document.createElement('div');
+  row.className = className;
+  row.textContent = text;
+  dom.list.appendChild(row);
+}
 
 export function renderHistoryList(dom: HistoryDom, state: HistoryRenderState): void {
-  // Preserve scroll position so a background re-render does not jump the panel to the top.
-  const savedScroll = state.kind === 'loaded' ? dom.list.scrollTop : 0;
+  const savedScroll = dom.list.scrollTop;
   dom.list.replaceChildren();
-  dom.status.textContent = state.kind === 'loading' ? 'Loading chats…' : '';
+  dom.status.textContent = state.kind === 'loading' ? 'Loading chats...' : '';
+
+  appendCurrentRow(dom, state);
 
   if (state.kind === 'loading') {
-    const empty = document.createElement('div');
-    empty.className = 'cortex-widget-history__empty';
-    empty.textContent = 'Loading chats…';
-    dom.list.appendChild(empty);
+    appendStatusRow(dom, 'cortex-widget-history__empty', 'Loading chats...');
     return;
   }
 
   if (state.kind === 'error') {
-    const error = document.createElement('div');
-    error.className = 'cortex-widget-history__error';
-    error.textContent = state.message;
-    dom.list.appendChild(error);
+    appendStatusRow(dom, 'cortex-widget-history__error', state.message);
     return;
   }
 
   if (state.kind === 'empty') {
-    const empty = document.createElement('div');
-    empty.className = 'cortex-widget-history__empty';
-    empty.textContent = 'No chats yet';
-    dom.list.appendChild(empty);
+    if (!state.liveSessionId) {
+      appendStatusRow(dom, 'cortex-widget-history__empty', 'No chats yet');
+    }
+    dom.list.scrollTop = savedScroll;
     return;
-  }
-
-  const draftRow = document.createElement('button');
-  draftRow.type = 'button';
-  draftRow.className = 'cortex-widget-history__row';
-  draftRow.dataset.draft = 'true';
-  draftRow.dataset.active = String(state.draftSelected);
-  draftRow.setAttribute('data-testid', 'history-draft-row');
-
-  const draftTitle = document.createElement('span');
-  draftTitle.className = 'cortex-widget-history__row-title';
-  draftTitle.textContent = 'New chat';
-  draftRow.appendChild(draftTitle);
-  dom.list.appendChild(draftRow);
-
-  if (state.liveSessionId) {
-    const currentRow = document.createElement('button');
-    currentRow.type = 'button';
-    currentRow.className = 'cortex-widget-history__row';
-    currentRow.dataset.sessionId = state.liveSessionId;
-    currentRow.dataset.liveCurrent = 'true';
-    currentRow.dataset.active = String(!state.draftSelected && state.selectedSessionId === null);
-    currentRow.setAttribute('data-testid', 'history-current-row');
-
-    const currentTitle = document.createElement('span');
-    currentTitle.className = 'cortex-widget-history__row-title';
-    currentTitle.textContent = 'Current chat';
-    currentRow.appendChild(currentTitle);
-    dom.list.appendChild(currentRow);
   }
 
   const filteredItems = state.liveSessionId
@@ -75,9 +88,7 @@ export function renderHistoryList(dom: HistoryDom, state: HistoryRenderState): v
     row.type = 'button';
     row.className = 'cortex-widget-history__row';
     row.dataset.sessionId = item.session_id;
-    const isHistoricallySelected = state.selectedSessionId === item.session_id;
-    const isLiveSelected = !state.draftSelected && state.selectedSessionId === null && state.liveSessionId === item.session_id;
-    row.dataset.active = String(isHistoricallySelected || isLiveSelected);
+    row.dataset.active = String(state.selectedHistoricalSessionId === item.session_id);
     row.dataset.menuOpen = String(state.menuSessionId === item.session_id);
     row.setAttribute('data-testid', 'history-row');
 

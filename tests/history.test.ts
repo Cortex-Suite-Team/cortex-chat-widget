@@ -160,7 +160,7 @@ describe('widget history', () => {
     expect(textarea.placeholder).toContain('read-only');
   });
 
-  it('new chat stays local draft only, and send does not trigger additional history refresh', async () => {
+  it('header new chat starts a fresh live chat, and send does not trigger additional history refresh', async () => {
     installTargets();
     const client = new CustomClient();
     client.uploadAttachmentImpl = async (file) => `attachment:${file.name}`;
@@ -185,12 +185,18 @@ describe('widget history', () => {
     __getLastController()!.setState(createMockChatState());
     await flushAsyncWork();
 
+    const firstController = __getLastController()!;
     const historyShadow = getHistoryShadow();
-    const draftRow = historyShadow.querySelector('[data-testid="history-draft-row"]') as HTMLButtonElement;
-    draftRow.click();
+    const newChatButton = historyShadow.querySelector('[data-testid="history-new-chat"]') as HTMLButtonElement;
+    expect(historyShadow.querySelector('[data-testid="history-draft-row"]')).toBeNull();
+    newChatButton.click();
     await flushAsyncWork();
 
-    expect(__getLastController()?.sendCalls).toHaveLength(0);
+    expect(firstController.sendCalls).toHaveLength(0);
+    expect(firstController.destroyCalls).toBe(1);
+    const nextController = __getLastController()!;
+    expect(nextController).not.toBe(firstController);
+    expect(nextController.connectCalls).toBe(1);
 
     const chatShadow = getChatShadow();
     const textarea = chatShadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
@@ -200,7 +206,7 @@ describe('widget history', () => {
     submitComposer(form);
     await flushAsyncWork();
 
-    expect(__getLastController()?.sendCalls).toHaveLength(1);
+    expect(nextController.sendCalls).toHaveLength(1);
     // Send must NOT trigger a history refresh — only the initial session-ready load fires.
     expect(getFetchMock().mock.calls.filter((call: any[]) => String(call[0]).includes('/api/chat/conversations/'))).toHaveLength(1);
   });
