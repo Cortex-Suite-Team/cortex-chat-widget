@@ -55,6 +55,7 @@ export declare class ChatWidget {
     private getPublicState;
     private getDisplayedChatState;
     private syncTextareaValue;
+    private resizeComposerTextarea;
     private notifyAndRender;
     private computeTranscriptKey;
     private setSelectedFile;

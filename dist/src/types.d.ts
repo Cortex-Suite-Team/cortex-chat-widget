@@ -132,6 +132,10 @@ export interface WidgetDom {
     root: HTMLElement;
     launcher: HTMLButtonElement;
     panel: HTMLElement;
+    shell: HTMLElement;
+    shellRail: HTMLElement;
+    historySlot: HTMLElement;
+    chatSlot: HTMLElement;
     title: HTMLElement;
     subtitle: HTMLElement;
     status: HTMLElement;

@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.8 builtAt=2026-05-17T10:30:26.201Z */
+/* cortex-chat-widget build: sdk=1.1.8 builtAt=2026-05-17T11:12:37.030Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -1400,6 +1400,8 @@ function toWidgetError(error2, fallbackCode = "widget_error", fallbackMessage = 
 var ICONS = {
   "paperclip": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z"/></svg>`,
   "send-fill": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.964.686a.5.5 0 0 0-.65-.65L.767 5.855H.766l-.452.18a.5.5 0 0 0-.082.887l.41.26.001.002 4.995 3.178 3.178 4.995.002.002.26.41a.5.5 0 0 0 .886-.083zm-1.833 1.89L6.637 10.07l-.215-.338a.5.5 0 0 0-.154-.154l-.338-.215 7.494-7.494 1.178-.471z"/></svg>`,
+  "arrow-up": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L7.5 2.707V14.5a.5.5 0 0 0 .5.5"/></svg>`,
+  "arrow-up-short": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 12a.5.5 0 0 0 .5-.5V5.707l2.146 2.147a.5.5 0 0 0 .708-.708l-3-3a.5.5 0 0 0-.708 0l-3 3a.5.5 0 1 0 .708.708L7.5 5.707V11.5a.5.5 0 0 0 .5.5"/></svg>`,
   "reply-fill": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.921 11.9 1.353 8.62a.719.719 0 0 1 0-1.238L5.921 4.1A.716.716 0 0 1 7 4.719V6c1.5 0 6 0 7 8-2.5-4.5-7-4-7-4v1.281c0 .56-.606.898-1.079.62z"/></svg>`,
   "arrow-clockwise": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>`,
   "plus-lg": `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 2.5a.5.5 0 0 1 .5.5v4.5H13a.5.5 0 0 1 0 1H8.5V13a.5.5 0 0 1-1 0V8.5H3a.5.5 0 0 1 0-1h4.5V3a.5.5 0 0 1 .5-.5"/></svg>`,
@@ -1512,8 +1514,11 @@ var authStyles = `
 var historyStyles = `
 .cortex-widget-history {
   --cortex-accent-color: #2563eb;
-  --cortex-background-color: #ffffff;
-  --cortex-text-color: #172033;
+  --cortex-background-color: #0f172a;
+  --cortex-surface-color: #111827;
+  --cortex-border-color: rgba(148, 163, 184, 0.2);
+  --cortex-muted-text: rgba(226, 232, 240, 0.64);
+  --cortex-text-color: #e5eefb;
   display: block;
   height: 100%;
   min-height: 0;
@@ -1526,13 +1531,11 @@ var historyStyles = `
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--cortex-accent-color) 10%, transparent), transparent 40%),
-    linear-gradient(180deg, color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%), var(--cortex-surface-color));
-  border: 1px solid var(--cortex-border-color);
-  border-radius: 18px;
-  box-shadow: var(--cortex-shadow-md);
-  padding: 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 8px;
 }
 
 .cortex-widget-history__header {
@@ -1550,9 +1553,9 @@ var historyStyles = `
 }
 
 .cortex-widget-history__search {
-  border: 1px dashed var(--cortex-border-color);
-  border-radius: 14px;
-  padding: 12px 14px;
+  border: 1px dashed rgba(226, 232, 240, 0.18);
+  border-radius: 10px;
+  padding: 8px 10px;
   color: var(--cortex-muted-text);
   font-size: 13px;
 }
@@ -1563,12 +1566,12 @@ var historyStyles = `
   gap: 8px;
   justify-content: center;
   border: 0;
-  border-radius: 999px;
+  border-radius: 10px;
   background: linear-gradient(135deg, var(--cortex-accent-color), color-mix(in srgb, var(--cortex-accent-color) 78%, #0f172a 22%));
   color: #ffffff;
   font: inherit;
   font-weight: 600;
-  padding: 10px 16px;
+  padding: 8px 12px;
   cursor: pointer;
 }
 
@@ -1579,6 +1582,7 @@ var historyStyles = `
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-right: 2px;
 }
 
 .cortex-widget-history__empty,
@@ -1591,7 +1595,7 @@ var historyStyles = `
 
 .cortex-widget-history__empty {
   color: var(--cortex-muted-text);
-  background: color-mix(in srgb, var(--cortex-background-color) 92%, #ffffff 8%);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .cortex-widget-history__error {
@@ -1606,10 +1610,10 @@ var historyStyles = `
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 1px solid transparent;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--cortex-background-color) 92%, #ffffff 8%);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -1618,7 +1622,7 @@ var historyStyles = `
 
 .cortex-widget-history__row[data-active="true"] {
   border-color: color-mix(in srgb, var(--cortex-accent-color) 22%, transparent);
-  background: color-mix(in srgb, var(--cortex-accent-color) 10%, var(--cortex-background-color) 90%);
+  background: color-mix(in srgb, var(--cortex-accent-color) 22%, rgba(255, 255, 255, 0.07) 78%);
 }
 
 .cortex-widget-history__row[data-pinned="true"] {
@@ -1682,7 +1686,7 @@ var historyStyles = `
   padding: 6px;
   border-radius: 12px;
   border: 1px solid var(--cortex-border-color);
-  background: var(--cortex-background-color);
+  background: #111827;
   box-shadow: var(--cortex-shadow-md);
   display: none;
   flex-direction: column;
@@ -1786,16 +1790,63 @@ var layoutStyles = `
 
 .cortex-widget__panel {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-height: 0;
   overflow: hidden;
-  border-radius: var(--cortex-border-radius);
+  gap: 0;
+  padding: 4px;
+  border-radius: 6px;
   border: 1px solid var(--cortex-border-color);
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--cortex-accent-color) 12%, transparent), transparent 38%),
-    linear-gradient(180deg, color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%), var(--cortex-surface-color));
+  background: var(--cortex-surface-color);
   box-shadow: var(--cortex-shadow-lg);
   container-type: inline-size;
+}
+
+.cortex-widget-shell {
+  --cortex-shell-nav-bg: color-mix(in srgb, #0f172a 88%, var(--cortex-accent-color) 12%);
+  --cortex-shell-chat-bg: linear-gradient(180deg, color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%), var(--cortex-surface-color));
+}
+
+.cortex-widget-shell__rail {
+  flex: 0 0 10px;
+  min-width: 10px;
+  border-radius: 6px 0 0 6px;
+  background: var(--cortex-shell-chat-bg);
+}
+
+.cortex-widget-shell__history {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cortex-widget-shell[data-has-history="false"] .cortex-widget-shell__history {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  max-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.cortex-widget-shell[data-has-history="true"] .cortex-widget-shell__rail,
+.cortex-widget-shell[data-has-history="true"] .cortex-widget-shell__history {
+  background: var(--cortex-shell-nav-bg);
+}
+
+.cortex-widget-shell[data-has-history="true"] .cortex-widget-shell__history {
+  flex: 0 0 clamp(236px, 30%, 340px);
+}
+
+.cortex-widget-shell__chat {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0 6px 6px 0;
+  background: var(--cortex-shell-chat-bg);
 }
 
 .cortex-widget[data-mode="embedded"] .cortex-widget__panel {
@@ -1998,6 +2049,8 @@ var layoutStyles = `
   min-width: 0;
   min-height: 38px;
   max-height: 112px;
+  overflow-y: hidden;
+  resize: none;
 }
 
 .cortex-widget__actions {
@@ -2720,8 +2773,16 @@ function createWidgetDom(options) {
   const launcher = createElement("button", "cortex-widget__launcher", options.launcherLabel);
   launcher.type = "button";
   launcher.setAttribute("data-testid", "launcher");
-  const panel = createElement("section", "cortex-widget__panel");
+  const panel = createElement("section", "cortex-widget__panel cortex-widget-shell");
   panel.setAttribute("data-testid", "panel");
+  panel.setAttribute("data-has-history", "false");
+  const shellRail = createElement("div", "cortex-widget-shell__rail");
+  shellRail.setAttribute("aria-hidden", "true");
+  shellRail.setAttribute("data-testid", "widget-shell-rail");
+  const historySlot = createElement("div", "cortex-widget-shell__history");
+  historySlot.setAttribute("data-testid", "widget-history-slot");
+  const chatSlot = createElement("div", "cortex-widget-shell__chat");
+  chatSlot.setAttribute("data-testid", "widget-chat-slot");
   const header = createElement("header", "cortex-widget__header");
   const headerMain = createElement("div", "cortex-widget__header-main");
   const avatar = createElement("div", "cortex-widget__avatar");
@@ -2804,7 +2865,7 @@ function createWidgetDom(options) {
   sendButton.setAttribute("aria-label", "Send message");
   sendButton.setAttribute("title", "Send message");
   sendButton.setAttribute("data-testid", "send-button");
-  sendButton.innerHTML = getIconSvg("send-fill");
+  sendButton.innerHTML = getIconSvg("arrow-up");
   attachWrap.append(fileInput, attachButton);
   actions.append(fileHint);
   composerRow.append(attachWrap, textarea, sendButton);
@@ -2813,7 +2874,8 @@ function createWidgetDom(options) {
   headerMain.append(avatar, headerText);
   header.append(headerMain);
   body.append(errorBanner, transcript, workerStatus, typing, escalation, authGate, composer);
-  panel.append(header, body);
+  chatSlot.append(header, body);
+  panel.append(shellRail, historySlot, chatSlot);
   if (options.mode === "floating") {
     root.append(panel, launcher);
   } else {
@@ -2826,6 +2888,10 @@ function createWidgetDom(options) {
     root,
     launcher,
     panel,
+    shell: panel,
+    shellRail,
+    historySlot,
+    chatSlot,
     title,
     subtitle,
     status,
@@ -11883,7 +11949,7 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading, op
   const canSend = !state.chat.input.locked && !state.isAwaitingAnswer && !isUploading && !questionLocksInput && (dom.textarea.value.trim().length > 0 || state.selectedFile !== null);
   dom.sendButton.disabled = !canSend;
   const isReplyMode = state.chat.activeQuestion !== null;
-  dom.sendButton.innerHTML = getIconSvg(isReplyMode ? "reply-fill" : "send-fill");
+  dom.sendButton.innerHTML = getIconSvg(isReplyMode ? "reply-fill" : "arrow-up");
   dom.sendButton.setAttribute("aria-label", isReplyMode ? "Reply" : "Send message");
   dom.sendButton.setAttribute("title", isReplyMode ? "Reply" : "Send message");
   dom.attachButton.disabled = !attachmentsAvailable || state.chat.input.locked || state.isAwaitingAnswer || isUploading;
@@ -11985,6 +12051,7 @@ var ChatWidget = class {
     };
     this.onTextareaInput = () => {
       this.ui.draftText = this.dom.textarea.value;
+      this.resizeComposerTextarea();
       this.notifyAndRender();
     };
     this.onTextareaKeyDown = (event) => {
@@ -12052,7 +12119,8 @@ var ChatWidget = class {
     this.mountTarget.appendChild(this.dom.host);
     if (this.options.mode === "embedded" && this.historyTarget) {
       const historyDom = createHistoryDom();
-      this.historyTarget.appendChild(historyDom.host);
+      this.dom.shell.setAttribute("data-has-history", "true");
+      this.dom.historySlot.appendChild(historyDom.host);
       this.historyController = new HistoryController({
         dom: historyDom,
         options: this.options,
@@ -12073,6 +12141,7 @@ var ChatWidget = class {
     }
     this.ui.isReady = true;
     this.notifyAndRender();
+    this.resizeComposerTextarea();
     this.options.onReady?.();
     if (this.options.mode === "embedded" || this.ui.isOpen) {
       void this.ensureConnected().catch((error2) => {
@@ -12336,6 +12405,24 @@ ${token}`;
       this.dom.textarea.value = this.ui.draftText;
     }
   }
+  resizeComposerTextarea() {
+    const textarea = this.dom.textarea;
+    const computed = window.getComputedStyle(textarea);
+    const parsePx = (value) => {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const lineHeight = parsePx(computed.lineHeight) || 20;
+    const verticalChrome = parsePx(computed.paddingTop) + parsePx(computed.paddingBottom) + parsePx(computed.borderTopWidth) + parsePx(computed.borderBottomWidth);
+    const maxHeight = lineHeight * 5 + verticalChrome;
+    const minHeight = lineHeight + verticalChrome;
+    textarea.style.maxHeight = `${maxHeight}px`;
+    textarea.style.height = "auto";
+    const measuredHeight = textarea.scrollHeight || minHeight;
+    const nextHeight = Math.max(minHeight, Math.min(measuredHeight, maxHeight));
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = measuredHeight > maxHeight ? "auto" : "hidden";
+  }
   notifyAndRender() {
     if (this.ui.isDestroyed) {
       return;
@@ -12348,6 +12435,7 @@ ${token}`;
       this.lastTranscriptRenderKey = transcriptKey;
     }
     renderWidget(this.dom, state, this.options, this.ui.attachmentsAvailable, this.ui.isUploading, { skipTranscript });
+    this.resizeComposerTextarea();
     this.historyController?.setLiveSessionId(this.getLiveSessionId());
     this.options.onStateChange?.(state);
   }
