@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.8 builtAt=2026-05-17T11:59:43.864Z */
+/* cortex-chat-widget build: sdk=1.1.8 builtAt=2026-05-17T14:06:57.834Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -12785,6 +12785,9 @@ ${token}`;
     this.notifyAndRender();
   }
   handleHistoryError(error2, code2, message) {
+    if (this.ui.isDestroyed) {
+      return;
+    }
     this.ui.error = toWidgetError(error2, code2, message);
     this.options.onError?.(error2);
     this.notifyAndRender();
