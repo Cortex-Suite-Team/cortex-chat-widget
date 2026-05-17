@@ -6,28 +6,35 @@ export type HistoryRenderState =
       kind: 'loading';
       liveSessionId: string | null;
       liveSelected: boolean;
+      liveTitle: string | null;
     }
   | {
       kind: 'empty';
       liveSessionId: string | null;
       liveSelected: boolean;
+      liveTitle: string | null;
     }
   | {
       kind: 'error';
       message: string;
       liveSessionId: string | null;
       liveSelected: boolean;
+      liveTitle: string | null;
     }
   | {
       kind: 'loaded';
       items: HistoryConversationSummary[];
       liveSessionId: string | null;
       liveSelected: boolean;
+      liveTitle: string | null;
       selectedHistoricalSessionId: string | null;
       menuSessionId: string | null;
     };
 
-function appendCurrentRow(dom: HistoryDom, state: { liveSessionId: string | null; liveSelected: boolean }): void {
+function appendCurrentRow(
+  dom: HistoryDom,
+  state: { liveSessionId: string | null; liveSelected: boolean; liveTitle: string | null },
+): void {
   if (!state.liveSessionId) {
     return;
   }
@@ -42,7 +49,7 @@ function appendCurrentRow(dom: HistoryDom, state: { liveSessionId: string | null
 
   const currentTitle = document.createElement('span');
   currentTitle.className = 'cortex-widget-history__row-title';
-  currentTitle.textContent = 'Current chat';
+  currentTitle.textContent = state.liveTitle || 'Current chat';
   currentRow.appendChild(currentTitle);
   dom.list.appendChild(currentRow);
 }

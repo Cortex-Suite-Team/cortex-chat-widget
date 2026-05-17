@@ -179,6 +179,7 @@ describe('history stability', () => {
       items,
       liveSessionId: null,
       liveSelected: false,
+      liveTitle: null,
       selectedHistoricalSessionId: null,
       menuSessionId: null,
     };
@@ -208,6 +209,7 @@ describe('history stability', () => {
       items,
       liveSessionId: 's_live',
       liveSelected: true,
+      liveTitle: null,
       selectedHistoricalSessionId: null,
       menuSessionId: null,
     });
@@ -219,6 +221,7 @@ describe('history stability', () => {
       items,
       liveSessionId: 's_live',
       liveSelected: false,
+      liveTitle: null,
       selectedHistoricalSessionId: 's12',
       menuSessionId: null,
     });
@@ -237,6 +240,7 @@ describe('history stability', () => {
       items,
       liveSessionId: 's_live',
       liveSelected: false,
+      liveTitle: null,
       selectedHistoricalSessionId: 's5',
       menuSessionId: null,
     });
@@ -248,6 +252,7 @@ describe('history stability', () => {
       items,
       liveSessionId: 's_live',
       liveSelected: false,
+      liveTitle: null,
       selectedHistoricalSessionId: 's5',
       menuSessionId: 's14',
     });

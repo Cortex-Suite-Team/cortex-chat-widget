@@ -62,11 +62,11 @@ function createClient(overrides: Partial<HistoryClient> = {}): jest.Mocked<Histo
   } as jest.Mocked<HistoryClient>;
 }
 
-function createSummary(sessionId: string, title: string, pinned = false): HistoryConversationSummary {
+function createSummary(sessionId: string, title: string, pinned = false, renamed = false): HistoryConversationSummary {
   return {
     session_id: sessionId,
     title,
-    renamed: false,
+    renamed,
     pinned,
     last_message_at: '2026-05-16T10:00:00Z',
     created_at: '2026-05-16T09:00:00Z',
@@ -250,6 +250,130 @@ describe('HistoryController', () => {
 
     expect(pinStore.isPinned('sess_pin')).toBe(true);
     expect(client.pinConversation).not.toHaveBeenCalled();
+  });
+
+  it('runtime title updates Current Chat and persists through renameConversation', async () => {
+    const dom = createHistoryDom();
+    const callbacks = createCallbacks();
+    const client = createClient({
+      listConversations: jest.fn(async () => []),
+    });
+    const controller = new HistoryController({ dom, options: createOptions(), callbacks });
+
+    controller.mount();
+    controller.setClient(client);
+    controller.setLiveSessionId('sess_live');
+    controller.applyRuntimeTitle(' Contract review ');
+    await flushAsyncWork();
+
+    const currentRow = dom.shadowRoot.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
+    expect(currentRow.textContent).toContain('Contract review');
+    expect(client.renameConversation).toHaveBeenCalledWith('sess_live', 'Contract review');
+  });
+
+  it('runtime title is ignored without liveSessionId or history client', async () => {
+    const dom = createHistoryDom();
+    const callbacks = createCallbacks();
+    const client = createClient();
+    const controller = new HistoryController({ dom, options: createOptions(), callbacks });
+
+    controller.mount();
+    controller.setClient(client);
+    controller.applyRuntimeTitle('No live session');
+    await flushAsyncWork();
+    expect(client.renameConversation).not.toHaveBeenCalled();
+
+    controller.setLiveSessionId('sess_live');
+    controller.setClient(null);
+    controller.applyRuntimeTitle('Local only');
+    await flushAsyncWork();
+    expect(client.renameConversation).not.toHaveBeenCalled();
+    expect(dom.shadowRoot.textContent).toContain('Local only');
+  });
+
+  it('repeated identical runtime title does not persist repeatedly', async () => {
+    const dom = createHistoryDom();
+    const callbacks = createCallbacks();
+    const client = createClient();
+    const controller = new HistoryController({ dom, options: createOptions(), callbacks });
+
+    controller.mount();
+    controller.setClient(client);
+    controller.setLiveSessionId('sess_live');
+    controller.applyRuntimeTitle('Contract review');
+    controller.applyRuntimeTitle('Contract review');
+    await flushAsyncWork();
+
+    expect(client.renameConversation).toHaveBeenCalledTimes(1);
+  });
+
+  it('matching backend item title prevents redundant runtime rename persistence', async () => {
+    const dom = createHistoryDom();
+    const callbacks = createCallbacks();
+    const client = createClient({
+      listConversations: jest.fn(async () => [createSummary('sess_live', 'Contract review')]),
+    });
+    const controller = new HistoryController({ dom, options: createOptions(), callbacks });
+
+    controller.mount();
+    controller.setClient(client);
+    controller.setLiveSessionId('sess_live');
+    await controller.refresh();
+    controller.applyRuntimeTitle('Contract review');
+    await flushAsyncWork();
+
+    expect(dom.shadowRoot.querySelector('[data-testid="history-current-row"]')?.textContent).toContain('Contract review');
+    expect(client.renameConversation).not.toHaveBeenCalled();
+  });
+
+  it('runtime title is ignored when live conversation is already manually renamed by backend', async () => {
+    const dom = createHistoryDom();
+    const callbacks = createCallbacks();
+    const client = createClient({
+      listConversations: jest.fn(async () => [createSummary('sess_live', 'Manual title', false, true)]),
+    });
+    const controller = new HistoryController({ dom, options: createOptions(), callbacks });
+
+    controller.mount();
+    controller.setClient(client);
+    controller.setLiveSessionId('sess_live');
+    await controller.refresh();
+    controller.applyRuntimeTitle('Runtime title');
+    await flushAsyncWork();
+
+    expect(dom.shadowRoot.querySelector('[data-testid="history-current-row"]')?.textContent).toContain('Manual title');
+    expect(client.renameConversation).not.toHaveBeenCalled();
+  });
+
+  it('manual rename of a session updates liveTitle when it becomes current and blocks later runtime title', async () => {
+    const dom = createHistoryDom();
+    const callbacks = createCallbacks();
+    const client = createClient({
+      listConversations: jest.fn(async () => [createSummary('sess_live', 'New chat')]),
+    });
+    const controller = new HistoryController({ dom, options: createOptions(), callbacks });
+    jest.spyOn(window, 'prompt').mockReturnValue('Manual title');
+
+    controller.mount();
+    controller.setClient(client);
+    await controller.refresh();
+
+    const toggle = dom.shadowRoot.querySelector('[data-testid="history-menu-toggle"]') as HTMLButtonElement;
+    toggle.click();
+    const renameAction = Array.from(dom.shadowRoot.querySelectorAll('.cortex-widget-history__menu-action'))
+      .find((action) => action.textContent?.includes('Rename')) as HTMLButtonElement;
+    renameAction.click();
+    await flushAsyncWork();
+
+    expect(client.renameConversation).toHaveBeenCalledWith('sess_live', 'Manual title');
+    controller.setLiveSessionId('sess_live');
+    expect(dom.shadowRoot.querySelector('[data-testid="history-current-row"]')?.textContent).toContain('Manual title');
+
+    controller.applyRuntimeTitle('Runtime title');
+    await flushAsyncWork();
+
+    expect(dom.shadowRoot.querySelector('[data-testid="history-current-row"]')?.textContent).toContain('Manual title');
+    expect(client.renameConversation).toHaveBeenCalledTimes(1);
   });
 
   it('ignores stale refresh responses', async () => {

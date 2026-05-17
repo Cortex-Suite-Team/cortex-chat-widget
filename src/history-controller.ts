@@ -21,12 +21,14 @@ interface HistoryControllerState {
   status: 'disabled' | 'loading' | 'ready' | 'empty' | 'error';
   items: HistoryConversationSummary[];
   liveSessionId: string | null;
+  liveTitle: string | null;
   selection: HistorySelection;
   menuSessionId: string | null;
   errorMessage: string | null;
 }
 
 const HISTORY_PIN_STORAGE_KEY = 'cortex-chat-widget:history-pins:v1';
+const MAX_RUNTIME_TITLE_LENGTH = 120;
 
 export class HistoryPinStore {
   private readonly storage: Storage | null;
@@ -122,10 +124,14 @@ export class HistoryController {
   private refreshGeneration = 0;
   private messagesGeneration = 0;
   private readonly pinStore: HistoryPinStore;
+  private readonly manuallyRenamedSessionIds = new Set<string>();
+  private readonly manualTitleBySessionId = new Map<string, string>();
+  private readonly lastAutoTitleBySessionId = new Map<string, string>();
   private readonly state: HistoryControllerState = {
     status: 'disabled',
     items: [],
     liveSessionId: null,
+    liveTitle: null,
     selection: { kind: 'none' },
     menuSessionId: null,
     errorMessage: null,
@@ -206,11 +212,67 @@ export class HistoryController {
     if (this.destroyed) {
       return;
     }
+    if (this.state.liveSessionId !== sessionId) {
+      this.state.liveTitle = null;
+    }
     this.state.liveSessionId = sessionId;
     if (sessionId && this.state.selection.kind === 'none') {
       this.state.selection = { kind: 'current' };
     }
+    this.syncLiveTitleFromItems();
     this.render();
+  }
+
+  applyRuntimeTitle(title: string): void {
+    if (this.destroyed) {
+      return;
+    }
+    const liveSessionId = this.state.liveSessionId;
+    if (!liveSessionId) {
+      return;
+    }
+    const nextTitle = this.normalizeRuntimeTitle(title);
+    if (!nextTitle) {
+      return;
+    }
+    if (this.isManualTitle(liveSessionId)) {
+      return;
+    }
+
+    const liveItem = this.state.items.find((item) => item.session_id === liveSessionId);
+    if (liveItem?.renamed) {
+      this.manuallyRenamedSessionIds.add(liveSessionId);
+      return;
+    }
+
+    const currentLiveTitle = this.state.liveTitle;
+    const knownItemTitle = liveItem?.title ?? null;
+    if (currentLiveTitle === nextTitle) {
+      return;
+    }
+
+    this.state.liveTitle = nextTitle;
+    if (liveItem) {
+      liveItem.title = nextTitle;
+    }
+    this.render();
+
+    if (!this.client) {
+      return;
+    }
+    if (knownItemTitle === nextTitle) {
+      return;
+    }
+    if (this.lastAutoTitleBySessionId.get(liveSessionId) === nextTitle) {
+      return;
+    }
+    this.lastAutoTitleBySessionId.set(liveSessionId, nextTitle);
+    void this.client.renameConversation(liveSessionId, nextTitle).catch((error) => {
+      this.debug?.log('[cortex-chat-widget] runtime title persistence failed', {
+        sessionId: liveSessionId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
   }
 
   async refresh(): Promise<void> {
@@ -237,6 +299,7 @@ export class HistoryController {
       ) {
         this.state.selection = this.state.liveSessionId ? { kind: 'current' } : { kind: 'none' };
       }
+      this.syncLiveTitleFromItems();
       this.render();
     } catch (error) {
       if (this.destroyed || generation !== this.refreshGeneration || client !== this.client) {
@@ -266,6 +329,7 @@ export class HistoryController {
         kind: 'loading',
         liveSessionId: this.state.liveSessionId,
         liveSelected,
+        liveTitle: this.state.liveTitle,
       });
       return;
     }
@@ -275,6 +339,7 @@ export class HistoryController {
         message: this.state.errorMessage || 'Unable to load chats.',
         liveSessionId: this.state.liveSessionId,
         liveSelected,
+        liveTitle: this.state.liveTitle,
       });
       return;
     }
@@ -283,6 +348,7 @@ export class HistoryController {
         kind: 'empty',
         liveSessionId: this.state.liveSessionId,
         liveSelected,
+        liveTitle: this.state.liveTitle,
       });
       return;
     }
@@ -292,6 +358,7 @@ export class HistoryController {
       items: this.getRenderItems(),
       liveSessionId: this.state.liveSessionId,
       liveSelected,
+      liveTitle: this.state.liveTitle,
       selectedHistoricalSessionId: this.state.selection.kind === 'historical'
         ? this.state.selection.sessionId
         : null,
@@ -395,7 +462,9 @@ export class HistoryController {
         const current = this.state.items.find((item) => item.session_id === sessionId);
         const nextTitle = window.prompt('Rename chat', current?.title ?? '');
         if (typeof nextTitle === 'string' && nextTitle.trim()) {
-          await this.client.renameConversation(sessionId, nextTitle.trim());
+          const trimmedTitle = nextTitle.trim();
+          await this.client.renameConversation(sessionId, trimmedTitle);
+          this.markManualRename(sessionId, trimmedTitle);
           await this.refresh();
         }
       } else if (action === 'delete') {
@@ -425,6 +494,7 @@ export class HistoryController {
     return [
       this.state.status,
       this.state.liveSessionId ?? '',
+      this.state.liveTitle ?? '',
       selectionSig,
       this.state.menuSessionId ?? '',
       this.state.errorMessage ?? '',
@@ -437,6 +507,8 @@ export class HistoryController {
   private getRenderItems(): HistoryConversationSummary[] {
     const derived = this.state.items.map((item) => ({
       ...item,
+      title: this.manualTitleBySessionId.get(item.session_id) ?? item.title,
+      renamed: this.manuallyRenamedSessionIds.has(item.session_id) || item.renamed,
       pinned: this.pinStore.isPinned(item.session_id),
     }));
     const pinned: HistoryConversationSummary[] = [];
@@ -449,5 +521,51 @@ export class HistoryController {
       }
     }
     return [...pinned, ...unpinned];
+  }
+
+  private normalizeRuntimeTitle(title: string): string | null {
+    const trimmed = title.trim();
+    if (!trimmed) {
+      return null;
+    }
+    return trimmed.slice(0, MAX_RUNTIME_TITLE_LENGTH);
+  }
+
+  private isManualTitle(sessionId: string): boolean {
+    return this.manuallyRenamedSessionIds.has(sessionId)
+      || this.state.items.some((item) => item.session_id === sessionId && item.renamed);
+  }
+
+  private markManualRename(sessionId: string, title: string): void {
+    this.manuallyRenamedSessionIds.add(sessionId);
+    this.manualTitleBySessionId.set(sessionId, title);
+    this.lastAutoTitleBySessionId.delete(sessionId);
+    const item = this.state.items.find((entry) => entry.session_id === sessionId);
+    if (item) {
+      item.title = title;
+      item.renamed = true;
+    }
+    if (sessionId === this.state.liveSessionId) {
+      this.state.liveTitle = title;
+    }
+    this.render();
+  }
+
+  private syncLiveTitleFromItems(): void {
+    const liveSessionId = this.state.liveSessionId;
+    if (!liveSessionId) {
+      return;
+    }
+    const manualTitle = this.manualTitleBySessionId.get(liveSessionId);
+    if (manualTitle) {
+      this.state.liveTitle = manualTitle;
+      return;
+    }
+    const liveItem = this.state.items.find((item) => item.session_id === liveSessionId);
+    if (!liveItem?.renamed) {
+      return;
+    }
+    this.manuallyRenamedSessionIds.add(liveSessionId);
+    this.state.liveTitle = liveItem.title;
   }
 }

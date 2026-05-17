@@ -44,6 +44,8 @@ const EMPTY_CHAT_STATE: ChatState = {
   workerState: { state: 'idle' },
 };
 
+const MAX_RUNTIME_CHAT_TITLE_LENGTH = 120;
+
 function cloneChatState(state: ChatState): ChatState {
   return {
     session: {
@@ -371,6 +373,10 @@ export class ChatWidget {
     });
 
     this.unsubscribeRawMessages = this.client.onMessage((message) => {
+      const runtimeTitle = this.extractRuntimeChatTitle(message);
+      if (runtimeTitle) {
+        this.historyController?.applyRuntimeTitle(runtimeTitle);
+      }
       const flags = getMessageFlags(message);
       if (flags.startTyping) {
         this.ui.isTyping = true;
@@ -816,5 +822,34 @@ export class ChatWidget {
     this.ui.isUploading = false;
     this.ui.error = toWidgetError(error, 'widget_runtime_error', 'Widget runtime error');
     this.options.onError?.(error);
+  }
+
+  private extractRuntimeChatTitle(message: unknown): string | null {
+    const candidates = [
+      this.readUnknownPath(message, ['payload', 'meta', 'chat_title']),
+      this.readUnknownPath(message, ['meta', 'chat_title']),
+      this.readUnknownPath(message, ['payload', 'payload', 'meta', 'chat_title']),
+    ];
+    for (const candidate of candidates) {
+      if (typeof candidate !== 'string') {
+        continue;
+      }
+      const trimmed = candidate.trim();
+      if (trimmed) {
+        return trimmed.slice(0, MAX_RUNTIME_CHAT_TITLE_LENGTH);
+      }
+    }
+    return null;
+  }
+
+  private readUnknownPath(value: unknown, path: string[]): unknown {
+    let current = value;
+    for (const key of path) {
+      if (!current || typeof current !== 'object' || !(key in current)) {
+        return undefined;
+      }
+      current = (current as Record<string, unknown>)[key];
+    }
+    return current;
   }
 }

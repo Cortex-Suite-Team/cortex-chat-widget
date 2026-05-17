@@ -41,6 +41,14 @@ function getFetchMock(): any {
   return global.fetch as any;
 }
 
+function setupHistoryFetch(conversations: unknown[] = []) {
+  getFetchMock().mockResolvedValue(mockJsonResponse({ ok: true, data: {} }));
+  getFetchMock().mockResolvedValueOnce(mockJsonResponse({
+    ok: true,
+    data: { conversations },
+  }));
+}
+
 describe('widget history', () => {
   beforeEach(() => {
     resetMocks();
@@ -273,6 +281,65 @@ describe('widget history', () => {
     expect((historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement).dataset.active).toBe('true');
     expect(textarea.placeholder).not.toContain('read-only');
     expect(getFetchMock().mock.calls.filter((call: any[]) => String(call[0]).includes('/api/chat/conversations/'))).toHaveLength(1);
+  });
+
+  it.each([
+    ['payload.meta.chat_title', { type: 'chat::answer', payload: { meta: { chat_title: 'Contract review' } } }],
+    ['meta.chat_title', { type: 'chat::answer', meta: { chat_title: 'Contract review' } }],
+    ['payload.payload.meta.chat_title', { type: 'chat::answer', payload: { payload: { meta: { chat_title: 'Contract review' } } } }],
+  ])('runtime title from %s updates Current Chat title and persists rename', async (_label, rawMessage) => {
+    installTargets();
+    const client = new CustomClient();
+    setupHistoryFetch([]);
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+      client,
+    });
+
+    __getLastController()!.setState(createMockChatState());
+    await flushAsyncWork();
+
+    client.emit(rawMessage as any);
+    await flushAsyncWork();
+
+    const currentRow = getHistoryShadow().querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
+    expect(currentRow.textContent).toContain('Contract review');
+
+    const renameCalls = getFetchMock().mock.calls.filter((call: any[]) => String(call[0]).includes('/rename/'));
+    expect(renameCalls).toHaveLength(1);
+    expect(renameCalls[0][0]).toContain('/api/chat/conversations/sess_mock/rename/');
+    expect(JSON.parse(renameCalls[0][1].body)).toEqual({ title: 'Contract review' });
+  });
+
+  it('blank and non-string runtime chat_title values are ignored', async () => {
+    installTargets();
+    const client = new CustomClient();
+    setupHistoryFetch([]);
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+      client,
+    });
+
+    __getLastController()!.setState(createMockChatState());
+    await flushAsyncWork();
+
+    client.emit({ type: 'chat::answer', payload: { meta: { chat_title: '   ' } } } as any);
+    client.emit({ type: 'chat::answer', meta: { chat_title: 42 } } as any);
+    await flushAsyncWork();
+
+    const currentRow = getHistoryShadow().querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
+    expect(currentRow.textContent).toContain('Current chat');
+    expect(getFetchMock().mock.calls.filter((call: any[]) => String(call[0]).includes('/rename/'))).toHaveLength(0);
   });
 
   it('delete removes item after backend success', async () => {
