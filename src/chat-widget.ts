@@ -119,6 +119,7 @@ export class ChatWidget {
 
   private readonly onTextareaInput = () => {
     this.ui.draftText = this.dom.textarea.value;
+    this.resizeComposerTextarea();
     this.notifyAndRender();
   };
 
@@ -210,7 +211,8 @@ export class ChatWidget {
     this.mountTarget.appendChild(this.dom.host);
     if (this.options.mode === 'embedded' && this.historyTarget) {
       const historyDom = createHistoryDom();
-      this.historyTarget.appendChild(historyDom.host);
+      this.dom.shell.setAttribute('data-has-history', 'true');
+      this.dom.historySlot.appendChild(historyDom.host);
       this.historyController = new HistoryController({
         dom: historyDom,
         options: this.options,
@@ -232,6 +234,7 @@ export class ChatWidget {
 
     this.ui.isReady = true;
     this.notifyAndRender();
+    this.resizeComposerTextarea();
     this.options.onReady?.();
 
     if (this.options.mode === 'embedded' || this.ui.isOpen) {
@@ -516,6 +519,29 @@ export class ChatWidget {
     }
   }
 
+  private resizeComposerTextarea(): void {
+    const textarea = this.dom.textarea;
+    const computed = window.getComputedStyle(textarea);
+    const parsePx = (value: string): number => {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const lineHeight = parsePx(computed.lineHeight) || 20;
+    const verticalChrome = parsePx(computed.paddingTop)
+      + parsePx(computed.paddingBottom)
+      + parsePx(computed.borderTopWidth)
+      + parsePx(computed.borderBottomWidth);
+    const maxHeight = (lineHeight * 5) + verticalChrome;
+    const minHeight = lineHeight + verticalChrome;
+
+    textarea.style.maxHeight = `${maxHeight}px`;
+    textarea.style.height = 'auto';
+    const measuredHeight = textarea.scrollHeight || minHeight;
+    const nextHeight = Math.max(minHeight, Math.min(measuredHeight, maxHeight));
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = measuredHeight > maxHeight ? 'auto' : 'hidden';
+  }
+
   private notifyAndRender(): void {
     if (this.ui.isDestroyed) {
       return;
@@ -528,6 +554,7 @@ export class ChatWidget {
       this.lastTranscriptRenderKey = transcriptKey;
     }
     renderWidget(this.dom, state, this.options, this.ui.attachmentsAvailable, this.ui.isUploading, { skipTranscript });
+    this.resizeComposerTextarea();
     this.historyController?.setLiveSessionId(this.getLiveSessionId());
     this.options.onStateChange?.(state);
   }

@@ -36,7 +36,8 @@ function getChatShadow(): ShadowRoot {
 }
 
 function getHistoryShadow(): ShadowRoot {
-  const host = document.querySelector('#history > *') as HTMLElement | null;
+  const chatShadow = getChatShadow();
+  const host = chatShadow.querySelector('[data-testid="widget-history-slot"] > *') as HTMLElement | null;
   if (!host?.shadowRoot) throw new Error('Expected history shadow root');
   return host.shadowRoot;
 }

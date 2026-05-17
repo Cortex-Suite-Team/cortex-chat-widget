@@ -685,7 +685,7 @@ export function renderWidget(
   dom.sendButton.disabled = !canSend;
 
   const isReplyMode = state.chat.activeQuestion !== null;
-  dom.sendButton.innerHTML = getIconSvg(isReplyMode ? 'reply-fill' : 'send-fill');
+  dom.sendButton.innerHTML = getIconSvg(isReplyMode ? 'reply-fill' : 'arrow-up');
   dom.sendButton.setAttribute('aria-label', isReplyMode ? 'Reply' : 'Send message');
   dom.sendButton.setAttribute('title', isReplyMode ? 'Reply' : 'Send message');
 

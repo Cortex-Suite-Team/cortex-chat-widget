@@ -1,8 +1,11 @@
 export const historyStyles = `
 .cortex-widget-history {
   --cortex-accent-color: #2563eb;
-  --cortex-background-color: #ffffff;
-  --cortex-text-color: #172033;
+  --cortex-background-color: #0f172a;
+  --cortex-surface-color: #111827;
+  --cortex-border-color: rgba(148, 163, 184, 0.2);
+  --cortex-muted-text: rgba(226, 232, 240, 0.64);
+  --cortex-text-color: #e5eefb;
   display: block;
   height: 100%;
   min-height: 0;
@@ -15,13 +18,11 @@ export const historyStyles = `
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--cortex-accent-color) 10%, transparent), transparent 40%),
-    linear-gradient(180deg, color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%), var(--cortex-surface-color));
-  border: 1px solid var(--cortex-border-color);
-  border-radius: 18px;
-  box-shadow: var(--cortex-shadow-md);
-  padding: 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 8px;
 }
 
 .cortex-widget-history__header {
@@ -39,9 +40,9 @@ export const historyStyles = `
 }
 
 .cortex-widget-history__search {
-  border: 1px dashed var(--cortex-border-color);
-  border-radius: 14px;
-  padding: 12px 14px;
+  border: 1px dashed rgba(226, 232, 240, 0.18);
+  border-radius: 10px;
+  padding: 8px 10px;
   color: var(--cortex-muted-text);
   font-size: 13px;
 }
@@ -52,12 +53,12 @@ export const historyStyles = `
   gap: 8px;
   justify-content: center;
   border: 0;
-  border-radius: 999px;
+  border-radius: 10px;
   background: linear-gradient(135deg, var(--cortex-accent-color), color-mix(in srgb, var(--cortex-accent-color) 78%, #0f172a 22%));
   color: #ffffff;
   font: inherit;
   font-weight: 600;
-  padding: 10px 16px;
+  padding: 8px 12px;
   cursor: pointer;
 }
 
@@ -68,6 +69,7 @@ export const historyStyles = `
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-right: 2px;
 }
 
 .cortex-widget-history__empty,
@@ -80,7 +82,7 @@ export const historyStyles = `
 
 .cortex-widget-history__empty {
   color: var(--cortex-muted-text);
-  background: color-mix(in srgb, var(--cortex-background-color) 92%, #ffffff 8%);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .cortex-widget-history__error {
@@ -95,10 +97,10 @@ export const historyStyles = `
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 1px solid transparent;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--cortex-background-color) 92%, #ffffff 8%);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -107,7 +109,7 @@ export const historyStyles = `
 
 .cortex-widget-history__row[data-active="true"] {
   border-color: color-mix(in srgb, var(--cortex-accent-color) 22%, transparent);
-  background: color-mix(in srgb, var(--cortex-accent-color) 10%, var(--cortex-background-color) 90%);
+  background: color-mix(in srgb, var(--cortex-accent-color) 22%, rgba(255, 255, 255, 0.07) 78%);
 }
 
 .cortex-widget-history__row[data-pinned="true"] {
@@ -171,7 +173,7 @@ export const historyStyles = `
   padding: 6px;
   border-radius: 12px;
   border: 1px solid var(--cortex-border-color);
-  background: var(--cortex-background-color);
+  background: #111827;
   box-shadow: var(--cortex-shadow-md);
   display: none;
   flex-direction: column;

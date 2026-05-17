@@ -62,7 +62,9 @@ describe('loader', () => {
     getCtrl()!.setState(createMockChatState());
     await Promise.resolve();
 
-    expect(historyTarget.firstElementChild).toBeTruthy();
+    const chatHost = chatTarget.firstElementChild as HTMLElement | null;
+    const historySlot = chatHost?.shadowRoot?.querySelector('[data-testid="widget-history-slot"]');
+    expect(historySlot?.firstElementChild).toBeTruthy();
     expect(fetchMock).toHaveBeenCalled();
   });
 });

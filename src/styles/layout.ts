@@ -57,16 +57,63 @@ export const layoutStyles = `
 
 .cortex-widget__panel {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-height: 0;
   overflow: hidden;
-  border-radius: var(--cortex-border-radius);
+  gap: 0;
+  padding: 4px;
+  border-radius: 6px;
   border: 1px solid var(--cortex-border-color);
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--cortex-accent-color) 12%, transparent), transparent 38%),
-    linear-gradient(180deg, color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%), var(--cortex-surface-color));
+  background: var(--cortex-surface-color);
   box-shadow: var(--cortex-shadow-lg);
   container-type: inline-size;
+}
+
+.cortex-widget-shell {
+  --cortex-shell-nav-bg: color-mix(in srgb, #0f172a 88%, var(--cortex-accent-color) 12%);
+  --cortex-shell-chat-bg: linear-gradient(180deg, color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%), var(--cortex-surface-color));
+}
+
+.cortex-widget-shell__rail {
+  flex: 0 0 10px;
+  min-width: 10px;
+  border-radius: 6px 0 0 6px;
+  background: var(--cortex-shell-chat-bg);
+}
+
+.cortex-widget-shell__history {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cortex-widget-shell[data-has-history="false"] .cortex-widget-shell__history {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  max-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.cortex-widget-shell[data-has-history="true"] .cortex-widget-shell__rail,
+.cortex-widget-shell[data-has-history="true"] .cortex-widget-shell__history {
+  background: var(--cortex-shell-nav-bg);
+}
+
+.cortex-widget-shell[data-has-history="true"] .cortex-widget-shell__history {
+  flex: 0 0 clamp(236px, 30%, 340px);
+}
+
+.cortex-widget-shell__chat {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0 6px 6px 0;
+  background: var(--cortex-shell-chat-bg);
 }
 
 .cortex-widget[data-mode="embedded"] .cortex-widget__panel {
@@ -269,6 +316,8 @@ export const layoutStyles = `
   min-width: 0;
   min-height: 38px;
   max-height: 112px;
+  overflow-y: hidden;
+  resize: none;
 }
 
 .cortex-widget__actions {

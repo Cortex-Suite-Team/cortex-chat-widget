@@ -39,8 +39,17 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   launcher.type = 'button';
   launcher.setAttribute('data-testid', 'launcher');
 
-  const panel = createElement('section', 'cortex-widget__panel');
+  const panel = createElement('section', 'cortex-widget__panel cortex-widget-shell');
   panel.setAttribute('data-testid', 'panel');
+  panel.setAttribute('data-has-history', 'false');
+
+  const shellRail = createElement('div', 'cortex-widget-shell__rail');
+  shellRail.setAttribute('aria-hidden', 'true');
+  shellRail.setAttribute('data-testid', 'widget-shell-rail');
+  const historySlot = createElement('div', 'cortex-widget-shell__history');
+  historySlot.setAttribute('data-testid', 'widget-history-slot');
+  const chatSlot = createElement('div', 'cortex-widget-shell__chat');
+  chatSlot.setAttribute('data-testid', 'widget-chat-slot');
 
   const header = createElement('header', 'cortex-widget__header');
   const headerMain = createElement('div', 'cortex-widget__header-main');
@@ -129,7 +138,7 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   sendButton.setAttribute('aria-label', 'Send message');
   sendButton.setAttribute('title', 'Send message');
   sendButton.setAttribute('data-testid', 'send-button');
-  sendButton.innerHTML = getIconSvg('send-fill');
+  sendButton.innerHTML = getIconSvg('arrow-up');
 
   attachWrap.append(fileInput, attachButton);
   actions.append(fileHint);
@@ -140,7 +149,8 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   headerMain.append(avatar, headerText);
   header.append(headerMain);
   body.append(errorBanner, transcript, workerStatus, typing, escalation, authGate, composer);
-  panel.append(header, body);
+  chatSlot.append(header, body);
+  panel.append(shellRail, historySlot, chatSlot);
 
   if (options.mode === 'floating') {
     root.append(panel, launcher);
@@ -156,6 +166,10 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
     root,
     launcher,
     panel,
+    shell: panel,
+    shellRail,
+    historySlot,
+    chatSlot,
     title,
     subtitle,
     status,

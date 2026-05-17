@@ -29,7 +29,8 @@ function getChatShadow(): ShadowRoot {
 }
 
 function getHistoryShadow(): ShadowRoot {
-  const host = document.querySelector('#history > *') as HTMLElement | null;
+  const chatShadow = getChatShadow();
+  const host = chatShadow.querySelector('[data-testid="widget-history-slot"] > *') as HTMLElement | null;
   if (!host?.shadowRoot) {
     throw new Error('Expected history shadow root');
   }
@@ -345,7 +346,7 @@ describe('widget history', () => {
 
     const historyShadow = getHistoryShadow();
     const historyRoot = historyShadow.querySelector('.cortex-widget-history') as HTMLElement;
-    const historyHost = document.querySelector('#history > *') as HTMLElement;
+    const historyHost = getChatShadow().querySelector('[data-testid="widget-history-slot"] > *') as HTMLElement;
 
     expect(historyRoot.classList.contains('cortex-widget-history--dark')).toBe(true);
     expect(historyRoot.classList.contains('cortex-widget-history--light')).toBe(false);
