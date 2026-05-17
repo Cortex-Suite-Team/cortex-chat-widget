@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.8 builtAt=2026-05-17T11:12:37.030Z */
+/* cortex-chat-widget build: sdk=1.1.8 builtAt=2026-05-17T11:28:49.025Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -1581,8 +1581,30 @@ var historyStyles = `
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, #ffffff 28%, transparent) transparent;
+}
+
+.cortex-widget-history__list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cortex-widget-history__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cortex-widget-history__list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, #ffffff 24%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.cortex-widget-history__list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, #ffffff 38%, transparent);
+  background-clip: content-box;
 }
 
 .cortex-widget-history__empty,
@@ -1608,25 +1630,29 @@ var historyStyles = `
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  padding: 10px 12px;
+  padding: 4px 6px;
   border: 1px solid transparent;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.055);
+  border-radius: 6px;
+  background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
+.cortex-widget-history__row:hover {
+  background: color-mix(in srgb, #ffffff 7%, transparent);
+}
+
 .cortex-widget-history__row[data-active="true"] {
-  border-color: color-mix(in srgb, var(--cortex-accent-color) 22%, transparent);
-  background: color-mix(in srgb, var(--cortex-accent-color) 22%, rgba(255, 255, 255, 0.07) 78%);
+  border-color: color-mix(in srgb, var(--cortex-accent-color) 38%, transparent);
+  background: color-mix(in srgb, var(--cortex-accent-color) 18%, transparent);
 }
 
 .cortex-widget-history__row[data-pinned="true"] {
-  border-color: color-mix(in srgb, var(--cortex-accent-color) 16%, transparent);
+  color: color-mix(in srgb, #ffffff 92%, var(--cortex-accent-color) 8%);
 }
 
 .cortex-widget-history__row-title {
@@ -1683,8 +1709,8 @@ var historyStyles = `
   right: 10px;
   z-index: 2;
   min-width: 140px;
-  padding: 6px;
-  border-radius: 12px;
+  padding: 4px;
+  border-radius: 8px;
   border: 1px solid var(--cortex-border-color);
   background: #111827;
   box-shadow: var(--cortex-shadow-md);
@@ -1699,12 +1725,12 @@ var historyStyles = `
 
 .cortex-widget-history__menu-action {
   border: 0;
-  border-radius: 10px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
-  padding: 8px 10px;
+  padding: 6px 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
