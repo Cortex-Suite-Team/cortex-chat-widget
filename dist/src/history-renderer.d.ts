@@ -3,20 +3,24 @@ export type HistoryRenderState = {
     kind: 'loading';
     liveSessionId: string | null;
     liveSelected: boolean;
+    liveTitle: string | null;
 } | {
     kind: 'empty';
     liveSessionId: string | null;
     liveSelected: boolean;
+    liveTitle: string | null;
 } | {
     kind: 'error';
     message: string;
     liveSessionId: string | null;
     liveSelected: boolean;
+    liveTitle: string | null;
 } | {
     kind: 'loaded';
     items: HistoryConversationSummary[];
     liveSessionId: string | null;
     liveSelected: boolean;
+    liveTitle: string | null;
     selectedHistoricalSessionId: string | null;
     menuSessionId: string | null;
 };
