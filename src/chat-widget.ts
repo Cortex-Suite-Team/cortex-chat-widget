@@ -804,6 +804,9 @@ export class ChatWidget {
   }
 
   private handleHistoryError(error: unknown, code: string, message: string): void {
+    if (this.ui.isDestroyed) {
+      return;
+    }
     this.ui.error = toWidgetError(error, code, message);
     this.options.onError?.(error);
     this.notifyAndRender();
