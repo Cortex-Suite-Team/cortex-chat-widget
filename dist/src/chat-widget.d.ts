@@ -70,5 +70,7 @@ export declare class ChatWidget {
     private handleHistoryError;
     private resolveUploadError;
     private resolveRuntimeError;
+    private extractRuntimeChatTitle;
+    private readUnknownPath;
 }
 //# sourceMappingURL=chat-widget.d.ts.map

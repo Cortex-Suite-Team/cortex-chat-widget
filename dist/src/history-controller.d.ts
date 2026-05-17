@@ -31,6 +31,9 @@ export declare class HistoryController {
     private refreshGeneration;
     private messagesGeneration;
     private readonly pinStore;
+    private readonly manuallyRenamedSessionIds;
+    private readonly manualTitleBySessionId;
+    private readonly lastAutoTitleBySessionId;
     private readonly state;
     private readonly onNewChatClick;
     private readonly onListClick;
@@ -45,6 +48,7 @@ export declare class HistoryController {
     destroy(): void;
     setClient(client: HistoryClient | null): void;
     setLiveSessionId(sessionId: string | null): void;
+    applyRuntimeTitle(title: string): void;
     refresh(): Promise<void>;
     render(): void;
     private handleNewChatClick;
@@ -53,5 +57,9 @@ export declare class HistoryController {
     private handleMenuAction;
     private computeRenderKey;
     private getRenderItems;
+    private normalizeRuntimeTitle;
+    private isManualTitle;
+    private markManualRename;
+    private syncLiveTitleFromItems;
 }
 //# sourceMappingURL=history-controller.d.ts.map
