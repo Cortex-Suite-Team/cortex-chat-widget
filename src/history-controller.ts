@@ -104,6 +104,8 @@ export class HistoryController {
       this.state.items = [];
       this.state.errorMessage = null;
       this.state.menuSessionId = null;
+      this.state.selection = this.state.liveSessionId ? { kind: 'current' } : { kind: 'none' };
+      this.lastRenderKey = '';
       this.render();
       return;
     }

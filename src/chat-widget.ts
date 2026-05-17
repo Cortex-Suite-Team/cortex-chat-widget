@@ -260,10 +260,11 @@ export class ChatWidget {
       dispose();
       this.domCleanup.delete(dispose);
     }
+    const disconnectPromise = this.controller.disconnect();
     this.controller.destroy();
     this.dom.host.remove();
     try {
-      await this.controller.disconnect();
+      await disconnectPromise;
     } catch {}
   }
 

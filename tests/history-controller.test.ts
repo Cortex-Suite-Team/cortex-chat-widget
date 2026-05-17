@@ -197,6 +197,39 @@ describe('HistoryController', () => {
     expect(callbacks.onOpenHistorical).toHaveBeenCalledTimes(1);
   });
 
+  it('setClient(null) clears stale historical selection before a new client is enabled', async () => {
+    const dom = createHistoryDom();
+    const callbacks = createCallbacks();
+    const oldClient = createClient({
+      listConversations: jest.fn(async () => [createSummary('sess_old', 'Old Chat')]),
+      getMessages: jest.fn(async () => [createMessage('Old answer')]),
+    });
+    const newClient = createClient({
+      listConversations: jest.fn(async () => [createSummary('sess_new', 'New Chat')]),
+    });
+    const controller = new HistoryController({ dom, options: createOptions(), callbacks });
+
+    controller.mount();
+    controller.setClient(oldClient);
+    controller.setLiveSessionId('sess_live');
+    await controller.refresh();
+
+    const oldRow = dom.shadowRoot.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    oldRow.click();
+    await flushAsyncWork();
+    expect((dom.shadowRoot.querySelector('[data-testid="history-row"]') as HTMLButtonElement).dataset.active).toBe('true');
+
+    controller.setClient(null);
+    controller.setClient(newClient);
+    await controller.refresh();
+
+    const currentRow = dom.shadowRoot.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
+    const newRow = dom.shadowRoot.querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    expect(currentRow.dataset.active).toBe('true');
+    expect(newRow.dataset.sessionId).toBe('sess_new');
+    expect(newRow.dataset.active).toBe('false');
+  });
+
   it('destroy removes listeners and prevents later state/render updates', async () => {
     const dom = createHistoryDom();
     const callbacks = createCallbacks();
