@@ -92,12 +92,21 @@ export function renderHistoryList(dom: HistoryDom, state: HistoryRenderState): v
     row.dataset.sessionId = item.session_id;
     row.dataset.active = String(state.selectedHistoricalSessionId === item.session_id);
     row.dataset.menuOpen = String(state.menuSessionId === item.session_id);
+    row.dataset.pinned = String(item.pinned);
     row.setAttribute('data-testid', 'history-row');
 
     const title = document.createElement('span');
     title.className = 'cortex-widget-history__row-title';
     title.textContent = item.title;
     title.setAttribute('data-testid', 'history-row-title');
+
+    const pinIndicator = document.createElement('span');
+    pinIndicator.className = 'cortex-widget-history__row-pin';
+    pinIndicator.setAttribute('aria-hidden', 'true');
+    if (item.pinned) {
+      pinIndicator.innerHTML = getIconSvg('pin-angle-fill');
+      pinIndicator.setAttribute('data-testid', 'history-pinned-icon');
+    }
 
     const menuToggle = document.createElement('button');
     menuToggle.type = 'button';
@@ -111,17 +120,38 @@ export function renderHistoryList(dom: HistoryDom, state: HistoryRenderState): v
     menu.className = 'cortex-widget-history__menu';
     menu.setAttribute('data-testid', 'history-menu');
 
-    for (const action of ['Pin', 'Rename', 'Delete']) {
+    const actions = [
+      {
+        action: 'pin',
+        label: item.pinned ? 'Unpin' : 'Pin',
+        icon: item.pinned ? 'pin-angle' : 'pin-angle-fill',
+      },
+      { action: 'rename', label: 'Rename', icon: 'pencil-square' },
+      { action: 'delete', label: 'Delete', icon: 'trash' },
+    ] as const;
+
+    for (const action of actions) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'cortex-widget-history__menu-action';
       button.dataset.sessionId = item.session_id;
-      button.dataset.action = action.toLowerCase();
-      button.textContent = action;
+      button.dataset.action = action.action;
+
+      const icon = document.createElement('span');
+      icon.className = 'cortex-widget-history__menu-action-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.setAttribute('data-testid', 'history-menu-action-icon');
+      icon.innerHTML = getIconSvg(action.icon);
+
+      const label = document.createElement('span');
+      label.className = 'cortex-widget-history__menu-action-label';
+      label.textContent = action.label;
+
+      button.append(icon, label);
       menu.appendChild(button);
     }
 
-    row.append(title, menuToggle, menu);
+    row.append(title, pinIndicator, menuToggle, menu);
     dom.list.appendChild(row);
   }
 

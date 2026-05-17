@@ -26,6 +26,90 @@ interface HistoryControllerState {
   errorMessage: string | null;
 }
 
+const HISTORY_PIN_STORAGE_KEY = 'cortex-chat-widget:history-pins:v1';
+
+export class HistoryPinStore {
+  private readonly storage: Storage | null;
+  private readonly key: string;
+  private memoryPins: Record<string, true> = {};
+
+  constructor(storage: Storage | null, key: string) {
+    this.storage = storage;
+    this.key = key;
+    this.memoryPins = this.readPins();
+  }
+
+  isPinned(sessionId: string): boolean {
+    return this.memoryPins[sessionId] === true;
+  }
+
+  setPinned(sessionId: string, pinned: boolean): void {
+    if (!sessionId) {
+      return;
+    }
+    if (pinned) {
+      this.memoryPins[sessionId] = true;
+    } else {
+      delete this.memoryPins[sessionId];
+    }
+    this.writePins();
+  }
+
+  toggle(sessionId: string): boolean {
+    const nextPinned = !this.isPinned(sessionId);
+    this.setPinned(sessionId, nextPinned);
+    return nextPinned;
+  }
+
+  snapshot(): Record<string, true> {
+    return { ...this.memoryPins };
+  }
+
+  private readPins(): Record<string, true> {
+    if (!this.storage) {
+      return {};
+    }
+    try {
+      const raw = this.storage.getItem(this.key);
+      if (!raw) {
+        return {};
+      }
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return {};
+      }
+      const pins: Record<string, true> = {};
+      for (const [sessionId, value] of Object.entries(parsed)) {
+        if (value === true) {
+          pins[sessionId] = true;
+        }
+      }
+      return pins;
+    } catch {
+      return {};
+    }
+  }
+
+  private writePins(): void {
+    if (!this.storage) {
+      return;
+    }
+    try {
+      this.storage.setItem(this.key, JSON.stringify(this.memoryPins));
+    } catch {
+      // Keep the in-memory snapshot if browser storage is unavailable.
+    }
+  }
+}
+
+function getLocalStorage(): Storage | null {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export class HistoryController {
   private readonly dom: HistoryDom;
   private readonly options: NormalizedWidgetOptions;
@@ -37,6 +121,7 @@ export class HistoryController {
   private lastRenderKey = '';
   private refreshGeneration = 0;
   private messagesGeneration = 0;
+  private readonly pinStore: HistoryPinStore;
   private readonly state: HistoryControllerState = {
     status: 'disabled',
     items: [],
@@ -59,11 +144,13 @@ export class HistoryController {
     options: NormalizedWidgetOptions;
     callbacks: HistoryControllerCallbacks;
     debug?: DebugLogger;
+    pinStore?: HistoryPinStore;
   }) {
     this.dom = args.dom;
     this.options = args.options;
     this.callbacks = args.callbacks;
     this.debug = args.debug;
+    this.pinStore = args.pinStore ?? new HistoryPinStore(getLocalStorage(), HISTORY_PIN_STORAGE_KEY);
   }
 
   mount(): void {
@@ -202,7 +289,7 @@ export class HistoryController {
 
     renderHistoryList(this.dom, {
       kind: 'loaded',
-      items: this.state.items,
+      items: this.getRenderItems(),
       liveSessionId: this.state.liveSessionId,
       liveSelected,
       selectedHistoricalSessionId: this.state.selection.kind === 'historical'
@@ -319,13 +406,8 @@ export class HistoryController {
         }
         await this.refresh();
       } else if (action === 'pin') {
-        const current = this.state.items.find((item) => item.session_id === sessionId);
-        if (current?.pinned) {
-          await this.client.unpinConversation(sessionId);
-        } else {
-          await this.client.pinConversation(sessionId);
-        }
-        await this.refresh();
+        this.pinStore.toggle(sessionId);
+        this.render();
       }
     } catch (error) {
       this.callbacks.onError(error, `history_${action || 'action'}_failed`, 'Chat update failed');
@@ -334,7 +416,7 @@ export class HistoryController {
   }
 
   private computeRenderKey(): string {
-    const itemsSig = this.state.items
+    const itemsSig = this.getRenderItems()
       .map((item) => `${item.session_id}:${item.title}:${item.pinned ? '1' : '0'}`)
       .join(',');
     const selectionSig = this.state.selection.kind === 'historical'
@@ -347,7 +429,25 @@ export class HistoryController {
       this.state.menuSessionId ?? '',
       this.state.errorMessage ?? '',
       itemsSig,
+      Object.keys(this.pinStore.snapshot()).sort().join(','),
       this.options.mode,
     ].join('|');
+  }
+
+  private getRenderItems(): HistoryConversationSummary[] {
+    const derived = this.state.items.map((item) => ({
+      ...item,
+      pinned: this.pinStore.isPinned(item.session_id),
+    }));
+    const pinned: HistoryConversationSummary[] = [];
+    const unpinned: HistoryConversationSummary[] = [];
+    for (const item of derived) {
+      if (item.pinned) {
+        pinned.push(item);
+      } else {
+        unpinned.push(item);
+      }
+    }
+    return [...pinned, ...unpinned];
   }
 }

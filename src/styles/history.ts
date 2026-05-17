@@ -110,12 +110,36 @@ export const historyStyles = `
   background: color-mix(in srgb, var(--cortex-accent-color) 10%, var(--cortex-background-color) 90%);
 }
 
+.cortex-widget-history__row[data-pinned="true"] {
+  border-color: color-mix(in srgb, var(--cortex-accent-color) 16%, transparent);
+}
+
 .cortex-widget-history__row-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cortex-widget-history__row-pin {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cortex-accent-color);
+  opacity: 0.9;
+}
+
+.cortex-widget-history__row-pin:empty {
+  display: none;
+}
+
+.cortex-widget-history__row-pin svg {
+  width: 14px;
+  height: 14px;
 }
 
 .cortex-widget-history__menu-toggle {
@@ -167,6 +191,23 @@ export const historyStyles = `
   text-align: left;
   padding: 8px 10px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cortex-widget-history__menu-action-icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cortex-muted-text);
+}
+
+.cortex-widget-history__menu-action-label {
+  min-width: 0;
 }
 
 .cortex-widget-history__menu-action:hover {

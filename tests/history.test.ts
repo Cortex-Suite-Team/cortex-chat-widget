@@ -43,6 +43,7 @@ function getFetchMock(): any {
 describe('widget history', () => {
   beforeEach(() => {
     resetMocks();
+    window.localStorage.clear();
     global.fetch = jest.fn() as unknown as typeof fetch;
   });
 
@@ -74,8 +75,9 @@ describe('widget history', () => {
     }).toThrow('historyTarget requires controlPlaneUrl');
   });
 
-  it('renders history panel, preserves backend order, and shows title-only rows plus actions', async () => {
+  it('renders history panel, preserves backend order, pinned state, and menu actions', async () => {
     installTargets();
+    window.localStorage.setItem('cortex-chat-widget:history-pins:v1', JSON.stringify({ sess_b: true }));
     getFetchMock().mockResolvedValueOnce(mockJsonResponse({
       ok: true,
       data: {
@@ -103,13 +105,31 @@ describe('widget history', () => {
     expect(historyShadow.textContent).not.toContain('2026');
     expect(historyShadow.textContent).not.toContain('preview');
 
-    const toggle = historyShadow.querySelector('[data-testid="history-menu-toggle"]') as HTMLButtonElement;
-    toggle.click();
+    const rows = historyShadow.querySelectorAll('[data-testid="history-row"]') as NodeListOf<HTMLButtonElement>;
+    expect(rows[0].dataset.pinned).toBe('true');
+    expect(rows[1].dataset.pinned).toBe('false');
+    expect(rows[0].querySelector('[data-testid="history-pinned-icon"]')).not.toBeNull();
+    expect(rows[1].querySelector('[data-testid="history-pinned-icon"]')).toBeNull();
+
+    const pinnedToggle = rows[0].querySelector('[data-testid="history-menu-toggle"]') as HTMLButtonElement;
+    pinnedToggle.click();
 
     const menu = historyShadow.querySelector('[data-testid="history-menu"]') as HTMLElement;
-    expect(menu.textContent).toContain('Pin');
+    expect(menu.textContent).toContain('Unpin');
     expect(menu.textContent).toContain('Rename');
     expect(menu.textContent).toContain('Delete');
+    expect(menu.querySelectorAll('[data-testid="history-menu-action-icon"]')).toHaveLength(3);
+    const pinnedPinAction = menu.querySelector('[data-action="pin"]') as HTMLButtonElement;
+    expect(pinnedPinAction.textContent).toContain('Unpin');
+    expect(pinnedPinAction.dataset.action).toBe('pin');
+
+    pinnedToggle.click();
+    const unpinnedToggle = rows[1].querySelector('[data-testid="history-menu-toggle"]') as HTMLButtonElement;
+    unpinnedToggle.click();
+
+    const unpinnedPinAction = rows[1].querySelector('[data-action="pin"]') as HTMLButtonElement;
+    expect(unpinnedPinAction.textContent).toContain('Pin');
+    expect(unpinnedPinAction.dataset.action).toBe('pin');
   });
 
   it('clicking a history row loads read-only transcript and disables composer', async () => {

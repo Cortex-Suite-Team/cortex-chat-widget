@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { createHistoryDom } from '../src/history-dom.js';
-import { HistoryController, type HistoryControllerCallbacks } from '../src/history-controller.js';
+import { HistoryController, HistoryPinStore, type HistoryControllerCallbacks } from '../src/history-controller.js';
 import type { ChatMessageViewModel, HistoryClient, HistoryConversationSummary, NormalizedWidgetOptions } from '../src/types.js';
 
 function createOptions(): NormalizedWidgetOptions {
@@ -27,6 +27,29 @@ function createCallbacks(): jest.Mocked<HistoryControllerCallbacks> {
   };
 }
 
+function createMemoryStorage(initial: Record<string, true> = {}): Storage {
+  const data = new Map<string, string>();
+  data.set('cortex-chat-widget:history-pins:v1', JSON.stringify(initial));
+  return {
+    get length() {
+      return data.size;
+    },
+    clear: jest.fn(() => data.clear()),
+    getItem: jest.fn((key: string) => data.get(key) ?? null),
+    key: jest.fn((index: number) => Array.from(data.keys())[index] ?? null),
+    removeItem: jest.fn((key: string) => {
+      data.delete(key);
+    }),
+    setItem: jest.fn((key: string, value: string) => {
+      data.set(key, value);
+    }),
+  };
+}
+
+function createPinStore(storage: Storage | null = createMemoryStorage()): HistoryPinStore {
+  return new HistoryPinStore(storage, 'cortex-chat-widget:history-pins:v1');
+}
+
 function createClient(overrides: Partial<HistoryClient> = {}): jest.Mocked<HistoryClient> {
   return {
     listConversations: jest.fn(async () => []),
@@ -39,12 +62,12 @@ function createClient(overrides: Partial<HistoryClient> = {}): jest.Mocked<Histo
   } as jest.Mocked<HistoryClient>;
 }
 
-function createSummary(sessionId: string, title: string): HistoryConversationSummary {
+function createSummary(sessionId: string, title: string, pinned = false): HistoryConversationSummary {
   return {
     session_id: sessionId,
     title,
     renamed: false,
-    pinned: false,
+    pinned,
     last_message_at: '2026-05-16T10:00:00Z',
     created_at: '2026-05-16T09:00:00Z',
   };
@@ -128,6 +151,105 @@ describe('HistoryController', () => {
     await flushAsyncWork();
 
     expect(callbacks.onStartNewChat).toHaveBeenCalledTimes(1);
+  });
+
+  it('pin menu action updates local storage and never calls backend pin APIs', async () => {
+    const dom = createHistoryDom();
+    const callbacks = createCallbacks();
+    const storage = createMemoryStorage({ sess_unpin: true });
+    const pinStore = createPinStore(storage);
+    const client = createClient({
+      listConversations: jest.fn(async () => [
+          createSummary('sess_pin', 'Pin me', false),
+          createSummary('sess_unpin', 'Unpin me', false),
+      ]),
+    });
+    const controller = new HistoryController({ dom, options: createOptions(), callbacks, pinStore });
+
+    controller.mount();
+    controller.setClient(client);
+    controller.setLiveSessionId('sess_live');
+    await controller.refresh();
+
+    const pinRow = dom.shadowRoot.querySelector('[data-session-id="sess_pin"]') as HTMLButtonElement;
+    const unpinRow = dom.shadowRoot.querySelector('[data-session-id="sess_unpin"]') as HTMLButtonElement;
+    const pinAction = pinRow.querySelector('[data-action="pin"]') as HTMLButtonElement;
+    const unpinAction = unpinRow.querySelector('[data-action="pin"]') as HTMLButtonElement;
+
+    expect(pinAction.textContent).toContain('Pin');
+    expect(pinAction.dataset.action).toBe('pin');
+    expect(unpinAction.textContent).toContain('Unpin');
+    expect(unpinAction.dataset.action).toBe('pin');
+
+    pinAction.click();
+    await flushAsyncWork();
+    expect(pinStore.isPinned('sess_pin')).toBe(true);
+    expect(JSON.parse(storage.getItem('cortex-chat-widget:history-pins:v1') ?? '{}')).toMatchObject({
+      sess_pin: true,
+      sess_unpin: true,
+    });
+    expect(client.pinConversation).not.toHaveBeenCalled();
+
+    const refreshedRows = dom.shadowRoot.querySelectorAll('[data-testid="history-row"]') as NodeListOf<HTMLButtonElement>;
+    const refreshedUnpinAction = Array.from(refreshedRows)
+      .find((row) => row.dataset.sessionId === 'sess_unpin')!
+      .querySelector('[data-action="pin"]') as HTMLButtonElement;
+    refreshedUnpinAction.click();
+    await flushAsyncWork();
+    expect(pinStore.isPinned('sess_unpin')).toBe(false);
+    expect(JSON.parse(storage.getItem('cortex-chat-widget:history-pins:v1') ?? '{}')).toEqual({
+      sess_pin: true,
+    });
+    expect(client.unpinConversation).not.toHaveBeenCalled();
+  });
+
+  it('uses local pin state for rendering and sorting, ignoring backend pinned fields', async () => {
+    const dom = createHistoryDom();
+    const callbacks = createCallbacks();
+    const pinStore = createPinStore(createMemoryStorage({ sess_c: true, sess_a: true }));
+    const client = createClient({
+      listConversations: jest.fn(async () => [
+        createSummary('sess_a', 'A local pinned, backend false', false),
+        createSummary('sess_b', 'B backend pinned only', true),
+        createSummary('sess_c', 'C local pinned, backend false', false),
+        createSummary('sess_d', 'D unpinned', false),
+      ]),
+    });
+    const controller = new HistoryController({ dom, options: createOptions(), callbacks, pinStore });
+
+    controller.mount();
+    controller.setClient(client);
+    controller.setLiveSessionId('sess_live');
+    await controller.refresh();
+
+    const rows = Array.from(dom.shadowRoot.querySelectorAll('[data-testid="history-row"]')) as HTMLButtonElement[];
+    expect(rows.map((row) => row.dataset.sessionId)).toEqual(['sess_a', 'sess_c', 'sess_b', 'sess_d']);
+    expect(rows.map((row) => row.dataset.pinned)).toEqual(['true', 'true', 'false', 'false']);
+    expect(rows[0].querySelector('[data-testid="history-pinned-icon"]')).not.toBeNull();
+    expect(rows[1].querySelector('[data-testid="history-pinned-icon"]')).not.toBeNull();
+    expect(rows[2].querySelector('[data-testid="history-pinned-icon"]')).toBeNull();
+  });
+
+  it('degrades to in-memory pin state when storage is unavailable', async () => {
+    const dom = createHistoryDom();
+    const callbacks = createCallbacks();
+    const pinStore = createPinStore(null);
+    const client = createClient({
+      listConversations: jest.fn(async () => [createSummary('sess_pin', 'Pin me')]),
+    });
+    const controller = new HistoryController({ dom, options: createOptions(), callbacks, pinStore });
+
+    controller.mount();
+    controller.setClient(client);
+    controller.setLiveSessionId('sess_live');
+    await controller.refresh();
+
+    const pinAction = dom.shadowRoot.querySelector('[data-action="pin"]') as HTMLButtonElement;
+    pinAction.click();
+    await flushAsyncWork();
+
+    expect(pinStore.isPinned('sess_pin')).toBe(true);
+    expect(client.pinConversation).not.toHaveBeenCalled();
   });
 
   it('ignores stale refresh responses', async () => {
