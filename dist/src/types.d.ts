@@ -37,6 +37,28 @@ export interface HistoryConversationSummary {
     last_message_at: string | null;
     created_at: string | null;
 }
+export interface HistoryClient {
+    listConversations(): Promise<HistoryConversationSummary[]>;
+    getMessages(sessionId: string): Promise<ChatMessageViewModel[]>;
+    renameConversation(sessionId: string, title: string): Promise<void>;
+    pinConversation(sessionId: string): Promise<void>;
+    unpinConversation(sessionId: string): Promise<void>;
+    deleteConversation(sessionId: string): Promise<void>;
+}
+export type ChatViewMode = {
+    kind: 'live';
+} | {
+    kind: 'historical';
+    sessionId: string;
+};
+export type HistorySelection = {
+    kind: 'current';
+} | {
+    kind: 'historical';
+    sessionId: string;
+} | {
+    kind: 'none';
+};
 export interface CortexChatWidgetOptions {
     apiKey: string;
     workerRef?: string;
@@ -103,7 +125,6 @@ export interface InternalWidgetState {
     cachedUploadedFile: File | null;
     draftText: string;
     error: CortexChatWidgetError | null;
-    viewMode: 'draft' | 'live' | 'historical';
 }
 export interface WidgetDom {
     host: HTMLElement;
