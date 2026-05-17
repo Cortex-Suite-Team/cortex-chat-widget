@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-17T09:54:57.800Z */
+/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-17T10:11:25.941Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -1511,12 +1511,17 @@
   --cortex-background-color: #ffffff;
   --cortex-text-color: #172033;
   display: block;
+  height: 100%;
+  min-height: 0;
   color: var(--cortex-text-color);
   line-height: 1.4;
 }
 
 .cortex-widget-history__panel {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(circle at top right, color-mix(in srgb, var(--cortex-accent-color) 10%, transparent), transparent 40%),
     linear-gradient(180deg, color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%), var(--cortex-surface-color));
@@ -1527,6 +1532,7 @@
 }
 
 .cortex-widget-history__header {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1563,6 +1569,9 @@
 }
 
 .cortex-widget-history__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -10735,10 +10744,12 @@
     appendCurrentRow(dom, state);
     if (state.kind === "loading") {
       appendStatusRow(dom, "cortex-widget-history__empty", "Loading chats...");
+      dom.list.scrollTop = savedScroll;
       return;
     }
     if (state.kind === "error") {
       appendStatusRow(dom, "cortex-widget-history__error", state.message);
+      dom.list.scrollTop = savedScroll;
       return;
     }
     if (state.kind === "empty") {
