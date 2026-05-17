@@ -63,11 +63,13 @@ export function renderHistoryList(dom: HistoryDom, state: HistoryRenderState): v
 
   if (state.kind === 'loading') {
     appendStatusRow(dom, 'cortex-widget-history__empty', 'Loading chats...');
+    dom.list.scrollTop = savedScroll;
     return;
   }
 
   if (state.kind === 'error') {
     appendStatusRow(dom, 'cortex-widget-history__error', state.message);
+    dom.list.scrollTop = savedScroll;
     return;
   }
 

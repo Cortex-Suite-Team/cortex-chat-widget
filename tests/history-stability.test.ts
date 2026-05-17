@@ -3,6 +3,7 @@ import { flushAsyncWork, resetMocks } from './helpers.js';
 import { mountCortexChat } from '../src/index.js';
 import { __getLastController, createMockChatState } from './mocks/sdk-ui.js';
 import { renderHistoryList } from '../src/history-renderer.js';
+import { historyStyles } from '../src/styles/history.js';
 import type { HistoryDom } from '../src/types.js';
 
 const ASSISTANT_MSG = {
@@ -49,6 +50,20 @@ function getHistoryShadow(): ShadowRoot {
 
 function getFetchMock(): any {
   return global.fetch as any;
+}
+
+function createHistoryItems(count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const itemNumber = index + 1;
+    return {
+      session_id: `s${itemNumber}`,
+      title: `Scroll Test ${itemNumber}`,
+      renamed: false,
+      pinned: false,
+      last_message_at: '2026-01-01T00:00:00Z',
+      created_at: '2026-01-01T00:00:00Z',
+    };
+  });
 }
 
 describe('history stability', () => {
@@ -157,9 +172,7 @@ describe('history stability', () => {
     const status = document.createElement('div');
     const dom = { list, status } as unknown as HistoryDom;
 
-    const items = [
-      { session_id: 's1', title: 'Scroll Test', renamed: false, pinned: false, last_message_at: '2026-01-01T00:00:00Z', created_at: '2026-01-01T00:00:00Z' },
-    ];
+    const items = createHistoryItems(20);
     const state = {
       kind: 'loaded' as const,
       items,
@@ -181,6 +194,76 @@ describe('history stability', () => {
 
     // scrollTop must be restored to pre-render value
     expect(list.scrollTop).toBe(120);
+  });
+
+  it('renderHistoryList preserves scrollTop when historical selection changes', () => {
+    const list = document.createElement('div');
+    const status = document.createElement('div');
+    const dom = { list, status } as unknown as HistoryDom;
+    const items = createHistoryItems(20);
+
+    renderHistoryList(dom, {
+      kind: 'loaded',
+      items,
+      liveSessionId: 's_live',
+      liveSelected: true,
+      selectedHistoricalSessionId: null,
+      menuSessionId: null,
+    });
+
+    Object.defineProperty(list, 'scrollTop', { value: 180, writable: true, configurable: true });
+
+    renderHistoryList(dom, {
+      kind: 'loaded',
+      items,
+      liveSessionId: 's_live',
+      liveSelected: false,
+      selectedHistoricalSessionId: 's12',
+      menuSessionId: null,
+    });
+
+    expect(list.scrollTop).toBe(180);
+  });
+
+  it('renderHistoryList preserves scrollTop when menuSessionId changes', () => {
+    const list = document.createElement('div');
+    const status = document.createElement('div');
+    const dom = { list, status } as unknown as HistoryDom;
+    const items = createHistoryItems(20);
+
+    renderHistoryList(dom, {
+      kind: 'loaded',
+      items,
+      liveSessionId: 's_live',
+      liveSelected: false,
+      selectedHistoricalSessionId: 's5',
+      menuSessionId: null,
+    });
+
+    Object.defineProperty(list, 'scrollTop', { value: 240, writable: true, configurable: true });
+
+    renderHistoryList(dom, {
+      kind: 'loaded',
+      items,
+      liveSessionId: 's_live',
+      liveSelected: false,
+      selectedHistoricalSessionId: 's5',
+      menuSessionId: 's14',
+    });
+
+    expect(list.scrollTop).toBe(240);
+    const openMenuRow = list.querySelector('[data-session-id="s14"]') as HTMLElement;
+    expect(openMenuRow.dataset.menuOpen).toBe('true');
+  });
+
+  it('history list is styled as the scroll container', () => {
+    expect(historyStyles).toMatch(/\.cortex-widget-history__panel\s*{[^}]*height:\s*100%/s);
+    expect(historyStyles).toMatch(/\.cortex-widget-history__panel\s*{[^}]*display:\s*flex/s);
+    expect(historyStyles).toMatch(/\.cortex-widget-history__panel\s*{[^}]*flex-direction:\s*column/s);
+    expect(historyStyles).toMatch(/\.cortex-widget-history__header\s*{[^}]*flex:\s*0 0 auto/s);
+    expect(historyStyles).toMatch(/\.cortex-widget-history__list\s*{[^}]*flex:\s*1/s);
+    expect(historyStyles).toMatch(/\.cortex-widget-history__list\s*{[^}]*min-height:\s*0/s);
+    expect(historyStyles).toMatch(/\.cortex-widget-history__list\s*{[^}]*overflow-y:\s*auto/s);
   });
 });
 

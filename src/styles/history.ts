@@ -4,12 +4,17 @@ export const historyStyles = `
   --cortex-background-color: #ffffff;
   --cortex-text-color: #172033;
   display: block;
+  height: 100%;
+  min-height: 0;
   color: var(--cortex-text-color);
   line-height: 1.4;
 }
 
 .cortex-widget-history__panel {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(circle at top right, color-mix(in srgb, var(--cortex-accent-color) 10%, transparent), transparent 40%),
     linear-gradient(180deg, color-mix(in srgb, var(--cortex-background-color) 97%, #ffffff 3%), var(--cortex-surface-color));
@@ -20,6 +25,7 @@ export const historyStyles = `
 }
 
 .cortex-widget-history__header {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -56,6 +62,9 @@ export const historyStyles = `
 }
 
 .cortex-widget-history__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
