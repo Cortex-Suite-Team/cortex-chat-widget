@@ -205,6 +205,49 @@ describe('widget history', () => {
     expect(getFetchMock().mock.calls.filter((call: any[]) => String(call[0]).includes('/api/chat/conversations/'))).toHaveLength(1);
   });
 
+  it('sending while history is mounted stays in live mode and does not refresh conversations', async () => {
+    installTargets();
+    getFetchMock().mockResolvedValueOnce(mockJsonResponse({
+      ok: true,
+      data: {
+        conversations: [
+          { session_id: 'sess_hist', title: 'Existing chat', renamed: false, pinned: false, last_message_at: '2026-05-11T10:00:00Z', created_at: '2026-05-11T09:00:00Z' },
+        ],
+      },
+    }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+
+    const controller = __getLastController()!;
+    controller.setState(createMockChatState());
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+    const currentRow = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
+    currentRow.click();
+    await flushAsyncWork();
+    expect((historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement).dataset.active).toBe('true');
+
+    const chatShadow = getChatShadow();
+    const textarea = chatShadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = chatShadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+
+    changeInput(textarea, 'Continue current chat');
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(controller.sendCalls).toHaveLength(1);
+    expect((historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement).dataset.active).toBe('true');
+    expect(textarea.placeholder).not.toContain('read-only');
+    expect(getFetchMock().mock.calls.filter((call: any[]) => String(call[0]).includes('/api/chat/conversations/'))).toHaveLength(1);
+  });
+
   it('delete removes item after backend success', async () => {
     installTargets();
     getFetchMock()

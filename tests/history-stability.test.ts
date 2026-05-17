@@ -357,7 +357,7 @@ describe('Current Chat row', () => {
     expect(chatShadow.querySelector('[data-testid="transcript"]')!.textContent).toContain('Old answer');
   });
 
-  it('New Chat button sets draft mode independently of Current Chat row', async () => {
+  it('header New Chat button currently sets draft mode independently of Current Chat row', async () => {
     installTargets();
     getFetchMock().mockResolvedValueOnce(mockJson({ ok: true, data: { conversations: [] } }));
 
@@ -381,6 +381,32 @@ describe('Current Chat row', () => {
     const draftRow = historyShadow.querySelector('[data-testid="history-draft-row"]') as HTMLButtonElement;
     expect(draftRow.dataset.active).toBe('true');
     expect(historyShadow.querySelector('[data-testid="history-current-row"]')!.getAttribute('data-active')).toBe('false');
+
+    const textarea = getChatShadow().querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(false);
+  });
+
+  it('legacy scrollable draft row currently sets draft mode independently of Current Chat row', async () => {
+    installTargets();
+    getFetchMock().mockResolvedValueOnce(mockJson({ ok: true, data: { conversations: [] } }));
+
+    mountCortexChat({ apiKey: 'test-key', mode: 'embedded', target: '#chat', historyTarget: '#history', controlPlaneUrl: 'https://cp.example.test' });
+    __getLastController()!.setState(createMockChatState());
+    await flushAsyncWork();
+
+    const historyShadow = getHistoryShadow();
+
+    const currentRow = historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement;
+    currentRow.click();
+    await flushAsyncWork();
+    expect((historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement).dataset.active).toBe('true');
+
+    const draftRow = historyShadow.querySelector('[data-testid="history-draft-row"]') as HTMLButtonElement;
+    draftRow.click();
+    await flushAsyncWork();
+
+    expect((historyShadow.querySelector('[data-testid="history-draft-row"]') as HTMLButtonElement).dataset.active).toBe('true');
+    expect((historyShadow.querySelector('[data-testid="history-current-row"]') as HTMLButtonElement).dataset.active).toBe('false');
 
     const textarea = getChatShadow().querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(false);

@@ -24,6 +24,14 @@ function getFetchMock(): any {
   return global.fetch as any;
 }
 
+function getChatShadow(): ShadowRoot {
+  const host = document.querySelector('#chat > *') as HTMLElement | null;
+  if (!host?.shadowRoot) {
+    throw new Error('Expected chat shadow root');
+  }
+  return host.shadowRoot;
+}
+
 describe('widget history gate', () => {
   beforeEach(() => {
     resetMocks();
@@ -178,5 +186,65 @@ describe('widget history gate', () => {
     await flushAsyncWork();
 
     expect(getFetchMock()).not.toHaveBeenCalled();
+  });
+
+  it('auth-required flow does not load history until accepted session-ready state, then uses Bearer token', async () => {
+    installTargets();
+    getFetchMock().mockResolvedValue(mockJsonResponse({ ok: true, data: { conversations: [] } }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+
+    const controller = __getLastController()!;
+    controller.setState(createMockChatState({
+      auth: { state: 'required' },
+      connection: {
+        isSessionReady: false,
+        channelState: 'OPEN',
+        sessionState: 'AUTH_REQUIRED',
+        sessionId: null,
+        isConnected: true,
+        isStale: false,
+      },
+    }));
+    await flushAsyncWork();
+
+    expect(getFetchMock()).not.toHaveBeenCalled();
+
+    const shadow = getChatShadow();
+    const loginInput = shadow.querySelector('[data-testid="auth-login-input"]') as HTMLInputElement;
+    const passwordInput = shadow.querySelector('[data-testid="auth-password-input"]') as HTMLInputElement;
+    const submitButton = shadow.querySelector('[data-testid="auth-submit-button"]') as HTMLButtonElement;
+
+    loginInput.value = 'alice';
+    passwordInput.value = 's3cr3t';
+    submitButton.click();
+    await flushAsyncWork();
+
+    expect(controller.loginCalls).toEqual([{ login: 'alice', password: 's3cr3t' }]);
+    expect(getFetchMock()).not.toHaveBeenCalled();
+
+    controller.setState(createMockChatState({
+      auth: { state: 'accepted' },
+      connection: {
+        isSessionReady: true,
+        channelState: 'OPEN',
+        sessionState: 'ACTIVE',
+        sessionId: 'sess_auth',
+        isConnected: true,
+        isStale: false,
+      },
+    }));
+    await flushAsyncWork();
+
+    expect(getFetchMock()).toHaveBeenCalledTimes(1);
+    const [, requestInit] = getFetchMock().mock.calls[0] as [string, RequestInit];
+    const authHeader = (requestInit?.headers as Record<string, string>)?.Authorization ?? '';
+    expect(authHeader).toBe('Bearer mock-access-token');
   });
 });
