@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-17T09:36:45.856Z */
+/* cortex-chat-widget loader build: sdk=1.1.8 builtAt=2026-05-17T09:54:57.800Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -10850,6 +10850,8 @@
         this.state.items = [];
         this.state.errorMessage = null;
         this.state.menuSessionId = null;
+        this.state.selection = this.state.liveSessionId ? { kind: "current" } : { kind: "none" };
+        this.lastRenderKey = "";
         this.render();
         return;
       }
@@ -11930,10 +11932,11 @@
         dispose();
         this.domCleanup.delete(dispose);
       }
+      const disconnectPromise = this.controller.disconnect();
       this.controller.destroy();
       this.dom.host.remove();
       try {
-        await this.controller.disconnect();
+        await disconnectPromise;
       } catch {
       }
     }
