@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.9 builtAt=2026-05-17T17:12:44.474Z */
+/* cortex-chat-widget build: sdk=1.1.9 builtAt=2026-05-21T12:53:14.864Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -11569,6 +11569,18 @@ function getHeaderSubtitle(state, options) {
   const correspondent = getHeaderCorrespondent(state);
   return correspondent?.title ?? correspondent?.subtitle ?? options.subtitle;
 }
+function getQuestionRef(activeQuestion) {
+  if (!activeQuestion || typeof activeQuestion !== "object") {
+    return null;
+  }
+  const record = activeQuestion;
+  const questionRef = record["question_ref"];
+  if (typeof questionRef === "string" && questionRef.trim()) {
+    return questionRef.trim();
+  }
+  const legacyQuestionId = record["question_id"];
+  return typeof legacyQuestionId === "string" && legacyQuestionId.trim() ? legacyQuestionId.trim() : null;
+}
 function normalizeAvatarUrl(avatarUrl, options) {
   if (!avatarUrl) {
     return null;
@@ -11914,13 +11926,13 @@ function renderTranscript(transcriptEl, state, options) {
       bubble.appendChild(attachmentList);
     }
     if (message.type === "chat::question" && Array.isArray(message.meta?.["options"])) {
-      const questionId = toNonEmptyString(message.meta?.["question_id"]);
+      const questionRef = toNonEmptyString(message.meta?.["question_ref"]) ?? toNonEmptyString(message.meta?.["question_id"]);
       const inputType = toNonEmptyString(message.meta?.["input_type"]) ?? "radio";
       if (inputType === "checkbox") {
         console.warn('[cortex-chat-widget] chat::question input_type="checkbox" is not supported');
       }
-      if (questionId && inputType !== "checkbox") {
-        const isActive = state.chat.activeQuestion?.question_id === questionId;
+      if (questionRef && inputType !== "checkbox") {
+        const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
         const optionsDisabled = !isActive || state.isAwaitingAnswer;
         const optionsContainer = document.createElement("div");
         optionsContainer.className = "cortex-widget__question-options";
@@ -11933,7 +11945,7 @@ function renderTranscript(transcriptEl, state, options) {
           btn.className = "cortex-widget__question-option";
           btn.type = "button";
           btn.textContent = optionLabel;
-          btn.dataset.questionId = questionId;
+          btn.dataset.questionRef = questionRef;
           btn.dataset.optionId = optionId;
           btn.disabled = optionsDisabled;
           btn.setAttribute("data-testid", "question-option");
@@ -12153,6 +12165,18 @@ function summarizeSendPayload3(payload) {
     metaKeys: payload.meta ? Object.keys(payload.meta) : [],
     clientMsgId: payload.meta && typeof payload.meta.client_msg_id === "string" ? payload.meta.client_msg_id : void 0
   };
+}
+function getQuestionRef2(activeQuestion) {
+  if (!activeQuestion || typeof activeQuestion !== "object") {
+    return null;
+  }
+  const record = activeQuestion;
+  const questionRef = record["question_ref"];
+  if (typeof questionRef === "string" && questionRef.trim()) {
+    return questionRef.trim();
+  }
+  const legacyQuestionId = record["question_id"];
+  return typeof legacyQuestionId === "string" && legacyQuestionId.trim() ? legacyQuestionId.trim() : null;
 }
 var ChatWidget = class {
   constructor(args) {
@@ -12675,7 +12699,8 @@ ${token}`;
         return;
       }
     }
-    const questionMeta = activeQuestion ? { question_id: activeQuestion.question_id, selected_option: "reply" } : void 0;
+    const questionRef = getQuestionRef2(activeQuestion);
+    const questionMeta = questionRef ? { question_ref: questionRef, selected_option: "reply" } : void 0;
     try {
       const sendRequest = {
         content: [content],
@@ -12725,14 +12750,14 @@ ${token}`;
     }
     this.notifyAndRender();
   }
-  async handleOptionSelect(questionId, optionId, optionLabel) {
+  async handleOptionSelect(questionRef, optionId, optionLabel) {
     if (this.ui.isDestroyed || this.ui.isAwaitingAnswer || this.chatView.kind === "historical") {
       return;
     }
     try {
       const result = await this.controller.sendMessage({
         content: [optionLabel],
-        meta: { question_id: questionId, selected_option: optionId }
+        meta: { question_ref: questionRef, selected_option: optionId }
       });
       if (!result.ok) {
         this.ui.isAwaitingAnswer = false;
@@ -12765,10 +12790,11 @@ ${token}`;
     }
     const btn = event.target.closest(".cortex-widget__question-option");
     if (!btn || btn.disabled) return;
-    const { questionId, optionId } = btn.dataset;
+    const questionRef = btn.dataset.questionRef ?? btn.dataset.questionId;
+    const { optionId } = btn.dataset;
     const optionLabel = btn.textContent ?? "";
-    if (questionId && optionId) {
-      await this.handleOptionSelect(questionId, optionId, optionLabel);
+    if (questionRef && optionId) {
+      await this.handleOptionSelect(questionRef, optionId, optionLabel);
     }
   }
   setOpen(nextOpen) {
