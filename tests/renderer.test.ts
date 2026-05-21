@@ -841,7 +841,7 @@ describe('widget renderer behavior', () => {
         content: 'What would you like to do?',
         status: 'final',
         meta: {
-          question_id: 'q_1',
+          question_ref: 'q_1',
           input_type: 'radio',
           allow_reply: true,
           options: [
@@ -851,7 +851,7 @@ describe('widget renderer behavior', () => {
         },
       }],
       activeQuestion: {
-        question_id: 'q_1',
+        question_ref: 'q_1',
         input_type: 'radio',
         allow_reply: true,
         options: [
@@ -889,14 +889,14 @@ describe('widget renderer behavior', () => {
         content: 'Choose',
         status: 'final',
         meta: {
-          question_id: 'q_await',
+          question_ref: 'q_await',
           input_type: 'radio',
           allow_reply: false,
           options: [{ id: 'ok', label: 'OK' }],
         },
       }],
       activeQuestion: {
-        question_id: 'q_await',
+        question_ref: 'q_await',
         input_type: 'radio',
         allow_reply: false,
         options: [{ id: 'ok', label: 'OK' }],
@@ -907,14 +907,14 @@ describe('widget renderer behavior', () => {
     autoClient?.emit({ type: 'chat::question', payload: {
       role: 'assistant',
       content: 'Choose',
-      meta: { question_id: 'q_await', input_type: 'radio', allow_reply: false, options: [{ id: 'ok', label: 'OK' }] },
+      meta: { question_ref: 'q_await', input_type: 'radio', allow_reply: false, options: [{ id: 'ok', label: 'OK' }] },
     }});
 
     // Re-apply state with isAwaitingAnswer via awaiting state
     applyChatState(baseChatState({
       input: { locked: false },
       activeQuestion: {
-        question_id: 'q_await',
+        question_ref: 'q_await',
         input_type: 'radio',
         allow_reply: false,
         options: [{ id: 'ok', label: 'OK' }],
@@ -926,7 +926,7 @@ describe('widget renderer behavior', () => {
         content: 'Choose',
         status: 'final',
         meta: {
-          question_id: 'q_await',
+          question_ref: 'q_await',
           input_type: 'radio',
           allow_reply: false,
           options: [{ id: 'ok', label: 'OK' }],
@@ -952,7 +952,7 @@ describe('widget renderer behavior', () => {
         content: 'Old question',
         status: 'final',
         meta: {
-          question_id: 'q_past',
+          question_ref: 'q_past',
           input_type: 'radio',
           allow_reply: true,
           options: [{ id: 'yes', label: 'Yes' }],
@@ -1215,7 +1215,7 @@ describe('worker status rendering', () => {
     applyChatState(baseChatState({
       workerState: { state: 'idle' },
       activeQuestion: {
-        question_id: 'q1',
+        question_ref: 'q1',
         input_type: 'radio',
         allow_reply: false,
         options: [{ id: 'a', label: 'Option A' }],
@@ -1226,7 +1226,7 @@ describe('worker status rendering', () => {
         role: 'assistant',
         content: 'Choose:',
         meta: {
-          question_id: 'q1',
+          question_ref: 'q1',
           input_type: 'radio',
           options: [{ id: 'a', label: 'Option A' }],
         },
@@ -1287,7 +1287,7 @@ describe('composer icon controls', () => {
 
     applyChatState(baseChatState({
       activeQuestion: {
-        question_id: 'q1',
+        question_ref: 'q1',
         input_type: 'radio',
         allow_reply: true,
         options: [],
@@ -1305,7 +1305,7 @@ describe('composer icon controls', () => {
 
     applyChatState(baseChatState({
       activeQuestion: {
-        question_id: 'q1',
+        question_ref: 'q1',
         input_type: 'radio',
         allow_reply: true,
         options: [],
@@ -1719,7 +1719,7 @@ describe('widget send result behavior', () => {
 
     applyChatState(baseChatState({
       activeQuestion: {
-        question_id: 'q1',
+        question_ref: 'q1',
         input_type: 'radio',
         allow_reply: false,
         options: [{ id: 'yes', label: 'Yes' }],
@@ -1730,7 +1730,7 @@ describe('widget send result behavior', () => {
         role: 'assistant',
         content: 'Confirm?',
         meta: {
-          question_id: 'q1',
+          question_ref: 'q1',
           input_type: 'radio',
           allow_reply: false,
           options: [{ id: 'yes', label: 'Yes' }],
@@ -1754,7 +1754,7 @@ describe('widget send result behavior', () => {
     // that way textarea.disabled solely reflects isAwaitingAnswer after option failure
     applyChatState(baseChatState({
       activeQuestion: {
-        question_id: 'q2',
+        question_ref: 'q2',
         input_type: 'radio',
         allow_reply: true,
         options: [{ id: 'no', label: 'No' }],
@@ -1765,7 +1765,7 @@ describe('widget send result behavior', () => {
         role: 'assistant',
         content: 'Cancel?',
         meta: {
-          question_id: 'q2',
+          question_ref: 'q2',
           input_type: 'radio',
           allow_reply: true,
           options: [{ id: 'no', label: 'No' }],

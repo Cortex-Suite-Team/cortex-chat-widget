@@ -60,7 +60,8 @@ export interface QuestionOption {
 }
 
 export interface QuestionState {
-  question_id: string;
+  question_ref: string;
+  question_id?: string;
   input_type: string;
   allow_reply: boolean;
   options: QuestionOption[];

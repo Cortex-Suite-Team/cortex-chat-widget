@@ -82,6 +82,21 @@ function summarizeSendPayload(payload: {
   };
 }
 
+function getQuestionRef(activeQuestion: unknown): string | null {
+  if (!activeQuestion || typeof activeQuestion !== 'object') {
+    return null;
+  }
+  const record = activeQuestion as Record<string, unknown>;
+  const questionRef = record['question_ref'];
+  if (typeof questionRef === 'string' && questionRef.trim()) {
+    return questionRef.trim();
+  }
+  const legacyQuestionId = record['question_id'];
+  return typeof legacyQuestionId === 'string' && legacyQuestionId.trim()
+    ? legacyQuestionId.trim()
+    : null;
+}
+
 export class ChatWidget {
   private readonly options: NormalizedWidgetOptions;
   private readonly dom: WidgetDom;
@@ -680,8 +695,9 @@ export class ChatWidget {
       }
     }
 
-    const questionMeta = activeQuestion
-      ? { question_id: activeQuestion.question_id, selected_option: 'reply' }
+    const questionRef = getQuestionRef(activeQuestion);
+    const questionMeta = questionRef
+      ? { question_ref: questionRef, selected_option: 'reply' }
       : undefined;
 
     try {
@@ -738,14 +754,14 @@ export class ChatWidget {
     this.notifyAndRender();
   }
 
-  private async handleOptionSelect(questionId: string, optionId: string, optionLabel: string): Promise<void> {
+  private async handleOptionSelect(questionRef: string, optionId: string, optionLabel: string): Promise<void> {
     if (this.ui.isDestroyed || this.ui.isAwaitingAnswer || this.chatView.kind === 'historical') {
       return;
     }
     try {
       const result = await this.controller.sendMessage({
         content: [optionLabel],
-        meta: { question_id: questionId, selected_option: optionId },
+        meta: { question_ref: questionRef, selected_option: optionId },
       });
 
       if (!result.ok) {
@@ -782,10 +798,11 @@ export class ChatWidget {
 
     const btn = (event.target as Element).closest('.cortex-widget__question-option') as HTMLButtonElement | null;
     if (!btn || btn.disabled) return;
-    const { questionId, optionId } = btn.dataset;
+    const questionRef = btn.dataset.questionRef ?? btn.dataset.questionId;
+    const { optionId } = btn.dataset;
     const optionLabel = btn.textContent ?? '';
-    if (questionId && optionId) {
-      await this.handleOptionSelect(questionId, optionId, optionLabel);
+    if (questionRef && optionId) {
+      await this.handleOptionSelect(questionRef, optionId, optionLabel);
     }
   }
 

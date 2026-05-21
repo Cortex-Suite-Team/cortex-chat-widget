@@ -35,6 +35,21 @@ function getHeaderSubtitle(state: CortexChatWidgetState, options: NormalizedWidg
   return correspondent?.title ?? correspondent?.subtitle ?? options.subtitle;
 }
 
+function getQuestionRef(activeQuestion: unknown): string | null {
+  if (!activeQuestion || typeof activeQuestion !== 'object') {
+    return null;
+  }
+  const record = activeQuestion as Record<string, unknown>;
+  const questionRef = record['question_ref'];
+  if (typeof questionRef === 'string' && questionRef.trim()) {
+    return questionRef.trim();
+  }
+  const legacyQuestionId = record['question_id'];
+  return typeof legacyQuestionId === 'string' && legacyQuestionId.trim()
+    ? legacyQuestionId.trim()
+    : null;
+}
+
 function normalizeAvatarUrl(
   avatarUrl: string | null,
   options: NormalizedWidgetOptions,
@@ -465,15 +480,16 @@ function renderTranscript(
 
     // Question options for chat::question messages
     if (message.type === 'chat::question' && Array.isArray(message.meta?.['options'])) {
-      const questionId = toNonEmptyString(message.meta?.['question_id']);
+      const questionRef = toNonEmptyString(message.meta?.['question_ref'])
+        ?? toNonEmptyString(message.meta?.['question_id']);
       const inputType = toNonEmptyString(message.meta?.['input_type']) ?? 'radio';
 
       if (inputType === 'checkbox') {
         console.warn('[cortex-chat-widget] chat::question input_type="checkbox" is not supported');
       }
 
-      if (questionId && inputType !== 'checkbox') {
-        const isActive = state.chat.activeQuestion?.question_id === questionId;
+      if (questionRef && inputType !== 'checkbox') {
+        const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
         const optionsDisabled = !isActive || state.isAwaitingAnswer;
 
         const optionsContainer = document.createElement('div');
@@ -489,7 +505,7 @@ function renderTranscript(
           btn.className = 'cortex-widget__question-option';
           btn.type = 'button';
           btn.textContent = optionLabel;
-          btn.dataset.questionId = questionId;
+          btn.dataset.questionRef = questionRef;
           btn.dataset.optionId = optionId;
           btn.disabled = optionsDisabled;
           btn.setAttribute('data-testid', 'question-option');
