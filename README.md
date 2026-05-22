@@ -88,6 +88,48 @@ Stage 5 supports one file attachment when the active client exposes `uploadAttac
 
 If the client does not support uploads, the widget disables attachment UI up front instead of failing later.
 
+## Interactive Questions
+
+The widget renders canonical `chat::question` payloads from `payload.meta.questions`.
+
+```json
+{
+  "type": "chat::question",
+  "payload": {
+    "content": "Please clarify",
+    "role": "assistant",
+    "meta": {
+      "question_ref": "q_01hzk8p5x4w6",
+      "input_type": "form",
+      "allow_reply": true,
+      "questions": [
+        {
+          "key": "decision",
+          "label": "Decision",
+          "type": "select",
+          "required": true,
+          "options": [
+            { "id": "approve", "label": "Approve" }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+Rules:
+
+- `payload.meta.questions` is canonical
+- top-level `payload.meta.options` is not supported
+- `question_ref` is canonical
+- `question_id` is accepted only as an inbound legacy fallback for old `chat::question`
+- `resume_event_ref` is internal runtime coordination metadata and is never exposed by the widget
+
+The widget sends answers back as `chat::message` and always includes `payload.meta.question_ref`.
+
+Single select / radio answers use `selected_option`; form or multi-question answers use `answers`.
+
 ## Destroy / Unmount Example
 
 ```ts

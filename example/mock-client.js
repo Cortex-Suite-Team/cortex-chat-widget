@@ -224,12 +224,20 @@ export function createMockCortexClient() {
             content: ['What would you like to do with this?'],
             meta: {
               actor: DEMO_ACTOR,
-              question_id: `q_${turnId}`,
-              input_type: 'radio',
+              question_ref: `q_${turnId}`,
+              input_type: 'form',
               allow_reply: true,
-              options: [
-                { id: 'approve', label: 'Approve' },
-                { id: 'reject', label: 'Reject' },
+              questions: [
+                {
+                  key: 'decision',
+                  label: 'Decision',
+                  type: 'radio',
+                  required: true,
+                  options: [
+                    { id: 'approve', label: 'Approve' },
+                    { id: 'reject', label: 'Reject' },
+                  ],
+                },
               ],
             },
           }));
