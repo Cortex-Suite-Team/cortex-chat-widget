@@ -31,6 +31,7 @@ export declare class ChatWidget {
     private readonly onAuthPasswordKeyDown;
     private readonly onLauncherClick;
     private readonly onTranscriptClick;
+    private readonly onTranscriptSubmit;
     constructor(args: {
         options: NormalizedWidgetOptions;
         dom: WidgetDom;
@@ -65,6 +66,7 @@ export declare class ChatWidget {
     private handleSend;
     private handleLoginSubmit;
     private handleOptionSelect;
+    private handleQuestionFormSubmit;
     private handleTranscriptClick;
     private setOpen;
     private handleHistoryError;

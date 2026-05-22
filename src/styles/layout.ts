@@ -379,6 +379,17 @@ export const layoutStyles = `
   margin-top: 10px;
 }
 
+.cortex-widget__question-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cortex-widget__question-field {
+  display: grid;
+  gap: 5px;
+}
+
 @container (max-width: 339px) {
   .cortex-widget__header {
     padding: 12px 12px 10px;

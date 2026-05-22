@@ -59,11 +59,22 @@ export interface QuestionOption {
   label: string;
 }
 
+export type QuestionType = 'select' | 'radio' | 'text' | 'boolean' | 'date' | 'email';
+
+export interface QuestionField {
+  key: string;
+  label: string;
+  type: QuestionType;
+  required: boolean;
+  options: QuestionOption[];
+}
+
 export interface QuestionState {
   question_ref: string;
   question_id?: string;
   input_type: string;
   allow_reply: boolean;
+  questions?: QuestionField[];
   options: QuestionOption[];
   turn_id?: string | null;
 }

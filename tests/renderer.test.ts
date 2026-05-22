@@ -842,18 +842,35 @@ describe('widget renderer behavior', () => {
         status: 'final',
         meta: {
           question_ref: 'q_1',
-          input_type: 'radio',
+          input_type: 'form',
           allow_reply: true,
-          options: [
-            { id: 'approve', label: 'Approve' },
-            { id: 'reject', label: 'Reject' },
+          questions: [
+            {
+              key: 'decision',
+              label: 'Decision',
+              type: 'select',
+              options: [
+                { id: 'approve', label: 'Approve' },
+                { id: 'reject', label: 'Reject' },
+              ],
+            },
           ],
         },
       }],
       activeQuestion: {
         question_ref: 'q_1',
-        input_type: 'radio',
+        input_type: 'form',
         allow_reply: true,
+        questions: [{
+          key: 'decision',
+          label: 'Decision',
+          type: 'select',
+          required: false,
+          options: [
+            { id: 'approve', label: 'Approve' },
+            { id: 'reject', label: 'Reject' },
+          ],
+        }],
         options: [
           { id: 'approve', label: 'Approve' },
           { id: 'reject', label: 'Reject' },
@@ -869,6 +886,59 @@ describe('widget renderer behavior', () => {
     expect(buttons[0].textContent).toBe('Approve');
     expect(buttons[1].textContent).toBe('Reject');
     expect(buttons[0].disabled).toBe(false);
+  });
+
+  it('submits canonical form questions with answers and question_ref', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      activeQuestion: {
+        question_ref: 'q_form',
+        input_type: 'form',
+        allow_reply: false,
+        questions: [
+          { key: 'email', label: 'Email', type: 'email', required: true, options: [] },
+          { key: 'subscribe', label: 'Subscribe', type: 'boolean', required: false, options: [] },
+        ],
+        options: [],
+      },
+      transcript: [{
+        id: 'msg_form',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'Tell us more',
+        status: 'final',
+        meta: {
+          question_ref: 'q_form',
+          input_type: 'form',
+          allow_reply: false,
+          questions: [
+            { key: 'email', label: 'Email', type: 'email', required: true },
+            { key: 'subscribe', label: 'Subscribe', type: 'boolean' },
+          ],
+        },
+      }],
+    }));
+
+    const form = shadow.querySelector('[data-testid="question-form"]') as HTMLFormElement;
+    const email = form.querySelector('input[name="email"]') as HTMLInputElement;
+    const subscribe = form.querySelector('input[name="subscribe"]') as HTMLInputElement;
+    email.value = 'person@example.test';
+    subscribe.checked = true;
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(controller.sendCalls[0]).toMatchObject({
+      meta: {
+        question_ref: 'q_form',
+        answers: {
+          email: 'person@example.test',
+          subscribe: true,
+        },
+      },
+    });
+    expect(controller.sendCalls[0]?.meta).not.toHaveProperty('resume_event_ref');
   });
 
   it('disables question option buttons when isAwaitingAnswer is true', async () => {
@@ -890,15 +960,27 @@ describe('widget renderer behavior', () => {
         status: 'final',
         meta: {
           question_ref: 'q_await',
-          input_type: 'radio',
+          input_type: 'form',
           allow_reply: false,
-          options: [{ id: 'ok', label: 'OK' }],
+          questions: [{
+            key: 'decision',
+            label: 'Decision',
+            type: 'radio',
+            options: [{ id: 'ok', label: 'OK' }],
+          }],
         },
       }],
       activeQuestion: {
         question_ref: 'q_await',
-        input_type: 'radio',
+        input_type: 'form',
         allow_reply: false,
+        questions: [{
+          key: 'decision',
+          label: 'Decision',
+          type: 'radio',
+          required: false,
+          options: [{ id: 'ok', label: 'OK' }],
+        }],
         options: [{ id: 'ok', label: 'OK' }],
       },
     }));
@@ -907,7 +989,17 @@ describe('widget renderer behavior', () => {
     autoClient?.emit({ type: 'chat::question', payload: {
       role: 'assistant',
       content: 'Choose',
-      meta: { question_ref: 'q_await', input_type: 'radio', allow_reply: false, options: [{ id: 'ok', label: 'OK' }] },
+      meta: {
+        question_ref: 'q_await',
+        input_type: 'form',
+        allow_reply: false,
+        questions: [{
+          key: 'decision',
+          label: 'Decision',
+          type: 'radio',
+          options: [{ id: 'ok', label: 'OK' }],
+        }],
+      },
     }});
 
     // Re-apply state with isAwaitingAnswer via awaiting state
@@ -915,8 +1007,15 @@ describe('widget renderer behavior', () => {
       input: { locked: false },
       activeQuestion: {
         question_ref: 'q_await',
-        input_type: 'radio',
+        input_type: 'form',
         allow_reply: false,
+        questions: [{
+          key: 'decision',
+          label: 'Decision',
+          type: 'radio',
+          required: false,
+          options: [{ id: 'ok', label: 'OK' }],
+        }],
         options: [{ id: 'ok', label: 'OK' }],
       },
       transcript: [{
@@ -927,9 +1026,14 @@ describe('widget renderer behavior', () => {
         status: 'final',
         meta: {
           question_ref: 'q_await',
-          input_type: 'radio',
+          input_type: 'form',
           allow_reply: false,
-          options: [{ id: 'ok', label: 'OK' }],
+          questions: [{
+            key: 'decision',
+            label: 'Decision',
+            type: 'radio',
+            options: [{ id: 'ok', label: 'OK' }],
+          }],
         },
       }],
     }));
@@ -953,9 +1057,14 @@ describe('widget renderer behavior', () => {
         status: 'final',
         meta: {
           question_ref: 'q_past',
-          input_type: 'radio',
+          input_type: 'form',
           allow_reply: true,
-          options: [{ id: 'yes', label: 'Yes' }],
+          questions: [{
+            key: 'decision',
+            label: 'Decision',
+            type: 'radio',
+            options: [{ id: 'yes', label: 'Yes' }],
+          }],
         },
       }],
     }));
@@ -1216,8 +1325,15 @@ describe('worker status rendering', () => {
       workerState: { state: 'idle' },
       activeQuestion: {
         question_ref: 'q1',
-        input_type: 'radio',
+        input_type: 'form',
         allow_reply: false,
+        questions: [{
+          key: 'decision',
+          label: 'Decision',
+          type: 'radio',
+          required: false,
+          options: [{ id: 'a', label: 'Option A' }],
+        }],
         options: [{ id: 'a', label: 'Option A' }],
       },
       transcript: [{
@@ -1227,8 +1343,13 @@ describe('worker status rendering', () => {
         content: 'Choose:',
         meta: {
           question_ref: 'q1',
-          input_type: 'radio',
-          options: [{ id: 'a', label: 'Option A' }],
+          input_type: 'form',
+          questions: [{
+            key: 'decision',
+            label: 'Decision',
+            type: 'radio',
+            options: [{ id: 'a', label: 'Option A' }],
+          }],
         },
       }],
     }));
@@ -1713,15 +1834,22 @@ describe('widget send result behavior', () => {
   });
 
   it('option select success sets isAwaitingAnswer true', async () => {
-    mountWidget();
+    const { controller } = mountWidget();
     const shadow = getShadow();
     const sendButton = shadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
 
     applyChatState(baseChatState({
       activeQuestion: {
         question_ref: 'q1',
-        input_type: 'radio',
+        input_type: 'form',
         allow_reply: false,
+        questions: [{
+          key: 'decision',
+          label: 'Decision',
+          type: 'radio',
+          required: false,
+          options: [{ id: 'yes', label: 'Yes' }],
+        }],
         options: [{ id: 'yes', label: 'Yes' }],
       },
       transcript: [{
@@ -1731,9 +1859,14 @@ describe('widget send result behavior', () => {
         content: 'Confirm?',
         meta: {
           question_ref: 'q1',
-          input_type: 'radio',
+          input_type: 'form',
           allow_reply: false,
-          options: [{ id: 'yes', label: 'Yes' }],
+          questions: [{
+            key: 'decision',
+            label: 'Decision',
+            type: 'radio',
+            options: [{ id: 'yes', label: 'Yes' }],
+          }],
         },
       }],
     }));
@@ -1742,6 +1875,10 @@ describe('widget send result behavior', () => {
     optBtn.click();
     await flushAsyncWork();
 
+    expect(controller.sendCalls[0]).toMatchObject({
+      content: ['Yes'],
+      meta: { question_ref: 'q1', selected_option: 'yes' },
+    });
     expect(sendButton.disabled).toBe(true);
   });
 
@@ -1755,8 +1892,15 @@ describe('widget send result behavior', () => {
     applyChatState(baseChatState({
       activeQuestion: {
         question_ref: 'q2',
-        input_type: 'radio',
+        input_type: 'form',
         allow_reply: true,
+        questions: [{
+          key: 'decision',
+          label: 'Decision',
+          type: 'radio',
+          required: false,
+          options: [{ id: 'no', label: 'No' }],
+        }],
         options: [{ id: 'no', label: 'No' }],
       },
       transcript: [{
@@ -1766,9 +1910,14 @@ describe('widget send result behavior', () => {
         content: 'Cancel?',
         meta: {
           question_ref: 'q2',
-          input_type: 'radio',
+          input_type: 'form',
           allow_reply: true,
-          options: [{ id: 'no', label: 'No' }],
+          questions: [{
+            key: 'decision',
+            label: 'Decision',
+            type: 'radio',
+            options: [{ id: 'no', label: 'No' }],
+          }],
         },
       }],
     }));

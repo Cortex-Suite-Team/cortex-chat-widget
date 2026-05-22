@@ -209,6 +209,67 @@ function toNonEmptyString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+type WidgetQuestionOption = {
+  id: string;
+  label: string;
+};
+
+type WidgetQuestionField = {
+  key: string;
+  label: string;
+  type: 'select' | 'radio' | 'text' | 'boolean' | 'date' | 'email';
+  required: boolean;
+  options: WidgetQuestionOption[];
+};
+
+function normalizeQuestionOptions(value: unknown): WidgetQuestionOption[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is Record<string, unknown> => isRecord(item))
+    .map((item) => ({
+      id: String(item['id'] ?? ''),
+      label: String(item['label'] ?? ''),
+    }))
+    .filter((option) => option.id !== '' && option.label !== '');
+}
+
+function normalizeQuestionFields(value: unknown): WidgetQuestionField[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const supported = new Set(['select', 'radio', 'text', 'boolean', 'date', 'email']);
+  return value
+    .filter((item): item is Record<string, unknown> => isRecord(item))
+    .map((item): WidgetQuestionField | null => {
+      const key = toNonEmptyString(item['key']);
+      const rawType = toNonEmptyString(item['type']);
+      if (!key || !rawType || !supported.has(rawType)) {
+        return null;
+      }
+      return {
+        key,
+        label: toNonEmptyString(item['label']) ?? key,
+        type: rawType as WidgetQuestionField['type'],
+        required: item['required'] === true,
+        options: normalizeQuestionOptions(item['options']),
+      };
+    })
+    .filter((item): item is WidgetQuestionField => item !== null);
+}
+
+function singleChoiceQuestion(questions: WidgetQuestionField[]): WidgetQuestionField | null {
+  if (questions.length !== 1) {
+    return null;
+  }
+  const [question] = questions;
+  if ((question.type === 'select' || question.type === 'radio') && question.options.length > 0) {
+    return question;
+  }
+  return null;
+}
+
 function formatMessageTime(value: string | null | undefined): string | null {
   if (!value) {
     return null;
@@ -332,11 +393,11 @@ function renderTranscript(
     const hasTextContent = rendered.format === 'html'
       ? rendered.html.trim().length > 0
       : rendered.text.trim().length > 0;
-    const hasQuestionOptions = message.type === 'chat::question'
-      && Array.isArray(message.meta?.['options'])
-      && (message.meta['options'] as unknown[]).length > 0;
+    const hasQuestionControls = message.type === 'chat::question'
+      && Array.isArray(message.meta?.['questions'])
+      && normalizeQuestionFields(message.meta['questions']).length > 0;
 
-    if (!hasTextContent && attachments.length === 0 && !hasQuestionOptions) {
+    if (!hasTextContent && attachments.length === 0 && !hasQuestionControls) {
       continue;
     }
 
@@ -478,17 +539,14 @@ function renderTranscript(
       bubble.appendChild(attachmentList);
     }
 
-    // Question options for chat::question messages
-    if (message.type === 'chat::question' && Array.isArray(message.meta?.['options'])) {
+    // Canonical ask_user questions for chat::question messages.
+    if (message.type === 'chat::question' && Array.isArray(message.meta?.['questions'])) {
       const questionRef = toNonEmptyString(message.meta?.['question_ref'])
         ?? toNonEmptyString(message.meta?.['question_id']);
-      const inputType = toNonEmptyString(message.meta?.['input_type']) ?? 'radio';
+      const questions = normalizeQuestionFields(message.meta?.['questions']);
+      const choiceQuestion = singleChoiceQuestion(questions);
 
-      if (inputType === 'checkbox') {
-        console.warn('[cortex-chat-widget] chat::question input_type="checkbox" is not supported');
-      }
-
-      if (questionRef && inputType !== 'checkbox') {
+      if (questionRef && choiceQuestion) {
         const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
         const optionsDisabled = !isActive || state.isAwaitingAnswer;
 
@@ -496,23 +554,72 @@ function renderTranscript(
         optionsContainer.className = 'cortex-widget__question-options';
         optionsContainer.setAttribute('data-testid', 'question-options');
 
-        for (const option of message.meta['options'] as Array<Record<string, unknown>>) {
-          const optionId = toNonEmptyString(option['id']);
-          const optionLabel = toNonEmptyString(option['label']);
-          if (!optionId || !optionLabel) continue;
-
+        for (const option of choiceQuestion.options) {
           const btn = document.createElement('button');
           btn.className = 'cortex-widget__question-option';
           btn.type = 'button';
-          btn.textContent = optionLabel;
+          btn.textContent = option.label;
           btn.dataset.questionRef = questionRef;
-          btn.dataset.optionId = optionId;
+          btn.dataset.questionKey = choiceQuestion.key;
+          btn.dataset.optionId = option.id;
           btn.disabled = optionsDisabled;
           btn.setAttribute('data-testid', 'question-option');
           optionsContainer.appendChild(btn);
         }
 
         bubble.appendChild(optionsContainer);
+      } else if (questionRef && questions.length > 0) {
+        const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
+        const controlsDisabled = !isActive || state.isAwaitingAnswer;
+        const form = document.createElement('form');
+        form.className = 'cortex-widget__question-form';
+        form.dataset.questionRef = questionRef;
+        form.setAttribute('data-testid', 'question-form');
+
+        for (const question of questions) {
+          const field = document.createElement('label');
+          field.className = 'cortex-widget__question-field';
+          const label = document.createElement('span');
+          label.className = 'cortex-widget__question-label';
+          label.textContent = question.label;
+          field.appendChild(label);
+
+          let control: HTMLInputElement | HTMLSelectElement;
+          if (question.type === 'select' && question.options.length > 0) {
+            const select = document.createElement('select');
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Select';
+            select.appendChild(placeholder);
+            for (const option of question.options) {
+              const item = document.createElement('option');
+              item.value = option.id;
+              item.textContent = option.label;
+              select.appendChild(item);
+            }
+            control = select;
+          } else {
+            const input = document.createElement('input');
+            input.type = question.type === 'boolean' ? 'checkbox' : question.type;
+            control = input;
+          }
+          control.name = question.key;
+          control.required = question.required;
+          control.disabled = controlsDisabled;
+          control.className = 'cortex-widget__question-control';
+          control.setAttribute('data-question-type', question.type);
+          field.appendChild(control);
+          form.appendChild(field);
+        }
+
+        const submit = document.createElement('button');
+        submit.className = 'cortex-widget__question-submit cortex-widget__question-option';
+        submit.type = 'submit';
+        submit.textContent = 'Submit';
+        submit.disabled = controlsDisabled;
+        submit.setAttribute('data-testid', 'question-form-submit');
+        form.appendChild(submit);
+        bubble.appendChild(form);
       }
     }
 

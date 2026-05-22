@@ -58,7 +58,14 @@ function cloneChatState(state: ChatState): ChatState {
     escalation: state.escalation ? { ...state.escalation } : null,
     lastError: state.lastError ? { ...state.lastError } : null,
     activeQuestion: state.activeQuestion
-      ? { ...state.activeQuestion, options: [...state.activeQuestion.options] }
+      ? {
+          ...state.activeQuestion,
+          questions: (state.activeQuestion.questions ?? []).map((question) => ({
+            ...question,
+            options: [...question.options],
+          })),
+          options: [...state.activeQuestion.options],
+        }
       : null,
     workerState: { ...state.workerState },
   };
@@ -199,6 +206,15 @@ export class ChatWidget {
 
   private readonly onTranscriptClick = (event: MouseEvent) => {
     void this.handleTranscriptClick(event);
+  };
+
+  private readonly onTranscriptSubmit = (event: Event) => {
+    const form = (event.target as Element).closest('.cortex-widget__question-form') as HTMLFormElement | null;
+    if (!form) {
+      return;
+    }
+    event.preventDefault();
+    void this.handleQuestionFormSubmit(form);
   };
 
   constructor(args: {
@@ -426,6 +442,7 @@ export class ChatWidget {
     this.dom.authPasswordInput.addEventListener('keydown', this.onAuthPasswordKeyDown);
     this.dom.launcher.addEventListener('click', this.onLauncherClick);
     this.dom.transcript.addEventListener('click', this.onTranscriptClick);
+    this.dom.transcript.addEventListener('submit', this.onTranscriptSubmit);
 
     this.domCleanup.add(() => this.dom.textarea.removeEventListener('input', this.onTextareaInput));
     this.domCleanup.add(() => this.dom.textarea.removeEventListener('keydown', this.onTextareaKeyDown));
@@ -437,6 +454,7 @@ export class ChatWidget {
     this.domCleanup.add(() => this.dom.authPasswordInput.removeEventListener('keydown', this.onAuthPasswordKeyDown));
     this.domCleanup.add(() => this.dom.launcher.removeEventListener('click', this.onLauncherClick));
     this.domCleanup.add(() => this.dom.transcript.removeEventListener('click', this.onTranscriptClick));
+    this.domCleanup.add(() => this.dom.transcript.removeEventListener('submit', this.onTranscriptSubmit));
   }
 
   private teardownLiveListeners(): void {
@@ -762,6 +780,66 @@ export class ChatWidget {
       const result = await this.controller.sendMessage({
         content: [optionLabel],
         meta: { question_ref: questionRef, selected_option: optionId },
+      });
+
+      if (!result.ok) {
+        this.ui.isAwaitingAnswer = false;
+        this.ui.error = null;
+        this.notifyAndRender();
+        return;
+      }
+
+      this.chatView = { kind: 'live' };
+      this.historicalTranscript = [];
+      this.clearDraftComposer();
+      this.ui.error = null;
+      this.ui.isAwaitingAnswer = true;
+      this.notifyAndRender();
+    } catch (error) {
+      this.resolveRuntimeError(error);
+      this.notifyAndRender();
+    }
+  }
+
+  private async handleQuestionFormSubmit(form: HTMLFormElement): Promise<void> {
+    if (this.ui.isDestroyed || this.ui.isAwaitingAnswer || this.chatView.kind === 'historical') {
+      return;
+    }
+    const questionRef = form.dataset.questionRef;
+    if (!questionRef) {
+      return;
+    }
+
+    const answers: Record<string, unknown> = {};
+    for (const element of Array.from(form.elements)) {
+      if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement)) {
+        continue;
+      }
+      if (!element.name) {
+        continue;
+      }
+      const questionType = element.getAttribute('data-question-type');
+      const value = questionType === 'boolean' && element instanceof HTMLInputElement
+        ? element.checked
+        : element.value.trim();
+      if (element.required && (value === '' || value === false)) {
+        return;
+      }
+      answers[element.name] = value;
+    }
+    if (Object.keys(answers).length === 0) {
+      return;
+    }
+
+    const summary = Object.values(answers)
+      .map((value) => String(value))
+      .filter((value) => value.length > 0)
+      .join('\n') || 'Submitted answers';
+
+    try {
+      const result = await this.controller.sendMessage({
+        content: [summary],
+        meta: { question_ref: questionRef, answers },
       });
 
       if (!result.ok) {

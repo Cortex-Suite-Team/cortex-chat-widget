@@ -359,6 +359,29 @@ export const typographyStyles = `
   background: color-mix(in srgb, var(--cortex-accent-color) 15%, var(--cortex-background-color) 85%);
 }
 
+.cortex-widget__question-label {
+  font-size: 12px;
+  color: var(--cortex-subtle-text);
+}
+
+.cortex-widget__question-control {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--cortex-border-color);
+  border-radius: 8px;
+  background: var(--cortex-background-color);
+  color: var(--cortex-text-color);
+  font: inherit;
+  font-size: 12px;
+}
+
+.cortex-widget__question-control[type="checkbox"] {
+  min-height: auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
 .cortex-widget__message-status {
   display: flex;
   align-items: center;

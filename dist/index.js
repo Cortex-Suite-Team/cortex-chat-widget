@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.9 builtAt=2026-05-21T12:53:14.864Z */
+/* cortex-chat-widget build: sdk=1.1.9 builtAt=2026-05-22T11:29:25.521Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -2138,6 +2138,17 @@ var layoutStyles = `
   margin-top: 10px;
 }
 
+.cortex-widget__question-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cortex-widget__question-field {
+  display: grid;
+  gap: 5px;
+}
+
 @container (max-width: 339px) {
   .cortex-widget__header {
     padding: 12px 12px 10px;
@@ -2696,6 +2707,29 @@ var typographyStyles = `
   background: color-mix(in srgb, var(--cortex-accent-color) 15%, var(--cortex-background-color) 85%);
 }
 
+.cortex-widget__question-label {
+  font-size: 12px;
+  color: var(--cortex-subtle-text);
+}
+
+.cortex-widget__question-control {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--cortex-border-color);
+  border-radius: 8px;
+  background: var(--cortex-background-color);
+  color: var(--cortex-text-color);
+  font: inherit;
+  font-size: 12px;
+}
+
+.cortex-widget__question-control[type="checkbox"] {
+  min-height: auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
 .cortex-widget__message-status {
   display: flex;
   align-items: center;
@@ -3095,13 +3129,18 @@ function resolveVisibleContent(payload) {
   }
   return message ?? null;
 }
+function withoutInternalRefs(meta) {
+  const cleaned = { ...meta };
+  delete cleaned["resume_event_ref"];
+  return cleaned;
+}
 function normalizeCortexMessage(message) {
   const payload = asPayload(message);
   const payloadMeta = isRecord(payload["meta"]) ? payload["meta"] : void 0;
-  const mergedMeta = {
+  const mergedMeta = withoutInternalRefs({
     ...isRecord(message.meta) ? message.meta : {},
     ...payloadMeta ?? {}
-  };
+  });
   switch (message.type) {
     case "chat::message":
       return {
@@ -3635,6 +3674,45 @@ function generateClientMsgId() {
   }
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
+function normalizeQuestionOptions(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item) => isRecord(item)).map((item) => ({
+    id: String(item["id"] ?? ""),
+    label: String(item["label"] ?? "")
+  })).filter((option) => option.id !== "" && option.label !== "");
+}
+function normalizeQuestionFields(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const supportedTypes = /* @__PURE__ */ new Set(["select", "radio", "text", "boolean", "date", "email"]);
+  return value.filter((item) => isRecord(item)).map((item) => {
+    const key = asNonEmptyString(item["key"]);
+    const rawType = asNonEmptyString(item["type"]);
+    if (!key || !rawType || !supportedTypes.has(rawType)) {
+      return null;
+    }
+    return {
+      key,
+      label: asNonEmptyString(item["label"]) ?? key,
+      type: rawType,
+      required: item["required"] === true,
+      options: normalizeQuestionOptions(item["options"])
+    };
+  }).filter((item) => item !== null);
+}
+function choiceOptionsFromQuestions(questions) {
+  if (questions.length !== 1) {
+    return [];
+  }
+  const [question] = questions;
+  if (question.type !== "select" && question.type !== "radio") {
+    return [];
+  }
+  return question.options;
+}
 function getSessionContextCorrespondent(client) {
   const rawSessionContext = client.sessionContext;
   if (isRecord(rawSessionContext) && isRecord(rawSessionContext["correspondent"])) {
@@ -3769,7 +3847,14 @@ function createChatController(options) {
       auth: { ...authState },
       escalation: cloneEscalation(escalation),
       lastError,
-      activeQuestion: activeQuestion ? { ...activeQuestion, options: [...activeQuestion.options] } : null,
+      activeQuestion: activeQuestion ? {
+        ...activeQuestion,
+        questions: (activeQuestion.questions ?? []).map((question) => ({
+          ...question,
+          options: [...question.options]
+        })),
+        options: [...activeQuestion.options]
+      } : null,
       workerState: { ...workerState }
     };
   }
@@ -3944,14 +4029,17 @@ function createChatController(options) {
       resetWorkerStateToIdle();
       const payload = asPayload(message);
       const meta = isRecord(payload["meta"]) ? payload["meta"] : null;
-      const questionId = meta ? asNonEmptyString(meta["question_id"]) : null;
-      if (questionId) {
-        const rawOptions = Array.isArray(meta?.["options"]) ? meta["options"] : [];
+      const questionRef = meta ? asNonEmptyString(meta["question_ref"]) ?? asNonEmptyString(meta["question_id"]) : null;
+      const legacyQuestionId = questionRef && meta && !asNonEmptyString(meta["question_ref"]) ? asNonEmptyString(meta["question_id"]) : null;
+      if (questionRef) {
+        const questions = normalizeQuestionFields(meta?.["questions"]);
         activeQuestion = {
-          question_id: questionId,
+          question_ref: questionRef,
+          ...legacyQuestionId ? { question_id: legacyQuestionId } : {},
           input_type: asNonEmptyString(meta?.["input_type"]) ?? "radio",
           allow_reply: meta?.["allow_reply"] === true,
-          options: rawOptions.filter((o) => isRecord(o)).map((o) => ({ id: String(o["id"] ?? ""), label: String(o["label"] ?? "") })).filter((o) => o.id !== "" && o.label !== ""),
+          questions,
+          options: choiceOptionsFromQuestions(questions),
           turn_id: asNonEmptyString(payload["turn_id"]) ?? null
         };
       }
@@ -11703,6 +11791,45 @@ function toNonEmptyString(value) {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
 }
+function normalizeQuestionOptions2(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item) => isRecord2(item)).map((item) => ({
+    id: String(item["id"] ?? ""),
+    label: String(item["label"] ?? "")
+  })).filter((option) => option.id !== "" && option.label !== "");
+}
+function normalizeQuestionFields2(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const supported = /* @__PURE__ */ new Set(["select", "radio", "text", "boolean", "date", "email"]);
+  return value.filter((item) => isRecord2(item)).map((item) => {
+    const key = toNonEmptyString(item["key"]);
+    const rawType = toNonEmptyString(item["type"]);
+    if (!key || !rawType || !supported.has(rawType)) {
+      return null;
+    }
+    return {
+      key,
+      label: toNonEmptyString(item["label"]) ?? key,
+      type: rawType,
+      required: item["required"] === true,
+      options: normalizeQuestionOptions2(item["options"])
+    };
+  }).filter((item) => item !== null);
+}
+function singleChoiceQuestion(questions) {
+  if (questions.length !== 1) {
+    return null;
+  }
+  const [question] = questions;
+  if ((question.type === "select" || question.type === "radio") && question.options.length > 0) {
+    return question;
+  }
+  return null;
+}
 function formatMessageTime(value) {
   if (!value) {
     return null;
@@ -11801,8 +11928,8 @@ function renderTranscript(transcriptEl, state, options) {
     const rendered = renderChatMessageContent(message);
     const attachments = getMessageAttachments(message);
     const hasTextContent = rendered.format === "html" ? rendered.html.trim().length > 0 : rendered.text.trim().length > 0;
-    const hasQuestionOptions = message.type === "chat::question" && Array.isArray(message.meta?.["options"]) && message.meta["options"].length > 0;
-    if (!hasTextContent && attachments.length === 0 && !hasQuestionOptions) {
+    const hasQuestionControls = message.type === "chat::question" && Array.isArray(message.meta?.["questions"]) && normalizeQuestionFields2(message.meta["questions"]).length > 0;
+    if (!hasTextContent && attachments.length === 0 && !hasQuestionControls) {
       continue;
     }
     const wrapper = document.createElement("article");
@@ -11925,33 +12052,78 @@ function renderTranscript(transcriptEl, state, options) {
       }
       bubble.appendChild(attachmentList);
     }
-    if (message.type === "chat::question" && Array.isArray(message.meta?.["options"])) {
+    if (message.type === "chat::question" && Array.isArray(message.meta?.["questions"])) {
       const questionRef = toNonEmptyString(message.meta?.["question_ref"]) ?? toNonEmptyString(message.meta?.["question_id"]);
-      const inputType = toNonEmptyString(message.meta?.["input_type"]) ?? "radio";
-      if (inputType === "checkbox") {
-        console.warn('[cortex-chat-widget] chat::question input_type="checkbox" is not supported');
-      }
-      if (questionRef && inputType !== "checkbox") {
+      const questions = normalizeQuestionFields2(message.meta?.["questions"]);
+      const choiceQuestion = singleChoiceQuestion(questions);
+      if (questionRef && choiceQuestion) {
         const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
         const optionsDisabled = !isActive || state.isAwaitingAnswer;
         const optionsContainer = document.createElement("div");
         optionsContainer.className = "cortex-widget__question-options";
         optionsContainer.setAttribute("data-testid", "question-options");
-        for (const option of message.meta["options"]) {
-          const optionId = toNonEmptyString(option["id"]);
-          const optionLabel = toNonEmptyString(option["label"]);
-          if (!optionId || !optionLabel) continue;
+        for (const option of choiceQuestion.options) {
           const btn = document.createElement("button");
           btn.className = "cortex-widget__question-option";
           btn.type = "button";
-          btn.textContent = optionLabel;
+          btn.textContent = option.label;
           btn.dataset.questionRef = questionRef;
-          btn.dataset.optionId = optionId;
+          btn.dataset.questionKey = choiceQuestion.key;
+          btn.dataset.optionId = option.id;
           btn.disabled = optionsDisabled;
           btn.setAttribute("data-testid", "question-option");
           optionsContainer.appendChild(btn);
         }
         bubble.appendChild(optionsContainer);
+      } else if (questionRef && questions.length > 0) {
+        const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
+        const controlsDisabled = !isActive || state.isAwaitingAnswer;
+        const form = document.createElement("form");
+        form.className = "cortex-widget__question-form";
+        form.dataset.questionRef = questionRef;
+        form.setAttribute("data-testid", "question-form");
+        for (const question of questions) {
+          const field = document.createElement("label");
+          field.className = "cortex-widget__question-field";
+          const label = document.createElement("span");
+          label.className = "cortex-widget__question-label";
+          label.textContent = question.label;
+          field.appendChild(label);
+          let control;
+          if (question.type === "select" && question.options.length > 0) {
+            const select = document.createElement("select");
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = "Select";
+            select.appendChild(placeholder);
+            for (const option of question.options) {
+              const item = document.createElement("option");
+              item.value = option.id;
+              item.textContent = option.label;
+              select.appendChild(item);
+            }
+            control = select;
+          } else {
+            const input = document.createElement("input");
+            input.type = question.type === "boolean" ? "checkbox" : question.type;
+            control = input;
+          }
+          control.name = question.key;
+          control.required = question.required;
+          control.disabled = controlsDisabled;
+          control.className = "cortex-widget__question-control";
+          control.setAttribute("data-question-type", question.type);
+          field.appendChild(control);
+          form.appendChild(field);
+        }
+        const submit = document.createElement("button");
+        submit.className = "cortex-widget__question-submit cortex-widget__question-option";
+        submit.type = "submit";
+        submit.textContent = "Submit";
+        submit.disabled = controlsDisabled;
+        submit.setAttribute("data-testid", "question-form-submit");
+        form.appendChild(submit);
+        bubble.appendChild(form);
       }
     }
     const meta = document.createElement("div");
@@ -12152,7 +12324,14 @@ function cloneChatState(state) {
     auth: { ...state.auth },
     escalation: state.escalation ? { ...state.escalation } : null,
     lastError: state.lastError ? { ...state.lastError } : null,
-    activeQuestion: state.activeQuestion ? { ...state.activeQuestion, options: [...state.activeQuestion.options] } : null,
+    activeQuestion: state.activeQuestion ? {
+      ...state.activeQuestion,
+      questions: (state.activeQuestion.questions ?? []).map((question) => ({
+        ...question,
+        options: [...question.options]
+      })),
+      options: [...state.activeQuestion.options]
+    } : null,
     workerState: { ...state.workerState }
   };
 }
@@ -12258,6 +12437,14 @@ var ChatWidget = class {
     };
     this.onTranscriptClick = (event) => {
       void this.handleTranscriptClick(event);
+    };
+    this.onTranscriptSubmit = (event) => {
+      const form = event.target.closest(".cortex-widget__question-form");
+      if (!form) {
+        return;
+      }
+      event.preventDefault();
+      void this.handleQuestionFormSubmit(form);
     };
     this.options = args.options;
     this.dom = args.dom;
@@ -12461,6 +12648,7 @@ var ChatWidget = class {
     this.dom.authPasswordInput.addEventListener("keydown", this.onAuthPasswordKeyDown);
     this.dom.launcher.addEventListener("click", this.onLauncherClick);
     this.dom.transcript.addEventListener("click", this.onTranscriptClick);
+    this.dom.transcript.addEventListener("submit", this.onTranscriptSubmit);
     this.domCleanup.add(() => this.dom.textarea.removeEventListener("input", this.onTextareaInput));
     this.domCleanup.add(() => this.dom.textarea.removeEventListener("keydown", this.onTextareaKeyDown));
     this.domCleanup.add(() => this.dom.composer.removeEventListener("submit", this.onComposerSubmit));
@@ -12471,6 +12659,7 @@ var ChatWidget = class {
     this.domCleanup.add(() => this.dom.authPasswordInput.removeEventListener("keydown", this.onAuthPasswordKeyDown));
     this.domCleanup.add(() => this.dom.launcher.removeEventListener("click", this.onLauncherClick));
     this.domCleanup.add(() => this.dom.transcript.removeEventListener("click", this.onTranscriptClick));
+    this.domCleanup.add(() => this.dom.transcript.removeEventListener("submit", this.onTranscriptSubmit));
   }
   teardownLiveListeners() {
     if (this.unsubscribeController) {
@@ -12758,6 +12947,55 @@ ${token}`;
       const result = await this.controller.sendMessage({
         content: [optionLabel],
         meta: { question_ref: questionRef, selected_option: optionId }
+      });
+      if (!result.ok) {
+        this.ui.isAwaitingAnswer = false;
+        this.ui.error = null;
+        this.notifyAndRender();
+        return;
+      }
+      this.chatView = { kind: "live" };
+      this.historicalTranscript = [];
+      this.clearDraftComposer();
+      this.ui.error = null;
+      this.ui.isAwaitingAnswer = true;
+      this.notifyAndRender();
+    } catch (error2) {
+      this.resolveRuntimeError(error2);
+      this.notifyAndRender();
+    }
+  }
+  async handleQuestionFormSubmit(form) {
+    if (this.ui.isDestroyed || this.ui.isAwaitingAnswer || this.chatView.kind === "historical") {
+      return;
+    }
+    const questionRef = form.dataset.questionRef;
+    if (!questionRef) {
+      return;
+    }
+    const answers = {};
+    for (const element of Array.from(form.elements)) {
+      if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement)) {
+        continue;
+      }
+      if (!element.name) {
+        continue;
+      }
+      const questionType = element.getAttribute("data-question-type");
+      const value = questionType === "boolean" && element instanceof HTMLInputElement ? element.checked : element.value.trim();
+      if (element.required && (value === "" || value === false)) {
+        return;
+      }
+      answers[element.name] = value;
+    }
+    if (Object.keys(answers).length === 0) {
+      return;
+    }
+    const summary = Object.values(answers).map((value) => String(value)).filter((value) => value.length > 0).join("\n") || "Submitted answers";
+    try {
+      const result = await this.controller.sendMessage({
+        content: [summary],
+        meta: { question_ref: questionRef, answers }
       });
       if (!result.ok) {
         this.ui.isAwaitingAnswer = false;
