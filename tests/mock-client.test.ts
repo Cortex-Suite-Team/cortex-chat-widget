@@ -5,7 +5,7 @@ type MockClient = {
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   onMessage(handler: (message: MockEnvelope) => void): () => void;
-  sendMessage(options: { content: unknown; attachments?: unknown[] }): Promise<void>;
+  sendMessage(options: { content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }): Promise<void>;
   uploadAttachment(file: File): Promise<string>;
 };
 
@@ -117,6 +117,34 @@ describe('example mock client attachments', () => {
         filename: 'contract.pdf',
         download_url: 'blob:contract',
       }],
+    });
+  });
+
+  it('preserves client_msg_id on user echo payload meta', async () => {
+    const createMockCortexClient = await loadMockClientFactory();
+    const client = createMockCortexClient();
+    const messages: MockEnvelope[] = [];
+
+    client.onMessage((message: MockEnvelope) => {
+      messages.push(message);
+    });
+
+    await client.connect();
+    await client.sendMessage({
+      content: 'Test',
+      meta: {
+        client_msg_id: 'client-test-1',
+      },
+    });
+    flushTimers();
+
+    const userMessage = messages.find((message) => message.type === 'chat::echo');
+    expect(userMessage?.payload).toMatchObject({
+      role: 'user',
+      content: 'Test',
+      meta: {
+        client_msg_id: 'client-test-1',
+      },
     });
   });
 

@@ -41,7 +41,7 @@
     "clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('dist', { recursive: true, force: true }))\"",
     "pretypecheck": "npm run sync:sdk",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pretest": "npm run sync:sdk",
+    "pretest": "npm --prefix ../sdk-ui run build && npm run sync:sdk",
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
   },
   "dependencies": {

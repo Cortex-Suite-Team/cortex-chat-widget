@@ -25,7 +25,7 @@ export class CortexClient {
   }
 
   readonly options: CortexClientOptions;
-  readonly sentMessages: Array<{ content: unknown; attachments?: unknown[] }> = [];
+  readonly sentMessages: Array<{ content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }> = [];
   readonly uploads: File[] = [];
   readonly uploadFiles: File[] = [];
   readonly listeners = new Set<MessageHandler>();
@@ -61,7 +61,7 @@ export class CortexClient {
     this.disconnectCalls += 1;
   }
 
-  async sendMessage(options: { content: unknown; attachments?: unknown[] }): Promise<void> {
+  async sendMessage(options: { content: unknown; attachments?: unknown[]; meta?: Record<string, unknown> }): Promise<void> {
     this.sentMessages.push(options);
   }
 

@@ -187,7 +187,7 @@ export function createMockCortexClient() {
       return id;
     },
 
-    async sendMessage({ content, attachments }) {
+    async sendMessage({ content, attachments, meta }) {
       if (!connected) {
         throw new Error('Mock client is not connected.');
       }
@@ -208,6 +208,7 @@ export function createMockCortexClient() {
       emit(createEnvelope('chat::echo', sessionId, nextSeq(), {
         role: 'user',
         content,
+        meta: meta && typeof meta === 'object' ? { ...meta } : undefined,
         attachments: resolvedAttachments,
       }));
 
