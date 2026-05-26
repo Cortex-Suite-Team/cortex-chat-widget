@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.11 builtAt=2026-05-26T21:00:17.316Z */
+/* cortex-chat-widget build: sdk=1.1.11 builtAt=2026-05-26T21:04:45.131Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
