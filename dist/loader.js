@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.11 builtAt=2026-05-26T20:52:49.253Z */
+/* cortex-chat-widget loader build: sdk=1.1.11 builtAt=2026-05-26T21:00:17.316Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -3644,6 +3644,7 @@
   }
 
   // ../sdk-ui/dist/src/chat-controller.js
+  var CORTEX_SDK_UI_VERSION = "0.1.0";
   var MESSAGE_SEND_TIMEOUT_MS = 15e3;
   var LIFECYCLE_SESSION_STATE_MAP = {
     active: "ACTIVE",
@@ -3654,6 +3655,34 @@
     timeout: "TIMEOUT",
     cancelled: "CANCELLED"
   };
+  function isModuleDebugEnabled() {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const queryDebug = params.get("debug");
+      if (queryDebug === "true" || queryDebug === "1") {
+        return true;
+      }
+      return window.localStorage.getItem("cortex_debug") === "1";
+    } catch {
+      return false;
+    }
+  }
+  console.log("[cortex sdk-ui controller module loaded]", {
+    source: "sdk-ui",
+    version: CORTEX_SDK_UI_VERSION,
+    ts: (/* @__PURE__ */ new Date()).toISOString()
+  });
+  if (isModuleDebugEnabled()) {
+    console.debug("[cortex sdk-ui controller module loaded]", {
+      source: "sdk-ui",
+      version: CORTEX_SDK_UI_VERSION,
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      href: typeof window !== "undefined" ? window.location.href : void 0
+    });
+  }
   async function withTimeout(promise, timeoutMs, msg) {
     let timer;
     try {
@@ -13308,6 +13337,37 @@ ${token}`;
       mountTarget,
       historyTarget,
       createClient: () => createClient(options)
+    });
+  }
+
+  // src/index.ts
+  var CORTEX_CHAT_WIDGET_VERSION = "0.1.0";
+  function isBundleDebugEnabled() {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const queryDebug = params.get("debug");
+      if (queryDebug === "true" || queryDebug === "1") {
+        return true;
+      }
+      return window.localStorage.getItem("cortex_debug") === "1";
+    } catch {
+      return false;
+    }
+  }
+  console.log("[cortex widget bundle loaded]", {
+    source: "cortex-chat-widget",
+    version: CORTEX_CHAT_WIDGET_VERSION,
+    ts: (/* @__PURE__ */ new Date()).toISOString()
+  });
+  if (isBundleDebugEnabled()) {
+    console.debug("[cortex widget bundle loaded]", {
+      source: "cortex-chat-widget",
+      version: CORTEX_CHAT_WIDGET_VERSION,
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      href: typeof window !== "undefined" ? window.location.href : void 0
     });
   }
 

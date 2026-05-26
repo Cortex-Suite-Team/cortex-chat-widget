@@ -472,7 +472,8 @@
         return {
           apiKey: params.get("key") ?? params.get("apiKey") ?? "",
           workerRef: params.get("workerRef") ?? "",
-          controlPlaneUrl: params.get("cp") ?? params.get("controlPlaneUrl") ?? ""
+          controlPlaneUrl: params.get("cp") ?? params.get("controlPlaneUrl") ?? "",
+          debug: params.get("debug") ?? ""
         };
       }
 
@@ -503,6 +504,15 @@
         apiKeyInput.value = config.apiKey ?? "";
         workerRefInput.value = config.workerRef ?? "";
         cpInput.value = config.controlPlaneUrl ?? "";
+      }
+
+      function isDebugEnabled() {
+        const params = new URLSearchParams(window.location.search);
+        const queryDebug = params.get("debug");
+        if (queryDebug === "true" || queryDebug === "1") {
+          return true;
+        }
+        return window.localStorage.getItem("cortex_debug") === "1";
       }
 
       function saveConfig(config) {
@@ -540,7 +550,11 @@
       }
 
       async function logBundleInfo() {
-        writeLog("Widget bundle import path.", { importPath: "../dist/index.js" });
+        writeLog("Widget bundle import path.", {
+          importPath: "../dist/index.js",
+          resolvedImportUrl: new URL("../dist/index.js", import.meta.url).href,
+          scriptUrls: [...document.scripts].map((script) => script.src).filter(Boolean)
+        });
         try {
           const response = await _nativeFetch(BUNDLE_INFO_URL, { cache: "no-store" });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -580,7 +594,7 @@
           workerRef: config.workerRef,
           authUrl: config.controlPlaneUrl,
           controlPlaneUrl: config.controlPlaneUrl,
-          debug: window.localStorage.getItem("cortex_debug") === "1",
+          debug: isDebugEnabled(),
           mode: "embedded",
           target: "#chat-root",
           historyTarget: "#history-root",
@@ -625,7 +639,7 @@
         if (widgetHandle) {
           widgetHandle.destroy();
           widgetHandle = null;
-          if (localStorage.getItem("cortex_debug") === "1") {
+          if (isDebugEnabled()) {
             window.__cortexWidgetHandle = null;
           } else {
             delete window.__cortexWidgetHandle;
@@ -647,7 +661,7 @@
 
         try {
           widgetHandle = mountCortexChat(buildWidgetOptions(config));
-          if (localStorage.getItem("cortex_debug") === "1") {
+          if (isDebugEnabled()) {
             window.__cortexWidgetHandle = widgetHandle;
           } else {
             delete window.__cortexWidgetHandle;
@@ -681,7 +695,7 @@
         if (widgetHandle) {
           widgetHandle.destroy();
           widgetHandle = null;
-          if (localStorage.getItem("cortex_debug") === "1") {
+          if (isDebugEnabled()) {
             window.__cortexWidgetHandle = null;
           } else {
             delete window.__cortexWidgetHandle;
