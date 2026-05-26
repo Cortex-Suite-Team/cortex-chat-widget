@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.11 builtAt=2026-05-26T16:26:13.639Z */
+/* cortex-chat-widget loader build: sdk=1.1.11 builtAt=2026-05-26T17:27:02.400Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -3485,12 +3485,16 @@
         }
       };
     }
-    function findMessageIndexByClientMsgId(clientMsgId) {
+    function isReconcileableOutgoingUserMessage(message, clientMsgId) {
+      const originalPayloadMeta = isRecord(message.originalPayload?.meta) ? message.originalPayload.meta : null;
+      return message.id.startsWith("client:") && message.type === "chat::message" && message.role === "user" && message.clientMsgId === clientMsgId && (message.deliveryStatus === "sending" || message.deliveryStatus === "sent" || message.deliveryStatus === "failed") && originalPayloadMeta?.["client_msg_id"] === clientMsgId;
+    }
+    function findReconcileableOutgoingUserMessageIndex(clientMsgId) {
       if (!clientMsgId) {
         return void 0;
       }
       for (const [index, message] of transcript.entries()) {
-        if (message.clientMsgId === clientMsgId) {
+        if (isReconcileableOutgoingUserMessage(message, clientMsgId)) {
           return index;
         }
       }
@@ -3571,7 +3575,7 @@
           return buildMalformedPartialMessage(message);
         }
         const normalized = normalizeCortexMessage(message);
-        const optimisticIndex = message.type === "chat::echo" && normalized.role === "user" ? findMessageIndexByClientMsgId(normalized.clientMsgId) : void 0;
+        const optimisticIndex = message.type === "chat::echo" && normalized.role === "user" ? findReconcileableOutgoingUserMessageIndex(normalized.clientMsgId) : void 0;
         const existingIndex = indexById.get(normalized.id);
         if (message.type === "chat::echo" && normalized.role === "user") {
           if (optimisticIndex !== void 0) {
