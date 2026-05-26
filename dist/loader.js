@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.11 builtAt=2026-05-26T20:35:24.580Z */
+/* cortex-chat-widget loader build: sdk=1.1.11 builtAt=2026-05-26T20:52:49.253Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
