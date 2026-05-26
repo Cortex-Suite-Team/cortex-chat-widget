@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.11 builtAt=2026-05-26T17:28:46.602Z */
+/* cortex-chat-widget loader build: sdk=1.1.11 builtAt=2026-05-26T20:35:24.580Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -3747,6 +3747,28 @@
       clientMsgId: payload.meta && typeof payload.meta.client_msg_id === "string" ? payload.meta.client_msg_id : void 0
     };
   }
+  function getMessageMetaClientMsgId(message) {
+    if (!message || !isRecord(message.meta)) {
+      return void 0;
+    }
+    return asNonEmptyString(message.meta["client_msg_id"]) ?? void 0;
+  }
+  function getPayloadMetaClientMsgId(message) {
+    if (!message || !isRecord(message.payload)) {
+      return void 0;
+    }
+    const payloadMeta = isRecord(message.payload["meta"]) ? message.payload["meta"] : null;
+    return asNonEmptyString(payloadMeta?.["client_msg_id"]) ?? void 0;
+  }
+  function isPendingOutgoingUserMessage(message) {
+    return message.id.startsWith("client:") && message.type === "chat::message" && message.role === "user" && (message.deliveryStatus === "sending" || message.deliveryStatus === "sent" || message.deliveryStatus === "failed");
+  }
+  function resolvePendingCandidate(transcript, clientMsgId) {
+    if (!clientMsgId) {
+      return void 0;
+    }
+    return transcript.find((message) => isPendingOutgoingUserMessage(message) && message.clientMsgId === clientMsgId && getMessageMetaClientMsgId(message.originalPayload) === clientMsgId);
+  }
   function createChatController(options) {
     const listeners = /* @__PURE__ */ new Set();
     const transcriptStore = createTranscriptStore();
@@ -4015,6 +4037,37 @@
         }
         return;
       }
+      if (message.type === "chat::echo") {
+        const transcriptBefore = transcriptStore.getSnapshot();
+        const normalized = normalizeCortexMessage(message);
+        const payloadMetaClientMsgId = getPayloadMetaClientMsgId(message);
+        const envelopeMetaClientMsgId = getMessageMetaClientMsgId(message);
+        const echoClientMsgId = normalized.clientMsgId;
+        const candidate = normalized.role === "user" ? resolvePendingCandidate(transcriptBefore, echoClientMsgId) : void 0;
+        const pendingKeys = transcriptBefore.filter((entry) => isPendingOutgoingUserMessage(entry)).map((entry) => entry.clientMsgId).filter((entry) => typeof entry === "string");
+        let skipReason;
+        if (normalized.role !== "user") {
+          skipReason = `role_${normalized.role ?? "unknown"}`;
+        } else if (!echoClientMsgId) {
+          skipReason = "missing_client_msg_id";
+        } else if (!candidate) {
+          skipReason = "no_pending_candidate";
+        }
+        debug.log("[chat echo debug]", {
+          type: message.type,
+          role: normalized.role,
+          seq: typeof message.seq === "number" ? message.seq : void 0,
+          echoClientMsgId,
+          envelopeMetaClientMsgId,
+          payloadMetaClientMsgId,
+          pendingKeys,
+          candidateId: candidate?.id,
+          candidateType: candidate?.type,
+          candidateDeliveryStatus: candidate?.deliveryStatus,
+          candidateClientMsgId: candidate?.clientMsgId ?? getMessageMetaClientMsgId(candidate),
+          skipReason
+        });
+      }
       const result = transcriptStore.ingest(message);
       if (result.mutation) {
         emit({
@@ -4137,6 +4190,12 @@
         emitStateChanged();
         try {
           debug.log("[sdk-ui] sendMessage -> client.sendMessage start", summarizeSendPayload2(sendPayload));
+          debug.log("[chat send debug]", {
+            localMessageId: id,
+            clientMsgId,
+            outboundMeta: sendPayload.meta,
+            envelopeMeta: void 0
+          });
           await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
           transcriptStore.upsertLocalMessage({
             ...optimistic,
@@ -12617,6 +12676,17 @@
         }
       });
       this.unsubscribeRawMessages = this.client.onMessage((message) => {
+        if (message.type === "chat::echo") {
+          const payload = typeof message.payload === "object" && message.payload !== null && !Array.isArray(message.payload) ? message.payload : {};
+          this.debug.log("[chat widget echo debug]", {
+            type: message.type,
+            role: typeof payload.role === "string" ? payload.role : void 0,
+            seq: typeof message.seq === "number" ? message.seq : void 0,
+            chatView: this.chatView.kind,
+            liveTranscriptLength: this.liveChatState.transcript.length,
+            historicalTranscriptLength: this.historicalTranscript.length
+          });
+        }
         const runtimeTitle = this.extractRuntimeChatTitle(message);
         if (runtimeTitle) {
           this.historyController?.applyRuntimeTitle(runtimeTitle);

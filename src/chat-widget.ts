@@ -404,6 +404,20 @@ export class ChatWidget {
     });
 
     this.unsubscribeRawMessages = this.client.onMessage((message) => {
+      if (message.type === 'chat::echo') {
+        const payload = typeof message.payload === 'object' && message.payload !== null && !Array.isArray(message.payload)
+          ? message.payload as Record<string, unknown>
+          : {};
+        this.debug.log('[chat widget echo debug]', {
+          type: message.type,
+          role: typeof payload.role === 'string' ? payload.role : undefined,
+          seq: typeof message.seq === 'number' ? message.seq : undefined,
+          chatView: this.chatView.kind,
+          liveTranscriptLength: this.liveChatState.transcript.length,
+          historicalTranscriptLength: this.historicalTranscript.length,
+        });
+      }
+
       const runtimeTitle = this.extractRuntimeChatTitle(message);
       if (runtimeTitle) {
         this.historyController?.applyRuntimeTitle(runtimeTitle);
