@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.11 builtAt=2026-05-26T21:04:45.131Z */
+/* cortex-chat-widget build: sdk=1.1.13 builtAt=2026-05-27T11:58:04.221Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -195,7 +195,7 @@ function _buildOpenError(wsUrl, baseMessage, details = {}) {
   error2.phase = details.phase;
   return error2;
 }
-function createTransport(WS, connectTimeoutMs, isDebugEnabled = () => false) {
+function createTransport(WS, connectTimeoutMs, _isDebugEnabled = () => false) {
   let ws = null;
   const transport = {
     onMessage: null,
@@ -266,16 +266,7 @@ function createTransport(WS, connectTimeoutMs, isDebugEnabled = () => false) {
           reject(makeError("transport_send_timeout", "Send timed out"));
         }, timeoutMs);
         try {
-          const envelopeType = typeof message === "object" && message !== null && "type" in message && typeof message.type === "string" ? message.type : "unknown";
-          debugLog(isDebugEnabled(), "[sdk] transport.send start", {
-            envelopeType,
-            readyState: ws.readyState
-          });
           ws.send(JSON.stringify(message));
-          debugLog(isDebugEnabled(), "[sdk] transport.send done", {
-            envelopeType,
-            readyState: ws.readyState
-          });
           clearTimeout(timer);
           resolve();
         } catch (err) {
@@ -3642,7 +3633,6 @@ function createTranscriptStore(options = {}) {
 }
 
 // ../sdk-ui/dist/src/chat-controller.js
-var CORTEX_SDK_UI_VERSION = "0.1.0";
 var MESSAGE_SEND_TIMEOUT_MS = 15e3;
 var LIFECYCLE_SESSION_STATE_MAP = {
   active: "ACTIVE",
@@ -3653,34 +3643,6 @@ var LIFECYCLE_SESSION_STATE_MAP = {
   timeout: "TIMEOUT",
   cancelled: "CANCELLED"
 };
-function isModuleDebugEnabled() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const queryDebug = params.get("debug");
-    if (queryDebug === "true" || queryDebug === "1") {
-      return true;
-    }
-    return window.localStorage.getItem("cortex_debug") === "1";
-  } catch {
-    return false;
-  }
-}
-console.log("[cortex sdk-ui controller module loaded]", {
-  source: "sdk-ui",
-  version: CORTEX_SDK_UI_VERSION,
-  ts: (/* @__PURE__ */ new Date()).toISOString()
-});
-if (isModuleDebugEnabled()) {
-  console.debug("[cortex sdk-ui controller module loaded]", {
-    source: "sdk-ui",
-    version: CORTEX_SDK_UI_VERSION,
-    ts: (/* @__PURE__ */ new Date()).toISOString(),
-    href: typeof window !== "undefined" ? window.location.href : void 0
-  });
-}
 async function withTimeout(promise, timeoutMs, msg) {
   let timer;
   try {
@@ -3773,28 +3735,6 @@ function summarizeSendPayload2(payload) {
     metaKeys: payload.meta ? Object.keys(payload.meta) : [],
     clientMsgId: payload.meta && typeof payload.meta.client_msg_id === "string" ? payload.meta.client_msg_id : void 0
   };
-}
-function getMessageMetaClientMsgId(message) {
-  if (!message || !isRecord(message.meta)) {
-    return void 0;
-  }
-  return asNonEmptyString(message.meta["client_msg_id"]) ?? void 0;
-}
-function getPayloadMetaClientMsgId(message) {
-  if (!message || !isRecord(message.payload)) {
-    return void 0;
-  }
-  const payloadMeta = isRecord(message.payload["meta"]) ? message.payload["meta"] : null;
-  return asNonEmptyString(payloadMeta?.["client_msg_id"]) ?? void 0;
-}
-function isPendingOutgoingUserMessage(message) {
-  return message.id.startsWith("client:") && message.type === "chat::message" && message.role === "user" && (message.deliveryStatus === "sending" || message.deliveryStatus === "sent" || message.deliveryStatus === "failed");
-}
-function resolvePendingCandidate(transcript, clientMsgId) {
-  if (!clientMsgId) {
-    return void 0;
-  }
-  return transcript.find((message) => isPendingOutgoingUserMessage(message) && message.clientMsgId === clientMsgId && getMessageMetaClientMsgId(message.originalPayload) === clientMsgId);
 }
 function createChatController(options) {
   const listeners = /* @__PURE__ */ new Set();
@@ -4064,37 +4004,6 @@ function createChatController(options) {
       }
       return;
     }
-    if (message.type === "chat::echo") {
-      const transcriptBefore = transcriptStore.getSnapshot();
-      const normalized = normalizeCortexMessage(message);
-      const payloadMetaClientMsgId = getPayloadMetaClientMsgId(message);
-      const envelopeMetaClientMsgId = getMessageMetaClientMsgId(message);
-      const echoClientMsgId = normalized.clientMsgId;
-      const candidate = normalized.role === "user" ? resolvePendingCandidate(transcriptBefore, echoClientMsgId) : void 0;
-      const pendingKeys = transcriptBefore.filter((entry) => isPendingOutgoingUserMessage(entry)).map((entry) => entry.clientMsgId).filter((entry) => typeof entry === "string");
-      let skipReason;
-      if (normalized.role !== "user") {
-        skipReason = `role_${normalized.role ?? "unknown"}`;
-      } else if (!echoClientMsgId) {
-        skipReason = "missing_client_msg_id";
-      } else if (!candidate) {
-        skipReason = "no_pending_candidate";
-      }
-      debug.log("[chat echo debug]", {
-        type: message.type,
-        role: normalized.role,
-        seq: typeof message.seq === "number" ? message.seq : void 0,
-        echoClientMsgId,
-        envelopeMetaClientMsgId,
-        payloadMetaClientMsgId,
-        pendingKeys,
-        candidateId: candidate?.id,
-        candidateType: candidate?.type,
-        candidateDeliveryStatus: candidate?.deliveryStatus,
-        candidateClientMsgId: candidate?.clientMsgId ?? getMessageMetaClientMsgId(candidate),
-        skipReason
-      });
-    }
     const result = transcriptStore.ingest(message);
     if (result.mutation) {
       emit({
@@ -4217,12 +4126,6 @@ function createChatController(options) {
       emitStateChanged();
       try {
         debug.log("[sdk-ui] sendMessage -> client.sendMessage start", summarizeSendPayload2(sendPayload));
-        debug.log("[chat send debug]", {
-          localMessageId: id,
-          clientMsgId,
-          outboundMeta: sendPayload.meta,
-          envelopeMeta: void 0
-        });
         await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
         transcriptStore.upsertLocalMessage({
           ...optimistic,
@@ -12703,17 +12606,6 @@ var ChatWidget = class {
       }
     });
     this.unsubscribeRawMessages = this.client.onMessage((message) => {
-      if (message.type === "chat::echo") {
-        const payload = typeof message.payload === "object" && message.payload !== null && !Array.isArray(message.payload) ? message.payload : {};
-        this.debug.log("[chat widget echo debug]", {
-          type: message.type,
-          role: typeof payload.role === "string" ? payload.role : void 0,
-          seq: typeof message.seq === "number" ? message.seq : void 0,
-          chatView: this.chatView.kind,
-          liveTranscriptLength: this.liveChatState.transcript.length,
-          historicalTranscriptLength: this.historicalTranscript.length
-        });
-      }
       const runtimeTitle = this.extractRuntimeChatTitle(message);
       if (runtimeTitle) {
         this.historyController?.applyRuntimeTitle(runtimeTitle);
@@ -13335,37 +13227,6 @@ function mountCortexChat(targetOrOptions, maybeOptions) {
     mountTarget,
     historyTarget,
     createClient: () => createClient(options)
-  });
-}
-
-// src/index.ts
-var CORTEX_CHAT_WIDGET_VERSION = "0.1.0";
-function isBundleDebugEnabled() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const queryDebug = params.get("debug");
-    if (queryDebug === "true" || queryDebug === "1") {
-      return true;
-    }
-    return window.localStorage.getItem("cortex_debug") === "1";
-  } catch {
-    return false;
-  }
-}
-console.log("[cortex widget bundle loaded]", {
-  source: "cortex-chat-widget",
-  version: CORTEX_CHAT_WIDGET_VERSION,
-  ts: (/* @__PURE__ */ new Date()).toISOString()
-});
-if (isBundleDebugEnabled()) {
-  console.debug("[cortex widget bundle loaded]", {
-    source: "cortex-chat-widget",
-    version: CORTEX_CHAT_WIDGET_VERSION,
-    ts: (/* @__PURE__ */ new Date()).toISOString(),
-    href: typeof window !== "undefined" ? window.location.href : void 0
   });
 }
 export {
