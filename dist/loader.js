@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.13 builtAt=2026-05-27T13:27:00.404Z */
+/* cortex-chat-widget loader build: sdk=1.1.13 builtAt=2026-05-27T14:07:51.861Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -2123,7 +2123,13 @@
   min-width: 0;
 }
 
-.cortex-widget__question-options,
+.cortex-widget__question-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
 .cortex-widget__message-attachments {
   display: flex;
   flex-wrap: wrap;
@@ -2687,17 +2693,23 @@
 }
 
 .cortex-widget__question-option {
-  padding: 7px 12px;
-  border-radius: 999px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 2px;
   border: 1px solid color-mix(in srgb, var(--cortex-accent-color) 36%, transparent);
   background: color-mix(in srgb, var(--cortex-accent-color) 9%, var(--cortex-background-color) 91%);
   color: var(--cortex-accent-color);
   font-size: 12px;
+  text-align: left;
   cursor: pointer;
 }
 
 .cortex-widget__question-option:hover:not(:disabled) {
   background: color-mix(in srgb, var(--cortex-accent-color) 15%, var(--cortex-background-color) 85%);
+}
+
+.cortex-widget__question-option:active:not(:disabled) {
+  background: color-mix(in srgb, var(--cortex-accent-color) 22%, var(--cortex-background-color) 78%);
 }
 
 .cortex-widget__question-label {
