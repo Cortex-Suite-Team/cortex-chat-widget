@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.13 builtAt=2026-05-27T14:07:51.861Z */
+/* cortex-chat-widget loader build: sdk=1.1.13 builtAt=2026-05-27T18:38:53.064Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -11605,7 +11605,8 @@
     "system::state",
     "system::pong",
     "system::telemetry",
-    "system::billing"
+    "system::billing",
+    "escalation::request"
   ]);
   var TERMINAL_SESSION_STATES2 = /* @__PURE__ */ new Set([
     "COMPLETED",
@@ -12936,7 +12937,7 @@ ${token}`;
         }
       }
       const questionRef = getQuestionRef2(activeQuestion);
-      const questionMeta = questionRef ? { question_ref: questionRef, selected_option: "reply" } : void 0;
+      const questionMeta = questionRef ? { question_ref: questionRef } : void 0;
       try {
         const sendRequest = {
           content: [content],
