@@ -2048,4 +2048,54 @@ describe('widget send result behavior', () => {
     expect(form).toBeNull();
     expect(bubble).toBeTruthy();
   });
+
+  it('free-text reply with allow_reply=true sends meta.question_ref only — no selected, no selected_option', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+
+    applyChatState(baseChatState({
+      activeQuestion: {
+        question_ref: 'q_free',
+        input_type: 'radio',
+        allow_reply: true,
+        questions: [],
+        options: [],
+      },
+    }));
+
+    changeInput(textarea, 'my free-text answer');
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(controller.sendCalls).toHaveLength(1);
+    const sentMeta = controller.sendCalls[0]?.meta;
+    expect(sentMeta).toEqual({ question_ref: 'q_free' });
+    expect(sentMeta).not.toHaveProperty('selected_option');
+    expect(sentMeta).not.toHaveProperty('selected');
+  });
+
+  it('free-text reply with allow_reply=false does not call sendMessage', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+
+    applyChatState(baseChatState({
+      activeQuestion: {
+        question_ref: 'q_blocked',
+        input_type: 'radio',
+        allow_reply: false,
+        questions: [],
+        options: [],
+      },
+    }));
+
+    changeInput(textarea, 'should not go through');
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(controller.sendCalls).toHaveLength(0);
+  });
 });

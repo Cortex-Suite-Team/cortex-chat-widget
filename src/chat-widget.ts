@@ -715,7 +715,7 @@ export class ChatWidget {
 
     const questionRef = getQuestionRef(activeQuestion);
     const questionMeta = questionRef
-      ? { question_ref: questionRef, selected_option: 'reply' }
+      ? { question_ref: questionRef }
       : undefined;
 
     try {
