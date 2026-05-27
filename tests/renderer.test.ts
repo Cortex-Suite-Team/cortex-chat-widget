@@ -1877,7 +1877,7 @@ describe('widget send result behavior', () => {
 
     expect(controller.sendCalls[0]).toMatchObject({
       content: ['Yes'],
-      meta: { question_ref: 'q1', selected_option: 'yes' },
+      meta: { question_ref: 'q1', selected: ['yes'] },
     });
     expect(sendButton.disabled).toBe(true);
   });
@@ -1929,5 +1929,123 @@ describe('widget send result behavior', () => {
 
     // textarea.disabled reflects isAwaitingAnswer||locked — not empty-content guard
     expect(textarea.disabled).toBe(false);
+  });
+
+  it('renders buttons for ask_user {key,label} questions with choice_mode radio', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_ask_user',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'What would you like to do?',
+        status: 'final',
+        meta: {
+          question_ref: 'q_ask',
+          choice_mode: 'radio',
+          allow_reply: false,
+          questions: [
+            { key: 'yes', label: 'Yes' },
+            { key: 'no', label: 'No' },
+          ],
+        },
+      }],
+      activeQuestion: {
+        question_ref: 'q_ask',
+        input_type: 'radio',
+        allow_reply: false,
+        questions: [],
+        options: [
+          { id: 'yes', label: 'Yes' },
+          { id: 'no', label: 'No' },
+        ],
+      },
+    }));
+
+    const buttons = shadow.querySelectorAll('[data-testid="question-option"]') as NodeListOf<HTMLButtonElement>;
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0].textContent).toBe('Yes');
+    expect(buttons[1].textContent).toBe('No');
+    expect(buttons[0].disabled).toBe(false);
+  });
+
+  it('clicking ask_user option button sends canonical selected array', async () => {
+    const { controller } = mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      activeQuestion: {
+        question_ref: 'q_ask2',
+        input_type: 'radio',
+        allow_reply: false,
+        questions: [],
+        options: [
+          { id: 'approve', label: 'Approve' },
+          { id: 'reject', label: 'Reject' },
+        ],
+      },
+      transcript: [{
+        id: 'msg_ask2',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'Approve or reject?',
+        status: 'final',
+        meta: {
+          question_ref: 'q_ask2',
+          choice_mode: 'radio',
+          allow_reply: false,
+          questions: [
+            { key: 'approve', label: 'Approve' },
+            { key: 'reject', label: 'Reject' },
+          ],
+        },
+      }],
+    }));
+
+    const buttons = shadow.querySelectorAll('[data-testid="question-option"]') as NodeListOf<HTMLButtonElement>;
+    expect(buttons).toHaveLength(2);
+    buttons[0].click();
+    await flushAsyncWork();
+
+    expect(controller.sendCalls[0]).toMatchObject({
+      content: ['Approve'],
+      meta: { question_ref: 'q_ask2', selected: ['approve'] },
+    });
+  });
+
+  it('chat::question without questions array renders as plain message bubble', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_plain_q',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'Please reply in the text box.',
+        status: 'final',
+        meta: {
+          question_ref: 'q_plain',
+          allow_reply: true,
+        },
+      }],
+      activeQuestion: {
+        question_ref: 'q_plain',
+        input_type: 'radio',
+        allow_reply: true,
+        questions: [],
+        options: [],
+      },
+    }));
+
+    const optionsContainer = shadow.querySelector('[data-testid="question-options"]');
+    const form = shadow.querySelector('[data-testid="question-form"]');
+    const bubble = shadow.querySelector('[data-testid="message-bubble"]');
+
+    expect(optionsContainer).toBeNull();
+    expect(form).toBeNull();
+    expect(bubble).toBeTruthy();
   });
 });

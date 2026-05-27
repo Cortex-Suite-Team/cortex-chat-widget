@@ -779,7 +779,7 @@ export class ChatWidget {
     try {
       const result = await this.controller.sendMessage({
         content: [optionLabel],
-        meta: { question_ref: questionRef, selected_option: optionId },
+        meta: { question_ref: questionRef, selected: [optionId] },
       });
 
       if (!result.ok) {

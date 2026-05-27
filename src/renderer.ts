@@ -270,6 +270,33 @@ function singleChoiceQuestion(questions: WidgetQuestionField[]): WidgetQuestionF
   return null;
 }
 
+// Synthesize a choice question from ask_user's {key, label} choices format.
+// ask_user emits questions as option descriptors (no type field) + a parent choice_mode.
+// Returns null if items have a type (handled by normalizeQuestionFields instead).
+function synthesizeAskUserChoiceQuestion(
+  rawQuestions: unknown,
+  questionRef: string,
+): WidgetQuestionField | null {
+  if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+    return null;
+  }
+  const options: WidgetQuestionOption[] = [];
+  for (const item of rawQuestions) {
+    if (!isRecord(item) || item['type'] != null) {
+      return null;
+    }
+    const id = toNonEmptyString(item['key']);
+    const label = toNonEmptyString(item['label']) ?? id;
+    if (id && label) {
+      options.push({ id, label });
+    }
+  }
+  if (options.length === 0) {
+    return null;
+  }
+  return { key: questionRef, label: '', type: 'radio', required: false, options };
+}
+
 function formatMessageTime(value: string | null | undefined): string | null {
   if (!value) {
     return null;
@@ -544,7 +571,10 @@ function renderTranscript(
       const questionRef = toNonEmptyString(message.meta?.['question_ref'])
         ?? toNonEmptyString(message.meta?.['question_id']);
       const questions = normalizeQuestionFields(message.meta?.['questions']);
-      const choiceQuestion = singleChoiceQuestion(questions);
+      const choiceQuestion = singleChoiceQuestion(questions)
+        ?? (questionRef
+          ? synthesizeAskUserChoiceQuestion(message.meta?.['questions'], questionRef)
+          : null);
 
       if (questionRef && choiceQuestion) {
         const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
