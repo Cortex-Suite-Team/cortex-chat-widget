@@ -45,7 +45,7 @@
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
   },
   "dependencies": {
-    "@cortex-suite/sdk": "^1.1.8",
+    "@cortex-suite/sdk": "^1.1.13",
     "@cortex-suite/sdk-ui": "file:../sdk-ui"
   },
   "devDependencies": {
