@@ -371,7 +371,13 @@ export const layoutStyles = `
   min-width: 0;
 }
 
-.cortex-widget__question-options,
+.cortex-widget__question-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
 .cortex-widget__message-attachments {
   display: flex;
   flex-wrap: wrap;

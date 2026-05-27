@@ -346,17 +346,23 @@ export const typographyStyles = `
 }
 
 .cortex-widget__question-option {
-  padding: 7px 12px;
-  border-radius: 999px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 2px;
   border: 1px solid color-mix(in srgb, var(--cortex-accent-color) 36%, transparent);
   background: color-mix(in srgb, var(--cortex-accent-color) 9%, var(--cortex-background-color) 91%);
   color: var(--cortex-accent-color);
   font-size: 12px;
+  text-align: left;
   cursor: pointer;
 }
 
 .cortex-widget__question-option:hover:not(:disabled) {
   background: color-mix(in srgb, var(--cortex-accent-color) 15%, var(--cortex-background-color) 85%);
+}
+
+.cortex-widget__question-option:active:not(:disabled) {
+  background: color-mix(in srgb, var(--cortex-accent-color) 22%, var(--cortex-background-color) 78%);
 }
 
 .cortex-widget__question-label {
