@@ -13,6 +13,7 @@ const HIDDEN_TRANSCRIPT_TYPES = new Set([
   'system::pong',
   'system::telemetry',
   'system::billing',
+  'escalation::request',
 ]);
 const TERMINAL_SESSION_STATES = new Set([
   'COMPLETED',

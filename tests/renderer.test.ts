@@ -259,6 +259,39 @@ describe('widget renderer behavior', () => {
     expect(escalation.textContent).toContain('waiting for human/operator action');
   });
 
+  it('escalation::request in transcript renders no bubble — escalation card is the user-visible surface', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      escalation: {
+        escalationId: 'esc_1',
+        allowedActions: ['reply_user'],
+        status: 'pending',
+      },
+      transcript: [{
+        id: 'esc_msg_1',
+        type: 'escalation::request',
+        role: 'escalation',
+        content: 'Needs human approval',
+        meta: {
+          escalationId: 'esc_1',
+          waitToken: 'tok_secret',
+          allowedActions: ['reply_user'],
+        },
+      }],
+    }));
+
+    const bubbles = shadow.querySelectorAll('[data-testid="message-bubble"]');
+    expect(bubbles).toHaveLength(0);
+
+    const card = shadow.querySelector('[data-testid="escalation-card"]') as HTMLElement;
+    expect(card.dataset.visible).toBe('true');
+
+    expect(shadow.textContent).not.toContain('tok_secret');
+    expect(shadow.textContent).not.toContain('Needs human approval');
+  });
+
   it('renders a visible user message for attachment-only backend echo without an empty bubble', () => {
     mountWidget();
     const shadow = getShadow();

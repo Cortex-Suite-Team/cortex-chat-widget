@@ -25,4 +25,31 @@ describe('shouldHideTranscriptMessage', () => {
       content: 'Something failed',
     })).toBe(false);
   });
+
+  it('hides escalation::request from end-user transcript', () => {
+    expect(shouldHideTranscriptMessage({
+      id: 'esc_1',
+      type: 'escalation::request',
+      role: 'escalation',
+      content: 'Needs human approval',
+      meta: { waitToken: 'tok', allowedActions: ['reply_user'] },
+    })).toBe(true);
+  });
+
+  it('does not hide normal chat messages', () => {
+    expect(shouldHideTranscriptMessage({
+      id: 'q1',
+      type: 'chat::question',
+      role: 'assistant',
+      content: 'Choose',
+      meta: {},
+    })).toBe(false);
+
+    expect(shouldHideTranscriptMessage({
+      id: 'a1',
+      type: 'chat::answer',
+      role: 'assistant',
+      content: 'Here is the answer',
+    })).toBe(false);
+  });
 });
