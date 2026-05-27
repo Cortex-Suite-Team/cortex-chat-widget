@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.13 builtAt=2026-05-27T12:24:06.979Z */
+/* cortex-chat-widget build: sdk=1.1.13 builtAt=2026-05-27T13:27:00.404Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -3708,6 +3708,23 @@ function choiceOptionsFromQuestions(questions) {
   }
   return question.options;
 }
+function buildAskUserOptions(rawQuestions) {
+  if (!Array.isArray(rawQuestions)) {
+    return [];
+  }
+  const options = [];
+  for (const item of rawQuestions) {
+    if (!isRecord(item) || item["type"] != null) {
+      return [];
+    }
+    const id = asNonEmptyString(item["key"]);
+    const label = asNonEmptyString(item["label"]) ?? id;
+    if (id && label) {
+      options.push({ id, label });
+    }
+  }
+  return options;
+}
 function getSessionContextCorrespondent(client) {
   const rawSessionContext = client.sessionContext;
   if (isRecord(rawSessionContext) && isRecord(rawSessionContext["correspondent"])) {
@@ -4028,13 +4045,14 @@ function createChatController(options) {
       const legacyQuestionId = questionRef && meta && !asNonEmptyString(meta["question_ref"]) ? asNonEmptyString(meta["question_id"]) : null;
       if (questionRef) {
         const questions = normalizeQuestionFields(meta?.["questions"]);
+        const options2 = questions.length > 0 ? choiceOptionsFromQuestions(questions) : buildAskUserOptions(meta?.["questions"]);
         activeQuestion = {
           question_ref: questionRef,
           ...legacyQuestionId ? { question_id: legacyQuestionId } : {},
           input_type: asNonEmptyString(meta?.["input_type"]) ?? "radio",
           allow_reply: meta?.["allow_reply"] === true,
           questions,
-          options: choiceOptionsFromQuestions(questions),
+          options: options2,
           turn_id: asNonEmptyString(payload["turn_id"]) ?? null
         };
       }
@@ -11825,6 +11843,26 @@ function singleChoiceQuestion(questions) {
   }
   return null;
 }
+function synthesizeAskUserChoiceQuestion(rawQuestions, questionRef) {
+  if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+    return null;
+  }
+  const options = [];
+  for (const item of rawQuestions) {
+    if (!isRecord2(item) || item["type"] != null) {
+      return null;
+    }
+    const id = toNonEmptyString(item["key"]);
+    const label = toNonEmptyString(item["label"]) ?? id;
+    if (id && label) {
+      options.push({ id, label });
+    }
+  }
+  if (options.length === 0) {
+    return null;
+  }
+  return { key: questionRef, label: "", type: "radio", required: false, options };
+}
 function formatMessageTime(value) {
   if (!value) {
     return null;
@@ -12050,7 +12088,7 @@ function renderTranscript(transcriptEl, state, options) {
     if (message.type === "chat::question" && Array.isArray(message.meta?.["questions"])) {
       const questionRef = toNonEmptyString(message.meta?.["question_ref"]) ?? toNonEmptyString(message.meta?.["question_id"]);
       const questions = normalizeQuestionFields2(message.meta?.["questions"]);
-      const choiceQuestion = singleChoiceQuestion(questions);
+      const choiceQuestion = singleChoiceQuestion(questions) ?? (questionRef ? synthesizeAskUserChoiceQuestion(message.meta?.["questions"], questionRef) : null);
       if (questionRef && choiceQuestion) {
         const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
         const optionsDisabled = !isActive || state.isAwaitingAnswer;
@@ -12941,7 +12979,7 @@ ${token}`;
     try {
       const result = await this.controller.sendMessage({
         content: [optionLabel],
-        meta: { question_ref: questionRef, selected_option: optionId }
+        meta: { question_ref: questionRef, selected: [optionId] }
       });
       if (!result.ok) {
         this.ui.isAwaitingAnswer = false;
