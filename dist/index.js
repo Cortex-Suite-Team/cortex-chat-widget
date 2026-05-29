@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.13 builtAt=2026-05-29T12:05:59.447Z */
+/* cortex-chat-widget build: sdk=1.1.13 builtAt=2026-05-29T12:54:26.667Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -3137,19 +3137,30 @@ function withoutInternalRefs(meta) {
   delete cleaned["resume_event_ref"];
   return cleaned;
 }
-var KNOWN_ACTOR_KINDS = /* @__PURE__ */ new Set(["user", "operator", "digital_worker", "system"]);
+function resolveActorKind(raw) {
+  if (raw === "operator" || raw === "human_operator")
+    return "operator";
+  if (raw === "digital_worker")
+    return "digital_worker";
+  if (raw === "user")
+    return "user";
+  if (raw === "system")
+    return "system";
+  return null;
+}
 function extractActor(message, payload) {
   const payloadMeta = isRecord(payload["meta"]) ? payload["meta"] : void 0;
   const messageMeta = isRecord(message.meta) ? message.meta : void 0;
   const raw = (isRecord(payloadMeta?.["actor"]) ? payloadMeta["actor"] : null) ?? (isRecord(payload["actor"]) ? payload["actor"] : null) ?? (isRecord(messageMeta?.["actor"]) ? messageMeta["actor"] : null);
   if (!raw)
     return null;
-  const kind = asNonEmptyString(raw["kind"]);
+  const kindRaw = asNonEmptyString(raw["kind"]);
   const name = asNonEmptyString(raw["name"]);
-  if (!kind || !name || !KNOWN_ACTOR_KINDS.has(kind))
+  const resolvedKind = kindRaw ? resolveActorKind(kindRaw) : null;
+  if (!resolvedKind || !name)
     return null;
   return {
-    kind,
+    kind: resolvedKind,
     id: asNonEmptyString(raw["id"]) ?? null,
     name,
     title: asNonEmptyString(raw["title"]) ?? null,
