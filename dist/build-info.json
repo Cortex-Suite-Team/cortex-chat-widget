@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-05-29T13:01:47.636Z",
+  "builtAt": "2026-05-29T13:37:22.968Z",
   "widgetEntry": "dist/index.js",
   "sdk": {
     "name": "@cortex-suite/sdk",
@@ -7,7 +7,7 @@
     "browserEntry": "@cortex-suite/sdk/browser"
   },
   "sdkUi": {
-    "entry": "D:\\GitHub\\Cortex\\public\\sdk-ui\\dist\\src\\index.js",
+    "entry": "/home/runner/work/cortex-chat-widget/cortex-chat-widget/sdk-ui/dist/src/index.js",
     "source": "file:../sdk-ui"
   },
   "sources": {
