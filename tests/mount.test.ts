@@ -230,12 +230,11 @@ describe('mountCortexChat', () => {
         type: 'chat::answer',
         role: 'assistant',
         content: 'Hello from another actor',
-        meta: {
-          actor: {
-            name: 'Local Bubble Actor',
-            title: 'Bubble Only',
-            avatar_url: 'https://example.test/local-bubble.png',
-          },
+        actor: {
+          kind: 'digital_worker',
+          name: 'Local Bubble Actor',
+          title: 'Bubble Only',
+          avatarUrl: 'https://example.test/local-bubble.png',
         },
       }],
     }));

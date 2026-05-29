@@ -17,6 +17,17 @@ export type SendMessageResult =
   | { ok: true; messageId: string; clientMsgId: string }
   | { ok: false; messageId: string; clientMsgId: string; error: string };
 
+export type ChatActorKind = 'user' | 'operator' | 'digital_worker' | 'system';
+
+export interface ChatActor {
+  kind: ChatActorKind;
+  id?: string | null;
+  name: string;
+  title?: string | null;
+  subtitle?: string | null;
+  avatarUrl?: string | null;
+}
+
 export interface ChatMessageViewModel {
   id: string;
   seq?: number | null;
@@ -26,6 +37,7 @@ export interface ChatMessageViewModel {
   status?: 'streaming' | 'final' | 'error';
   ts?: string | null;
   meta?: Record<string, unknown>;
+  actor?: ChatActor | null;
   clientMsgId?: string;
   deliveryStatus?: ChatMessageDeliveryStatus;
   retryable?: boolean;

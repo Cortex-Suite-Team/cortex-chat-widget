@@ -486,7 +486,7 @@ describe('widget renderer behavior', () => {
     expect(transcript.textContent).toContain('New chat');
   });
 
-  it('renders actor header with name and avatar when meta.actor is present on assistant message', () => {
+  it('renders actor header with name and avatar when actor field is present on assistant message', () => {
     mountWidget();
     const shadow = getShadow();
 
@@ -497,14 +497,12 @@ describe('widget renderer behavior', () => {
         role: 'assistant',
         content: 'Hello from Robot Vasya',
         status: 'final',
-        meta: {
-          actor: {
-            kind: 'digital_worker',
-            id: 'proj_1',
-            name: 'Robot Vasya',
-            title: 'Lawyer',
-            avatar_url: 'https://example.test/avatar.png',
-          },
+        actor: {
+          kind: 'digital_worker',
+          id: 'proj_1',
+          name: 'Robot Vasya',
+          title: 'Lawyer',
+          avatarUrl: 'https://example.test/avatar.png',
         },
       }],
     }));
@@ -530,9 +528,7 @@ describe('widget renderer behavior', () => {
         role: 'assistant',
         content: 'Hi',
         status: 'final',
-        meta: {
-          actor: { kind: 'digital_worker', name: 'Robot Vasya' },
-        },
+        actor: { kind: 'digital_worker', name: 'Robot Vasya' },
       }],
     }));
 
@@ -719,13 +715,11 @@ describe('widget renderer behavior', () => {
         role: 'assistant',
         content: 'Hello from Robot Vasya',
         status: 'final',
-        meta: {
-          actor: {
-            kind: 'digital_worker',
-            id: 'proj_1',
-            name: 'Robot Vasya',
-            avatar_url: '/static/workspace/img/digital_worker_default.png',
-          },
+        actor: {
+          kind: 'digital_worker',
+          id: 'proj_1',
+          name: 'Robot Vasya',
+          avatarUrl: '/static/workspace/img/digital_worker_default.png',
         },
       }],
     }));
@@ -1118,8 +1112,8 @@ describe('widget renderer behavior', () => {
         role: 'assistant',
         content: 'Here is the file.',
         status: 'final',
+        actor: { kind: 'digital_worker', name: 'Robot Vasya' },
         meta: {
-          actor: { kind: 'digital_worker', name: 'Robot Vasya' },
           attachments: [{
             file_id: 'file_reg',
             filename: 'report.pdf',
@@ -1340,9 +1334,7 @@ describe('worker status rendering', () => {
         type: 'chat::answer',
         role: 'assistant',
         content: 'Hello!',
-        meta: {
-          actor: { name: 'TestBot', kind: 'digital_worker', id: 'proj_1' },
-        },
+        actor: { kind: 'digital_worker', id: 'proj_1', name: 'TestBot' },
       }],
     }));
 
@@ -2130,5 +2122,193 @@ describe('widget send result behavior', () => {
     await flushAsyncWork();
 
     expect(controller.sendCalls).toHaveLength(0);
+  });
+});
+
+describe('actor rendering and missing-actor diagnostic', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it('operator echo with actor renders actor.name in actor-header', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'op_echo_actor',
+        type: 'chat::echo',
+        role: 'operator',
+        content: 'Operator reply',
+        status: 'final',
+        actor: { kind: 'operator', name: 'Alice Operator' },
+      }],
+    }));
+
+    const actorHeader = shadow.querySelector('[data-testid="actor-header"]') as HTMLElement;
+    const actorName = shadow.querySelector('[data-testid="actor-name"]') as HTMLElement;
+    expect(actorHeader).toBeTruthy();
+    expect(actorName.textContent).toBe('Alice Operator');
+    expect(shadow.querySelector('[data-testid="actor-missing"]')).toBeNull();
+  });
+
+  it('operator echo without actor renders diagnostic marker in debug mode and no Assistant fallback', () => {
+    mountWidget({ debug: true });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'op_echo_no_actor',
+        type: 'chat::echo',
+        role: 'operator',
+        content: 'Operator reply',
+        status: 'final',
+        actor: null,
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
+    const marker = shadow.querySelector('[data-testid="actor-missing"]') as HTMLElement;
+    expect(marker).toBeTruthy();
+    expect(marker.textContent).toBe('· unknown actor');
+    expect(shadow.querySelector('[data-testid="transcript-message"]')?.textContent).not.toContain('Assistant');
+  });
+
+  it('operator chat::message without actor triggers diagnostic in debug mode', () => {
+    mountWidget({ debug: true });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'op_msg_no_actor',
+        type: 'chat::message',
+        role: 'operator',
+        content: 'Operator message',
+        status: 'final',
+        actor: null,
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
+    expect(shadow.querySelector('[data-testid="actor-missing"]')).toBeTruthy();
+  });
+
+  it('worker answer with actor renders actor.name in actor-header', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'worker_answer_actor',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'I can help',
+        status: 'final',
+        actor: { kind: 'digital_worker', name: 'Robot Vasya', title: 'Legal Assistant' },
+      }],
+    }));
+
+    const actorName = shadow.querySelector('[data-testid="actor-name"]') as HTMLElement;
+    expect(actorName.textContent).toBe('Robot Vasya');
+    expect(shadow.querySelector('[data-testid="actor-missing"]')).toBeNull();
+  });
+
+  it('worker answer without actor shows diagnostic marker in debug mode and no fallback name', () => {
+    mountWidget({ debug: true });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'worker_no_actor',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'I can help',
+        status: 'final',
+        actor: null,
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
+    expect(shadow.querySelector('[data-testid="actor-missing"]')).toBeTruthy();
+    expect(shadow.querySelector('[data-testid="transcript-message"]')?.textContent).not.toContain('Assistant');
+  });
+
+  it('worker answer without actor does not show diagnostic marker when debug=false', () => {
+    mountWidget({ debug: false });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'worker_no_actor_prod',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'I can help',
+        status: 'final',
+        actor: null,
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
+    expect(shadow.querySelector('[data-testid="actor-missing"]')).toBeNull();
+    expect(shadow.querySelector('[data-testid="transcript-message"]')?.textContent).not.toContain('Assistant');
+  });
+
+  it('user message is right-aligned, has no actor-header and no actor-missing marker', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'user_msg',
+        type: 'chat::message',
+        role: 'user',
+        content: 'Hello!',
+        status: 'final',
+        actor: null,
+      }],
+    }));
+
+    const msg = shadow.querySelector('[data-testid="transcript-message"]') as HTMLElement;
+    expect(msg.dataset.role).toBe('user');
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
+    expect(shadow.querySelector('[data-testid="actor-missing"]')).toBeNull();
+  });
+
+  it('error message has no actor-header and no actor-missing marker', () => {
+    mountWidget({ debug: true });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'err_msg',
+        type: 'system::error',
+        role: 'error',
+        content: 'Something went wrong',
+        status: 'error',
+        actor: null,
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
+    expect(shadow.querySelector('[data-testid="actor-missing"]')).toBeNull();
+  });
+
+  it('escalation::request has no actor-header and no actor-missing marker', () => {
+    mountWidget({ debug: true });
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'esc_req',
+        type: 'escalation::request',
+        role: 'escalation',
+        content: 'Escalating…',
+        status: 'final',
+        actor: null,
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="actor-header"]')).toBeNull();
+    expect(shadow.querySelector('[data-testid="actor-missing"]')).toBeNull();
   });
 });

@@ -12,6 +12,21 @@ import type {
   WidgetDom,
 } from './types.js';
 
+const _warnedMissingActorIds = new Set<string>();
+
+function messageRequiresActor(message: ChatMessageViewModel): boolean {
+  if (message.role === 'user' || message.role === 'error') return false;
+  return (
+    message.type === 'chat::answer'
+    || message.type === 'chat::question'
+    || message.type === 'chat::partial'
+    || message.type === 'chat::forward'
+    || message.type === 'chat::hail'
+    || message.type === 'escalation::reply'
+    || ((message.type === 'chat::echo' || message.type === 'chat::message') && message.role === 'operator')
+  );
+}
+
 function getAvatarInitials(label: string): string {
   const normalized = label.trim();
   if (!normalized) {
@@ -434,16 +449,17 @@ function renderTranscript(
     wrapper.dataset.type = message.type;
     wrapper.setAttribute('data-testid', 'transcript-message');
 
-    // Actor header for non-user, non-error messages
-    const actor = isRecord(message.meta?.['actor']) ? message.meta!['actor'] as Record<string, unknown> : null;
-    const hasActorHeader = actor !== null && message.role !== 'user' && message.role !== 'error';
+    const actor = message.actor ?? null;
+    const actorRequired = messageRequiresActor(message);
+    const hasActorHeader = actor !== null && actorRequired;
+    const hasMissingActor = actor === null && actorRequired;
 
     if (hasActorHeader) {
       const actorHeader = document.createElement('div');
       actorHeader.className = 'cortex-widget__actor';
       actorHeader.setAttribute('data-testid', 'actor-header');
 
-      const avatarUrl = normalizeAvatarUrl(toNonEmptyString(actor!['avatar_url']), options);
+      const avatarUrl = normalizeAvatarUrl(actor.avatarUrl ?? null, options);
       if (avatarUrl) {
         const img = document.createElement('img');
         img.className = 'cortex-widget__actor-avatar';
@@ -459,11 +475,11 @@ function renderTranscript(
 
       const nameEl = document.createElement('span');
       nameEl.className = 'cortex-widget__actor-name';
-      nameEl.textContent = toNonEmptyString(actor!['name']) ?? 'Assistant';
+      nameEl.textContent = actor.name;
       nameEl.setAttribute('data-testid', 'actor-name');
       actorInfo.appendChild(nameEl);
 
-      const actorTitle = toNonEmptyString(actor!['title']);
+      const actorTitle = actor.title ?? null;
       if (actorTitle) {
         const titleEl = document.createElement('span');
         titleEl.className = 'cortex-widget__actor-title';
@@ -473,6 +489,22 @@ function renderTranscript(
 
       actorHeader.appendChild(actorInfo);
       wrapper.appendChild(actorHeader);
+    }
+
+    if (hasMissingActor) {
+      if (!_warnedMissingActorIds.has(message.id)) {
+        _warnedMissingActorIds.add(message.id);
+        console.warn('[cortex] Missing actor on non-user message', { type: message.type, id: message.id });
+      }
+      const isDebug = options.debug === true ||
+        (typeof localStorage !== 'undefined' && localStorage.getItem('cortex_debug') === '1');
+      if (isDebug) {
+        const marker = document.createElement('div');
+        marker.className = 'cortex-widget__actor-missing';
+        marker.setAttribute('data-testid', 'actor-missing');
+        marker.textContent = '· unknown actor';
+        wrapper.appendChild(marker);
+      }
     }
 
     const bubble = document.createElement('div');
@@ -665,7 +697,8 @@ function renderTranscript(
     if (timestampSource === 'client') {
       metaText.dataset.provisional = 'true';
     }
-    if (hasActorHeader) {
+    if (hasActorHeader || hasMissingActor) {
+      // Actor header shows identity (or diagnostic), so meta only carries timing
       metaText.textContent = timestampText ?? (message.status === 'streaming' ? 'streaming' : '');
     } else {
       const metaParts: string[] = [];
