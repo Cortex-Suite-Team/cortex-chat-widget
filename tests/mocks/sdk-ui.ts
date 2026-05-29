@@ -356,6 +356,37 @@ export function createMockChatState(
   };
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function asNonEmptyString(v: unknown): string | null {
+  return typeof v === 'string' && v.length > 0 ? v : null;
+}
+
+export function parseRawActor(raw: unknown): ChatActor | null {
+  if (!isRecord(raw)) return null;
+  const kindRaw = asNonEmptyString(raw['kind']);
+  const name = asNonEmptyString(raw['name']);
+  const kindMap: Record<string, ChatActorKind> = {
+    operator: 'operator',
+    human_operator: 'operator',
+    digital_worker: 'digital_worker',
+    user: 'user',
+    system: 'system',
+  };
+  const resolvedKind = kindRaw ? (kindMap[kindRaw] ?? null) : null;
+  if (!resolvedKind || !name) return null;
+  return {
+    kind: resolvedKind,
+    id: asNonEmptyString(raw['id']) ?? null,
+    name,
+    title: asNonEmptyString(raw['title']) ?? null,
+    subtitle: asNonEmptyString(raw['subtitle']) ?? null,
+    avatarUrl: asNonEmptyString(raw['avatarUrl']) ?? asNonEmptyString(raw['avatar_url']) ?? null,
+  };
+}
+
 export function __resetSdkUiMock(): void {
   controllers.length = 0;
 }

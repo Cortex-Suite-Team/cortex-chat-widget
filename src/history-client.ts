@@ -1,3 +1,4 @@
+import { parseRawActor } from '@cortex-suite/sdk-ui';
 import type { ChatMessageViewModel, HistoryConversationSummary } from './types.js';
 
 interface HistoryListResponse {
@@ -19,6 +20,7 @@ interface HistoryMessagesResponse {
       status?: ChatMessageViewModel['status'];
       ts?: string | null;
       meta?: Record<string, unknown>;
+      actor?: unknown;
     }>;
   };
 }
@@ -66,6 +68,7 @@ export function createHistoryClient(args: { controlPlaneUrl: string; bearerToken
         content: message.content,
         status: message.status,
         ts: message.ts ?? null,
+        actor: parseRawActor(message.actor ?? null),
         meta: message.meta ?? {},
       }));
     },

@@ -419,4 +419,160 @@ describe('widget history', () => {
     expect(historyRoot.classList.contains('cortex-widget-history--light')).toBe(false);
     expect(historyHost.style.getPropertyValue('--cortex-background-color')).toBe('#111827');
   });
+
+  it('history chat::question with actor renders worker name and title', async () => {
+    installTargets();
+    getFetchMock()
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          conversations: [
+            { session_id: 'sess_w', title: 'Worker chat', renamed: false, pinned: false, last_message_at: '2026-05-20T10:00:00Z', created_at: '2026-05-20T09:00:00Z' },
+          ],
+        },
+      }))
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          session_id: 'sess_w',
+          messages: [
+            {
+              id: 'audit:10',
+              type: 'chat::question',
+              role: 'worker',
+              content: ['Which plan do you need?'],
+              status: 'final',
+              ts: '2026-05-20T10:00:00Z',
+              actor: { kind: 'digital_worker', id: 'proj_1', name: 'Interactive Worker', title: 'Digital worker', avatar_url: '/static/avatar.png' },
+              meta: {},
+            },
+          ],
+        },
+      }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+
+    __getLastController()!.setState(createMockChatState());
+    await flushAsyncWork();
+
+    const row = getHistoryShadow().querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    row.click();
+    await flushAsyncWork();
+
+    const chatShadow = getChatShadow();
+    const actorName = chatShadow.querySelector('[data-testid="actor-name"]') as HTMLElement | null;
+    expect(actorName).not.toBeNull();
+    expect(actorName!.textContent).toBe('Interactive Worker');
+    expect(chatShadow.querySelector('[data-testid="actor-missing"]')).toBeNull();
+  });
+
+  it('history chat::answer with actor renders worker actor on answer message', async () => {
+    installTargets();
+    getFetchMock()
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          conversations: [
+            { session_id: 'sess_ans', title: 'Answer chat', renamed: false, pinned: false, last_message_at: '2026-05-20T10:00:00Z', created_at: '2026-05-20T09:00:00Z' },
+          ],
+        },
+      }))
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          session_id: 'sess_ans',
+          messages: [
+            {
+              id: 'audit:20',
+              type: 'chat::answer',
+              role: 'assistant',
+              content: 'Here is the answer.',
+              status: 'final',
+              ts: '2026-05-20T10:01:00Z',
+              actor: { kind: 'digital_worker', name: 'Interactive Worker', title: 'Digital worker' },
+              meta: {},
+            },
+          ],
+        },
+      }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+
+    __getLastController()!.setState(createMockChatState());
+    await flushAsyncWork();
+
+    const row = getHistoryShadow().querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    row.click();
+    await flushAsyncWork();
+
+    const chatShadow = getChatShadow();
+    const actorName = chatShadow.querySelector('[data-testid="actor-name"]') as HTMLElement | null;
+    expect(actorName).not.toBeNull();
+    expect(actorName!.textContent).toBe('Interactive Worker');
+  });
+
+  it('history message without actor shows debug missing-actor marker, not a fallback name', async () => {
+    installTargets();
+    window.localStorage.setItem('cortex_debug', '1');
+    getFetchMock()
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          conversations: [
+            { session_id: 'sess_noactor', title: 'Old chat', renamed: false, pinned: false, last_message_at: '2026-05-01T10:00:00Z', created_at: '2026-05-01T09:00:00Z' },
+          ],
+        },
+      }))
+      .mockResolvedValueOnce(mockJsonResponse({
+        ok: true,
+        data: {
+          session_id: 'sess_noactor',
+          messages: [
+            {
+              id: 'audit:30',
+              type: 'chat::answer',
+              role: 'assistant',
+              content: 'An old answer.',
+              status: 'final',
+              ts: '2026-05-01T10:00:00Z',
+              actor: null,
+              meta: {},
+            },
+          ],
+        },
+      }));
+
+    mountCortexChat({
+      apiKey: 'test-key',
+      mode: 'embedded',
+      target: '#chat',
+      historyTarget: '#history',
+      controlPlaneUrl: 'https://cp.example.test',
+    });
+
+    __getLastController()!.setState(createMockChatState());
+    await flushAsyncWork();
+
+    const row = getHistoryShadow().querySelector('[data-testid="history-row"]') as HTMLButtonElement;
+    row.click();
+    await flushAsyncWork();
+
+    const chatShadow = getChatShadow();
+    expect(chatShadow.querySelector('[data-testid="actor-name"]')).toBeNull();
+    const missingMarker = chatShadow.querySelector('[data-testid="actor-missing"]') as HTMLElement | null;
+    expect(missingMarker).not.toBeNull();
+    expect(missingMarker!.textContent).toContain('unknown actor');
+  });
 });
