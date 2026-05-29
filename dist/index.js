@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.13 builtAt=2026-05-29T13:37:22.968Z */
+/* cortex-chat-widget build: sdk=1.1.13 builtAt=2026-05-29T18:05:01.483Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -3148,11 +3148,8 @@ function resolveActorKind(raw) {
     return "system";
   return null;
 }
-function extractActor(message, payload) {
-  const payloadMeta = isRecord(payload["meta"]) ? payload["meta"] : void 0;
-  const messageMeta = isRecord(message.meta) ? message.meta : void 0;
-  const raw = (isRecord(payloadMeta?.["actor"]) ? payloadMeta["actor"] : null) ?? (isRecord(payload["actor"]) ? payload["actor"] : null) ?? (isRecord(messageMeta?.["actor"]) ? messageMeta["actor"] : null);
-  if (!raw)
+function parseRawActor(raw) {
+  if (!isRecord(raw))
     return null;
   const kindRaw = asNonEmptyString(raw["kind"]);
   const name = asNonEmptyString(raw["name"]);
@@ -3167,6 +3164,12 @@ function extractActor(message, payload) {
     subtitle: asNonEmptyString(raw["subtitle"]) ?? null,
     avatarUrl: asNonEmptyString(raw["avatarUrl"]) ?? asNonEmptyString(raw["avatar_url"]) ?? null
   };
+}
+function extractActor(message, payload) {
+  const payloadMeta = isRecord(payload["meta"]) ? payload["meta"] : void 0;
+  const messageMeta = isRecord(message.meta) ? message.meta : void 0;
+  const raw = (isRecord(payloadMeta?.["actor"]) ? payloadMeta["actor"] : null) ?? (isRecord(payload["actor"]) ? payload["actor"] : null) ?? (isRecord(messageMeta?.["actor"]) ? messageMeta["actor"] : null);
+  return parseRawActor(raw);
 }
 function normalizeCortexMessage(message) {
   const payload = asPayload(message);
@@ -10990,6 +10993,7 @@ function createHistoryClient(args) {
         content: message.content,
         status: message.status,
         ts: message.ts ?? null,
+        actor: parseRawActor(message.actor ?? null),
         meta: message.meta ?? {}
       }));
     },
@@ -12396,7 +12400,7 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading, op
   dom.textarea.placeholder = state.isHistoricalView ? "History view is read-only" : options.placeholder;
   const canSend = !state.chat.input.locked && !state.isAwaitingAnswer && !isUploading && !questionLocksInput && (dom.textarea.value.trim().length > 0 || state.selectedFile !== null);
   dom.sendButton.disabled = !canSend;
-  const isReplyMode = state.chat.activeQuestion !== null;
+  const isReplyMode = !!state.chat.activeQuestion && !!state.chat.activeQuestion.allow_reply;
   dom.sendButton.innerHTML = getIconSvg(isReplyMode ? "reply-fill" : "arrow-up");
   dom.sendButton.setAttribute("aria-label", isReplyMode ? "Reply" : "Send message");
   dom.sendButton.setAttribute("title", isReplyMode ? "Reply" : "Send message");
