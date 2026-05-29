@@ -54,6 +54,8 @@ async function resolveBuildInfo() {
   const sdkPackagePath = join(dirname(dirname(dirname(sdkBrowserEntry))), 'package.json');
   const sdkPackage = JSON.parse(await readFile(sdkPackagePath, 'utf8'));
 
+  const sdkUiEntry = require.resolve('@cortex-suite/sdk-ui');
+
   return {
     builtAt: new Date().toISOString(),
     widgetEntry: 'dist/index.js',
@@ -61,6 +63,10 @@ async function resolveBuildInfo() {
       name: sdkPackage.name,
       version: sdkPackage.version,
       browserEntry: '@cortex-suite/sdk/browser',
+    },
+    sdkUi: {
+      entry: sdkUiEntry,
+      source: 'file:../sdk-ui',
     },
     sources: {
       widget: 'https://github.com/Cortex-Suite-Team/cortex-chat-widget',

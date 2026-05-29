@@ -414,7 +414,8 @@
     </main>
 
     <script type="module">
-      import { mountCortexChat } from "../dist/index.js";
+      const resolvedImportUrl = new URL(`../dist/index.js?v=${Date.now()}`, import.meta.url).href;
+      const { mountCortexChat } = await import(resolvedImportUrl);
 
       const STORAGE_KEY = "cortex-chat-widget.real-runtime-history.config";
 
@@ -552,7 +553,7 @@
       async function logBundleInfo() {
         writeLog("Widget bundle import path.", {
           importPath: "../dist/index.js",
-          resolvedImportUrl: new URL("../dist/index.js", import.meta.url).href,
+          resolvedImportUrl,
           scriptUrls: [...document.scripts].map((script) => script.src).filter(Boolean)
         });
         try {
