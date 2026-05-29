@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.13 builtAt=2026-05-27T18:38:53.064Z */
+/* cortex-chat-widget build: sdk=1.1.13 builtAt=2026-05-29T11:13:46.371Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -3401,6 +3401,9 @@ function createEscalationController(options) {
     setState(nextState) {
       state = cloneEscalation(nextState);
     },
+    clearEscalation() {
+      state = null;
+    },
     ingest(message) {
       if (message.type === "escalation::request") {
         state = normalizeEscalationState(message);
@@ -3965,6 +3968,7 @@ function createChatController(options) {
     }
     if (status === "idle") {
       resetWorkerStateToIdle();
+      escalationController.clearEscalation();
       return true;
     }
     if (status === "waiting") {
@@ -3991,6 +3995,15 @@ function createChatController(options) {
     unsubscribeFromClient();
     unsubscribeFromClient = null;
   }
+  function shouldClearEscalationOnVisibleTranscriptMessage(message) {
+    if (!escalationController.getState())
+      return false;
+    if (message.type === "escalation::request")
+      return false;
+    if (message.role === "user")
+      return false;
+    return true;
+  }
   function handleMessage(message) {
     if (message.type === "system::opened") {
       handleSystemOpened();
@@ -4012,6 +4025,9 @@ function createChatController(options) {
       const correlationId = asNonEmptyString(meta?.["correlation_id"]) ?? void 0;
       const expiresAt = ttlMs !== void 0 ? Date.now() + ttlMs : void 0;
       applyWorkerState({ state: stateName, label, expiresAt, correlation_id: correlationId });
+      if (stateName === "idle") {
+        escalationController.clearEscalation();
+      }
       emitStateChanged();
       return;
     }
@@ -4048,6 +4064,9 @@ function createChatController(options) {
     if (message.type === "escalation::request" && escalation) {
       emit({ type: "escalation_opened", escalation: cloneEscalation(escalation) });
     }
+    if (result.mutation && shouldClearEscalationOnVisibleTranscriptMessage(result.mutation.message)) {
+      escalationController.clearEscalation();
+    }
     if (message.type === "chat::question") {
       awaitingAnswer = false;
       resetWorkerStateToIdle();
@@ -4073,6 +4092,9 @@ function createChatController(options) {
       awaitingAnswer = false;
       activeQuestion = null;
       resetWorkerStateToIdle();
+      if (message.type === "system::error") {
+        escalationController.clearEscalation();
+      }
     }
     if (message.type === "sandbox::lifecycle") {
       const payload = asPayload(message);
