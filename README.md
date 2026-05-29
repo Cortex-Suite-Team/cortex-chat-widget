@@ -148,3 +148,8 @@ widget.destroy();
 - `@cortex-suite/chat-widget` owns DOM, styling, and embeddable UX
 
 This package is not the Control Plane operator cockpit.
+
+
+cd D:\GitHub\Cortex\public\cortex-chat-widget
+npm run build
+python -m http.server 8080
