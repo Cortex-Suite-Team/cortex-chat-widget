@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.13 builtAt=2026-05-29T11:13:46.371Z */
+/* cortex-chat-widget loader build: sdk=1.1.13 builtAt=2026-05-29T12:05:59.447Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -3139,6 +3139,26 @@
     delete cleaned["resume_event_ref"];
     return cleaned;
   }
+  var KNOWN_ACTOR_KINDS = /* @__PURE__ */ new Set(["user", "operator", "digital_worker", "system"]);
+  function extractActor(message, payload) {
+    const payloadMeta = isRecord(payload["meta"]) ? payload["meta"] : void 0;
+    const messageMeta = isRecord(message.meta) ? message.meta : void 0;
+    const raw = (isRecord(payloadMeta?.["actor"]) ? payloadMeta["actor"] : null) ?? (isRecord(payload["actor"]) ? payload["actor"] : null) ?? (isRecord(messageMeta?.["actor"]) ? messageMeta["actor"] : null);
+    if (!raw)
+      return null;
+    const kind = asNonEmptyString(raw["kind"]);
+    const name = asNonEmptyString(raw["name"]);
+    if (!kind || !name || !KNOWN_ACTOR_KINDS.has(kind))
+      return null;
+    return {
+      kind,
+      id: asNonEmptyString(raw["id"]) ?? null,
+      name,
+      title: asNonEmptyString(raw["title"]) ?? null,
+      subtitle: asNonEmptyString(raw["subtitle"]) ?? null,
+      avatarUrl: asNonEmptyString(raw["avatarUrl"]) ?? asNonEmptyString(raw["avatar_url"]) ?? null
+    };
+  }
   function normalizeCortexMessage(message) {
     const payload = asPayload(message);
     const payloadMeta = isRecord(payload["meta"]) ? payload["meta"] : void 0;
@@ -3156,6 +3176,7 @@
           content: payload["content"],
           status: "final",
           ts: message.ts ?? null,
+          actor: null,
           clientMsgId: getClientMsgId(mergedMeta),
           meta: {
             ...mergedMeta,
@@ -3171,6 +3192,7 @@
           content: resolveVisibleContent(payload),
           status: "final",
           ts: message.ts ?? null,
+          actor: extractActor(message, payload),
           clientMsgId: getClientMsgId(mergedMeta),
           meta: {
             ...mergedMeta,
@@ -3187,6 +3209,7 @@
           content: payload["content"],
           status: "streaming",
           ts: message.ts ?? null,
+          actor: extractActor(message, payload),
           meta: {
             ...mergedMeta,
             ...buildAttachmentMeta(payload),
@@ -3202,6 +3225,7 @@
           content: payload["content"],
           status: "final",
           ts: message.ts ?? null,
+          actor: extractActor(message, payload),
           meta: {
             ...mergedMeta,
             ...buildAttachmentMeta(payload),
@@ -3219,6 +3243,7 @@
           content: resolveVisibleContent(payload),
           status: "final",
           ts: message.ts ?? null,
+          actor: extractActor(message, payload),
           clientMsgId: getClientMsgId(mergedMeta),
           meta: {
             ...mergedMeta,
@@ -3235,6 +3260,7 @@
           content: payload["content"] ?? payload["message"] ?? payload["reason"] ?? payload,
           status: "final",
           ts: message.ts ?? null,
+          actor: null,
           meta: {
             ...mergedMeta,
             escalationId: asNonEmptyString(payload["escalation_id"]),
@@ -3253,6 +3279,7 @@
           content: payload["content"] ?? payload,
           status: "final",
           ts: message.ts ?? null,
+          actor: extractActor(message, payload),
           meta: {
             ...mergedMeta,
             escalationId: asNonEmptyString(payload["escalation_id"]),
@@ -3269,6 +3296,7 @@
           content: asNonEmptyString(payload["message"]) ?? "Runtime error",
           status: "error",
           ts: message.ts ?? null,
+          actor: null,
           meta: {
             ...mergedMeta,
             code: asNonEmptyString(payload["code"]) ?? void 0
@@ -3283,6 +3311,7 @@
           content: payload["content"],
           status: "final",
           ts: message.ts ?? null,
+          actor: extractActor(message, payload),
           meta: {
             ...mergedMeta,
             ...asNonEmptyString(payload["turn_id"]) ? { turnId: asNonEmptyString(payload["turn_id"]) } : {}
@@ -3298,6 +3327,7 @@
           content: payload,
           status: "final",
           ts: message.ts ?? null,
+          actor: null,
           meta: mergedMeta
         };
       default:
@@ -3309,6 +3339,7 @@
           content: payload,
           status: "final",
           ts: message.ts ?? null,
+          actor: null,
           meta: {
             ...mergedMeta,
             rawType: message.type
@@ -11688,6 +11719,11 @@
   }
 
   // src/renderer.ts
+  var _warnedMissingActorIds = /* @__PURE__ */ new Set();
+  function messageRequiresActor(message) {
+    if (message.role === "user" || message.role === "error") return false;
+    return message.type === "chat::answer" || message.type === "chat::question" || message.type === "chat::partial" || message.type === "chat::forward" || message.type === "chat::hail" || message.type === "escalation::reply" || (message.type === "chat::echo" || message.type === "chat::message") && message.role === "operator";
+  }
   function getAvatarInitials(label) {
     const normalized = label.trim();
     if (!normalized) {
@@ -12007,13 +12043,15 @@
       wrapper.dataset.role = message.role;
       wrapper.dataset.type = message.type;
       wrapper.setAttribute("data-testid", "transcript-message");
-      const actor = isRecord2(message.meta?.["actor"]) ? message.meta["actor"] : null;
-      const hasActorHeader = actor !== null && message.role !== "user" && message.role !== "error";
+      const actor = message.actor ?? null;
+      const actorRequired = messageRequiresActor(message);
+      const hasActorHeader = actor !== null && actorRequired;
+      const hasMissingActor = actor === null && actorRequired;
       if (hasActorHeader) {
         const actorHeader = document.createElement("div");
         actorHeader.className = "cortex-widget__actor";
         actorHeader.setAttribute("data-testid", "actor-header");
-        const avatarUrl = normalizeAvatarUrl(toNonEmptyString(actor["avatar_url"]), options);
+        const avatarUrl = normalizeAvatarUrl(actor.avatarUrl ?? null, options);
         if (avatarUrl) {
           const img = document.createElement("img");
           img.className = "cortex-widget__actor-avatar";
@@ -12027,10 +12065,10 @@
         actorInfo.className = "cortex-widget__actor-info";
         const nameEl = document.createElement("span");
         nameEl.className = "cortex-widget__actor-name";
-        nameEl.textContent = toNonEmptyString(actor["name"]) ?? "Assistant";
+        nameEl.textContent = actor.name;
         nameEl.setAttribute("data-testid", "actor-name");
         actorInfo.appendChild(nameEl);
-        const actorTitle = toNonEmptyString(actor["title"]);
+        const actorTitle = actor.title ?? null;
         if (actorTitle) {
           const titleEl = document.createElement("span");
           titleEl.className = "cortex-widget__actor-title";
@@ -12039,6 +12077,20 @@
         }
         actorHeader.appendChild(actorInfo);
         wrapper.appendChild(actorHeader);
+      }
+      if (hasMissingActor) {
+        if (!_warnedMissingActorIds.has(message.id)) {
+          _warnedMissingActorIds.add(message.id);
+          console.warn("[cortex] Missing actor on non-user message", { type: message.type, id: message.id });
+        }
+        const isDebug = options.debug === true || typeof localStorage !== "undefined" && localStorage.getItem("cortex_debug") === "1";
+        if (isDebug) {
+          const marker = document.createElement("div");
+          marker.className = "cortex-widget__actor-missing";
+          marker.setAttribute("data-testid", "actor-missing");
+          marker.textContent = "\xB7 unknown actor";
+          wrapper.appendChild(marker);
+        }
       }
       const bubble = document.createElement("div");
       bubble.className = "cortex-widget__bubble";
@@ -12207,7 +12259,7 @@
       if (timestampSource === "client") {
         metaText.dataset.provisional = "true";
       }
-      if (hasActorHeader) {
+      if (hasActorHeader || hasMissingActor) {
         metaText.textContent = timestampText ?? (message.status === "streaming" ? "streaming" : "");
       } else {
         const metaParts = [];
