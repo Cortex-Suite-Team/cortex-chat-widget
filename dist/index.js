@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.14 builtAt=2026-05-30T13:17:07.487Z */
+/* cortex-chat-widget build: sdk=1.1.15 builtAt=2026-05-30T14:15:54.337Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -1374,8 +1374,9 @@ function toWidgetError(error2, fallbackCode = "widget_error", fallbackMessage = 
     };
   }
   if (error2 instanceof Error) {
+    const carriedCode = readStringProp(error2, "code");
     return {
-      code: fallbackCode,
+      code: carriedCode ?? fallbackCode,
       message: error2.message,
       cause: error2
     };
@@ -1385,6 +1386,15 @@ function toWidgetError(error2, fallbackCode = "widget_error", fallbackMessage = 
     message: fallbackMessage,
     cause: error2
   };
+}
+function readStringProp(obj, key) {
+  if (obj && typeof obj === "object" && key in obj) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+  return void 0;
 }
 
 // src/icons.ts
@@ -13207,7 +13217,13 @@ ${token}`;
   resolveUploadError(error2) {
     this.ui.isAwaitingAnswer = false;
     this.ui.isUploading = false;
-    this.ui.error = toWidgetError(error2, "upload_failed", "Attachment upload failed");
+    const widgetError = toWidgetError(error2, "upload_failed", "Attachment upload failed");
+    this.ui.error = widgetError;
+    this.debug.log("[cortex-chat-widget] upload failed", {
+      code: widgetError.code,
+      message: widgetError.message,
+      details: error2 && typeof error2 === "object" && "details" in error2 ? error2.details : void 0
+    });
     this.options.onError?.(error2);
   }
   resolveRuntimeError(error2) {
