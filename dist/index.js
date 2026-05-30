@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.14 builtAt=2026-05-30T13:09:01.131Z */
+/* cortex-chat-widget build: sdk=1.1.14 builtAt=2026-05-30T13:17:07.487Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -12284,9 +12284,7 @@ function renderTranscript(transcriptEl, state, options) {
     meta.appendChild(metaText);
     let statusEl = null;
     const deliveryStatus = typeof message.deliveryStatus === "string" ? message.deliveryStatus : void 0;
-    const isQuestionReply = !!(message.meta?.["question_ref"] ?? message.meta?.["question_id"]);
-    const shouldShowDeliveryStatus = message.role === "user" && !!deliveryStatus && (!isQuestionReply || deliveryStatus === "failed");
-    if (shouldShowDeliveryStatus) {
+    if (message.role === "user" && deliveryStatus) {
       statusEl = document.createElement("div");
       statusEl.className = "cortex-widget__message-status";
       statusEl.dataset.status = deliveryStatus;
