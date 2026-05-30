@@ -1426,7 +1426,7 @@ describe('composer icon controls', () => {
     expect(btn.querySelector('svg')).toBeTruthy();
   });
 
-  it('activeQuestion changes send button aria-label to Reply', () => {
+  it('send button keeps Send message aria-label when activeQuestion has allow_reply=true', () => {
     mountWidget();
     const shadow = getShadow();
     const btn = shadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
@@ -1440,11 +1440,11 @@ describe('composer icon controls', () => {
       },
     }));
 
-    expect(btn.getAttribute('aria-label')).toBe('Reply');
+    expect(btn.getAttribute('aria-label')).toBe('Send message');
     expect(btn.querySelector('svg')).toBeTruthy();
   });
 
-  it('send button reverts to Send message when activeQuestion clears', () => {
+  it('send button keeps Send message aria-label when activeQuestion clears', () => {
     mountWidget();
     const shadow = getShadow();
     const btn = shadow.querySelector('[data-testid="send-button"]') as HTMLButtonElement;
@@ -1457,7 +1457,7 @@ describe('composer icon controls', () => {
         options: [],
       },
     }));
-    expect(btn.getAttribute('aria-label')).toBe('Reply');
+    expect(btn.getAttribute('aria-label')).toBe('Send message');
 
     applyChatState(baseChatState({ activeQuestion: null }));
     expect(btn.getAttribute('aria-label')).toBe('Send message');
