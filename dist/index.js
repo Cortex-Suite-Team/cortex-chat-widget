@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.13 builtAt=2026-05-30T10:36:05.136Z */
+/* cortex-chat-widget build: sdk=1.1.14 builtAt=2026-05-30T12:48:20.846Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -11681,19 +11681,12 @@ var TERMINAL_SESSION_STATES2 = /* @__PURE__ */ new Set([
   "TIMEOUT",
   "CANCELLED"
 ]);
-function payloadValue(message, key) {
-  if (!message.payload || typeof message.payload !== "object") {
-    return void 0;
-  }
-  return message.payload[key];
-}
 function getMessageFlags(message) {
   const type = message.type;
-  const answerKind = payloadValue(message, "answer_kind");
   return {
     startTyping: type === "chat::typing" || type === "typing::start",
     stopTyping: type === "typing::stop",
-    finalAnswer: type === "chat::answer" && answerKind === "final",
+    finalAnswer: type === "chat::answer",
     isQuestion: type === "chat::question"
   };
 }
