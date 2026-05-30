@@ -71,6 +71,28 @@ function cloneChatState(state: ChatState): ChatState {
   };
 }
 
+function deriveCorrespondentFromTranscript(
+  transcript: ChatMessageViewModel[],
+): ChatState['session']['correspondent'] {
+  for (const message of transcript) {
+    if (message.role === 'user' || message.role === 'error') continue;
+
+    const actor = message.actor ?? null;
+    if (!actor || actor.kind !== 'digital_worker') continue;
+
+    return {
+      kind: actor.kind,
+      id: actor.id ?? null,
+      name: actor.name,
+      title: actor.title ?? null,
+      subtitle: actor.subtitle ?? null,
+      avatarUrl: actor.avatarUrl ?? null,
+    };
+  }
+
+  return null;
+}
+
 function summarizeSendPayload(payload: {
   content?: unknown;
   attachments?: unknown[];
@@ -545,10 +567,14 @@ export class ChatWidget {
     if (this.chatView.kind === 'historical') {
       return {
         ...cloneChatState(EMPTY_CHAT_STATE),
+        session: {
+          correspondent: deriveCorrespondentFromTranscript(this.historicalTranscript),
+        },
         transcript: [...this.historicalTranscript],
         input: { locked: true, reason: 'historical_read_only' },
       };
     }
+
     return cloneChatState(this.liveChatState);
   }
 
