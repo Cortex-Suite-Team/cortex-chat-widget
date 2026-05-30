@@ -34,8 +34,11 @@ export function toWidgetError(
   }
 
   if (error instanceof Error) {
+    // Preserve a typed code carried by SDK errors (e.g. CortexError.code such as
+    // 'upload_network_failed') instead of collapsing everything to the fallback.
+    const carriedCode = readStringProp(error, 'code');
     return {
-      code: fallbackCode,
+      code: carriedCode ?? fallbackCode,
       message: error.message,
       cause: error,
     };
@@ -46,4 +49,14 @@ export function toWidgetError(
     message: fallbackMessage,
     cause: error,
   };
+}
+
+function readStringProp(obj: unknown, key: string): string | undefined {
+  if (obj && typeof obj === 'object' && key in obj) {
+    const value = (obj as Record<string, unknown>)[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+  return undefined;
 }

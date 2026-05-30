@@ -936,7 +936,15 @@ export class ChatWidget {
   private resolveUploadError(error: unknown): void {
     this.ui.isAwaitingAnswer = false;
     this.ui.isUploading = false;
-    this.ui.error = toWidgetError(error, 'upload_failed', 'Attachment upload failed');
+    const widgetError = toWidgetError(error, 'upload_failed', 'Attachment upload failed');
+    this.ui.error = widgetError;
+    this.debug.log('[cortex-chat-widget] upload failed', {
+      code: widgetError.code,
+      message: widgetError.message,
+      details: (error && typeof error === 'object' && 'details' in error)
+        ? (error as { details?: unknown }).details
+        : undefined,
+    });
     this.options.onError?.(error);
   }
 
