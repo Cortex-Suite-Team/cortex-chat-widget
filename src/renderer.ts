@@ -361,13 +361,14 @@ function getDeliveryStatusLabel(status: string): string {
 
 function toAttachmentViewModel(attachment: unknown): TranscriptAttachmentViewModel | null {
   if (typeof attachment === 'string') {
-    const label = attachment.trim();
-    if (!label) {
+    const id = attachment.trim();
+    if (!id) {
       return null;
     }
+    // Raw id (e.g. fa_...) is internal only — never surface it as the visible label.
     return {
-      id: label,
-      label,
+      id,
+      label: 'Attached file',
       url: null,
       fileName: null,
       contentType: null,
@@ -386,9 +387,11 @@ function toAttachmentViewModel(attachment: unknown): TranscriptAttachmentViewMod
   const size = typeof attachment.size === 'number'
     ? attachment.size
     : (typeof attachment.size_bytes === 'number' ? attachment.size_bytes : null);
-  const label = fileName ?? id ?? url;
+  // Never fall back to the raw id (file_id/artifact_id/attachment_id) for the visible label.
+  const label = fileName ?? url ?? 'Attached file';
 
-  if (!label) {
+  // Keep the chip if we have a filename/url to show or an internal id to carry.
+  if (!fileName && !url && !id) {
     return null;
   }
 
@@ -403,6 +406,12 @@ function toAttachmentViewModel(attachment: unknown): TranscriptAttachmentViewMod
 }
 
 function getMessageAttachments(message: ChatMessageViewModel): TranscriptAttachmentViewModel[] {
+  // A worker question must never render user-uploaded attachments. The file belongs to the
+  // user message (and is an internal Runtime handle / operator artifact), not to the question.
+  if (message.type === 'chat::question') {
+    return [];
+  }
+
   const attachments = message.meta?.attachments;
   if (!Array.isArray(attachments)) {
     return [];

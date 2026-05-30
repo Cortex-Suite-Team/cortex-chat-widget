@@ -469,6 +469,77 @@ describe('widget renderer behavior', () => {
     expect(attachments.textContent).toContain('artifact.txt');
   });
 
+  it('does not render attachments on a worker chat::question even when meta carries them', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_question_with_attachment',
+        type: 'chat::question',
+        role: 'assistant',
+        content: 'Which file should I prioritise?',
+        meta: {
+          attachments: [{
+            artifact_id: 'fa_ea6e1234',
+            attachment_id: 'fa_ea6e1234',
+            filename: 'report.xlsx',
+          }],
+        },
+      }],
+    }));
+
+    const bubble = shadow.querySelector('[data-testid="message-bubble"]') as HTMLElement;
+    expect(bubble.textContent).toContain('Which file should I prioritise?');
+    expect(shadow.querySelector('[data-testid="message-attachments"]')).toBeNull();
+    expect(shadow.textContent).not.toContain('fa_ea6e1234');
+    expect(shadow.textContent).not.toContain('report.xlsx');
+  });
+
+  it('renders a bare string attachment ref as "Attached file" instead of the raw id', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_string_ref',
+        type: 'chat::echo',
+        role: 'user',
+        content: 'Here is the file',
+        meta: {
+          attachments: ['fa_ea6e1234'],
+        },
+      }],
+    }));
+
+    const attachments = shadow.querySelector('[data-testid="message-attachments"]') as HTMLElement;
+    expect(attachments).toBeTruthy();
+    expect(attachments.textContent).toContain('Attached file');
+    expect(attachments.textContent).not.toContain('fa_ea6e1234');
+  });
+
+  it('renders an object attachment with only an id as "Attached file" instead of the id', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_id_only_object',
+        type: 'chat::echo',
+        role: 'user',
+        content: 'Here is the file',
+        meta: {
+          attachments: [{ file_id: 'fa_ea6e1234', attachment_id: 'fa_ea6e1234' }],
+        },
+      }],
+    }));
+
+    const attachments = shadow.querySelector('[data-testid="message-attachments"]') as HTMLElement;
+    expect(attachments).toBeTruthy();
+    expect(attachments.textContent).toContain('Attached file');
+    expect(attachments.textContent).not.toContain('fa_ea6e1234');
+  });
+
   it('does not render an empty bubble when message content and attachments are both absent', () => {
     mountWidget();
     const shadow = getShadow();
