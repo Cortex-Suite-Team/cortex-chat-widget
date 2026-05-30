@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.14 builtAt=2026-05-30T12:48:20.846Z */
+/* cortex-chat-widget loader build: sdk=1.1.14 builtAt=2026-05-30T13:09:01.131Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -12286,7 +12286,9 @@
       meta.appendChild(metaText);
       let statusEl = null;
       const deliveryStatus = typeof message.deliveryStatus === "string" ? message.deliveryStatus : void 0;
-      if (message.role === "user" && deliveryStatus) {
+      const isQuestionReply = !!(message.meta?.["question_ref"] ?? message.meta?.["question_id"]);
+      const shouldShowDeliveryStatus = message.role === "user" && !!deliveryStatus && (!isQuestionReply || deliveryStatus === "failed");
+      if (shouldShowDeliveryStatus) {
         statusEl = document.createElement("div");
         statusEl.className = "cortex-widget__message-status";
         statusEl.dataset.status = deliveryStatus;
@@ -13284,6 +13286,7 @@ ${token}`;
       apiKey: baseOptions.apiKey,
       authUrl: baseOptions.authUrl,
       controlPlaneUrl: baseOptions.controlPlaneUrl,
+      uploadUrl: baseOptions.uploadUrl,
       target: baseOptions.target,
       historyTarget: baseOptions.historyTarget,
       theme: baseOptions.theme,
@@ -13358,6 +13361,7 @@ ${token}`;
       apiKey: options.apiKey,
       workerRef: options.workerRef,
       authUrl: options.authUrl,
+      uploadUrl: options.uploadUrl,
       debug: options.debug,
       onMessage: () => {
       }
