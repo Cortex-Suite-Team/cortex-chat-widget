@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.13 builtAt=2026-05-29T18:05:01.483Z */
+/* cortex-chat-widget loader build: sdk=1.1.13 builtAt=2026-05-30T10:12:10.765Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -3799,7 +3799,7 @@
           name,
           title: asNonEmptyString(contextCorrespondent["title"]) ?? null,
           subtitle: asNonEmptyString(contextCorrespondent["subtitle"]) ?? null,
-          avatarUrl: asNonEmptyString(contextCorrespondent["avatarUrl"]) ?? null
+          avatarUrl: asNonEmptyString(contextCorrespondent["avatarUrl"]) ?? asNonEmptyString(contextCorrespondent["avatar_url"]) ?? null
         };
       }
     }
@@ -12472,6 +12472,22 @@
       workerState: { ...state.workerState }
     };
   }
+  function deriveCorrespondentFromTranscript(transcript) {
+    for (const message of transcript) {
+      if (message.role === "user" || message.role === "error") continue;
+      const actor = message.actor ?? null;
+      if (!actor || actor.kind !== "digital_worker") continue;
+      return {
+        kind: actor.kind,
+        id: actor.id ?? null,
+        name: actor.name,
+        title: actor.title ?? null,
+        subtitle: actor.subtitle ?? null,
+        avatarUrl: actor.avatarUrl ?? null
+      };
+    }
+    return null;
+  }
   function summarizeSendPayload3(payload) {
     return {
       contentKind: Array.isArray(payload.content) ? "array" : typeof payload.content,
@@ -12882,6 +12898,9 @@ ${token}`;
       if (this.chatView.kind === "historical") {
         return {
           ...cloneChatState(EMPTY_CHAT_STATE),
+          session: {
+            correspondent: deriveCorrespondentFromTranscript(this.historicalTranscript)
+          },
           transcript: [...this.historicalTranscript],
           input: { locked: true, reason: "historical_read_only" }
         };
