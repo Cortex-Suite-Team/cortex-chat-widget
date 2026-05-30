@@ -23,21 +23,13 @@ const TERMINAL_SESSION_STATES = new Set([
   'CANCELLED',
 ]);
 
-function payloadValue(message: WidgetRawMessage, key: string): unknown {
-  if (!message.payload || typeof message.payload !== 'object') {
-    return undefined;
-  }
-  return (message.payload as Record<string, unknown>)[key];
-}
-
 export function getMessageFlags(message: WidgetRawMessage): MessageFlags {
   const type = message.type;
-  const answerKind = payloadValue(message, 'answer_kind');
 
   return {
     startTyping: type === 'chat::typing' || type === 'typing::start',
     stopTyping: type === 'typing::stop',
-    finalAnswer: type === 'chat::answer' && answerKind === 'final',
+    finalAnswer: type === 'chat::answer',
     isQuestion: type === 'chat::question',
   };
 }
