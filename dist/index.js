@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.16 builtAt=2026-05-30T15:58:05.061Z */
+/* cortex-chat-widget build: sdk=1.1.17 builtAt=2026-05-30T18:51:34.975Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -11995,13 +11995,13 @@ function getDeliveryStatusLabel(status) {
 }
 function toAttachmentViewModel(attachment) {
   if (typeof attachment === "string") {
-    const label2 = attachment.trim();
-    if (!label2) {
+    const id2 = attachment.trim();
+    if (!id2) {
       return null;
     }
     return {
-      id: label2,
-      label: label2,
+      id: id2,
+      label: "Attached file",
       url: null,
       fileName: null,
       contentType: null,
@@ -12016,8 +12016,8 @@ function toAttachmentViewModel(attachment) {
   const url = toNonEmptyString(attachment.download_url) ?? toNonEmptyString(attachment.url) ?? toNonEmptyString(attachment.href);
   const contentType = toNonEmptyString(attachment.content_type) ?? toNonEmptyString(attachment.mime_type) ?? toNonEmptyString(attachment.type);
   const size = typeof attachment.size === "number" ? attachment.size : typeof attachment.size_bytes === "number" ? attachment.size_bytes : null;
-  const label = fileName ?? id ?? url;
-  if (!label) {
+  const label = fileName ?? url ?? "Attached file";
+  if (!fileName && !url && !id) {
     return null;
   }
   return {
@@ -12030,6 +12030,9 @@ function toAttachmentViewModel(attachment) {
   };
 }
 function getMessageAttachments(message) {
+  if (message.type === "chat::question") {
+    return [];
+  }
   const attachments = message.meta?.attachments;
   if (!Array.isArray(attachments)) {
     return [];

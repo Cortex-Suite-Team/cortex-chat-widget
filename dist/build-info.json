@@ -1,9 +1,9 @@
 {
-  "builtAt": "2026-05-30T15:58:05.061Z",
+  "builtAt": "2026-05-30T18:51:34.975Z",
   "widgetEntry": "dist/index.js",
   "sdk": {
     "name": "@cortex-suite/sdk",
-    "version": "1.1.16",
+    "version": "1.1.17",
     "browserEntry": "@cortex-suite/sdk/browser"
   },
   "sdkUi": {
