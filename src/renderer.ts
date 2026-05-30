@@ -859,21 +859,24 @@ export function renderWidget(
     dom.textarea.value = '';
   }
   const questionLocksInput = !!state.chat.activeQuestion && !state.chat.activeQuestion.allow_reply;
-  dom.textarea.disabled = state.chat.input.locked || state.isAwaitingAnswer || isUploading || questionLocksInput;
+
+  const inputLocked = state.isDestroyed
+    || state.chat.input.locked
+    || state.isAwaitingAnswer
+    || isUploading
+    || questionLocksInput
+    || state.isHistoricalView;
+
+  const hasSendableContent = dom.textarea.value.trim().length > 0 || state.selectedFile !== null;
+
+  dom.textarea.disabled = inputLocked;
   dom.textarea.placeholder = state.isHistoricalView ? 'History view is read-only' : options.placeholder;
 
-  const canSend = !state.chat.input.locked
-    && !state.isAwaitingAnswer
-    && !isUploading
-    && !questionLocksInput
-    && (dom.textarea.value.trim().length > 0 || state.selectedFile !== null);
-
-  dom.sendButton.disabled = !canSend;
-
-  const isReplyMode = !!state.chat.activeQuestion && !!state.chat.activeQuestion.allow_reply;
-  dom.sendButton.innerHTML = getIconSvg(isReplyMode ? 'reply-fill' : 'arrow-up');
-  dom.sendButton.setAttribute('aria-label', isReplyMode ? 'Reply' : 'Send message');
-  dom.sendButton.setAttribute('title', isReplyMode ? 'Reply' : 'Send message');
+  dom.sendButton.disabled = inputLocked;
+  dom.sendButton.innerHTML = getIconSvg('arrow-up');
+  dom.sendButton.setAttribute('aria-label', 'Send message');
+  dom.sendButton.setAttribute('title', 'Send message');
+  dom.sendButton.dataset.empty = hasSendableContent ? 'false' : 'true';
 
   dom.attachButton.disabled = !attachmentsAvailable || state.chat.input.locked || state.isAwaitingAnswer || isUploading;
   dom.fileInput.disabled = dom.attachButton.disabled;
