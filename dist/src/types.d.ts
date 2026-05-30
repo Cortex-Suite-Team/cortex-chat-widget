@@ -4,6 +4,19 @@ export interface CortexChatWidgetError {
     message: string;
     cause?: unknown;
 }
+/**
+ * Attachment ref sent in chat::message payload.meta.attachments.
+ * Canonical local refs use artifact_id; file-service refs use file_id.
+ * attachment_id is a backward-compat alias kept for SDK ≤ 1.1.13 clients.
+ */
+export interface WidgetAttachmentRef {
+    attachment_id: string;
+    artifact_id?: string;
+    file_id?: string;
+    filename?: string;
+    content_type?: string;
+    size?: number;
+}
 export interface SelectedFileState {
     name: string;
     size: number;
@@ -122,7 +135,7 @@ export interface InternalWidgetState {
     attachmentsAvailable: boolean;
     selectedFile: SelectedFileState | null;
     selectedFileValue: File | null;
-    cachedUploadedAttachmentId: string | null;
+    cachedUploadedAttachmentRef: WidgetAttachmentRef | null;
     cachedUploadedFile: File | null;
     draftText: string;
     error: CortexChatWidgetError | null;

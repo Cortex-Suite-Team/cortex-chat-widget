@@ -1,4 +1,4 @@
-/* cortex-chat-widget build: sdk=1.1.15 builtAt=2026-05-30T14:15:54.337Z */
+/* cortex-chat-widget build: sdk=1.1.16 builtAt=2026-05-30T15:58:05.061Z */
 var __defProp = Object.defineProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -12536,7 +12536,7 @@ var ChatWidget = class {
       attachmentsAvailable: false,
       selectedFile: null,
       selectedFileValue: null,
-      cachedUploadedAttachmentId: null,
+      cachedUploadedAttachmentRef: null,
       cachedUploadedFile: null,
       draftText: "",
       error: null
@@ -12975,7 +12975,7 @@ ${token}`;
       type: file.type
     } : null;
     if (!file || this.ui.cachedUploadedFile !== file) {
-      this.ui.cachedUploadedAttachmentId = null;
+      this.ui.cachedUploadedAttachmentRef = null;
       this.ui.cachedUploadedFile = null;
     }
   }
@@ -12986,7 +12986,7 @@ ${token}`;
   clearDraftComposer() {
     this.ui.draftText = "";
     this.clearSelectedFile();
-    this.ui.cachedUploadedAttachmentId = null;
+    this.ui.cachedUploadedAttachmentRef = null;
     this.ui.cachedUploadedFile = null;
   }
   async uploadSelectedFile() {
@@ -12994,29 +12994,35 @@ ${token}`;
     if (!file) {
       return null;
     }
-    if (this.ui.cachedUploadedAttachmentId && this.ui.cachedUploadedFile === file) {
-      return this.ui.cachedUploadedAttachmentId;
+    if (this.ui.cachedUploadedAttachmentRef && this.ui.cachedUploadedFile === file) {
+      return this.ui.cachedUploadedAttachmentRef;
     }
     this.ui.isUploading = true;
     this.ui.error = null;
     this.notifyAndRender();
     try {
-      let uploadedId;
-      if (typeof this.client.uploadAttachment === "function") {
-        uploadedId = await this.client.uploadAttachment(file);
+      let attachmentRef;
+      const clientAny = this.client;
+      if (typeof clientAny["uploadAttachmentRef"] === "function") {
+        const raw = await clientAny["uploadAttachmentRef"](file);
+        attachmentRef = raw;
+      } else if (typeof this.client.uploadAttachment === "function") {
+        const uploadedId = await this.client.uploadAttachment(file);
+        attachmentRef = uploadedId.startsWith("fa_") ? { artifact_id: uploadedId, attachment_id: uploadedId } : { file_id: uploadedId, attachment_id: uploadedId };
       } else if (typeof this.client.uploadFile === "function") {
-        uploadedId = await this.client.uploadFile(file);
+        const uploadedId = await this.client.uploadFile(file);
+        attachmentRef = uploadedId.startsWith("fa_") ? { artifact_id: uploadedId, attachment_id: uploadedId } : { file_id: uploadedId, attachment_id: uploadedId };
       } else {
         throw createWidgetError(
           "attachments_unavailable",
           "Attachments are unavailable for the current client."
         );
       }
-      this.ui.cachedUploadedAttachmentId = uploadedId;
+      this.ui.cachedUploadedAttachmentRef = attachmentRef;
       this.ui.cachedUploadedFile = file;
       this.ui.isUploading = false;
       this.notifyAndRender();
-      return uploadedId;
+      return attachmentRef;
     } catch (error2) {
       this.resolveUploadError(error2);
       this.notifyAndRender();
@@ -13039,10 +13045,10 @@ ${token}`;
       return;
     }
     this.ui.error = null;
-    let attachmentId = null;
+    let attachmentRef = null;
     if (hasFile) {
-      attachmentId = await this.uploadSelectedFile();
-      if (this.ui.selectedFileValue && attachmentId === null) {
+      attachmentRef = await this.uploadSelectedFile();
+      if (this.ui.selectedFileValue && attachmentRef === null) {
         return;
       }
     }
@@ -13051,7 +13057,7 @@ ${token}`;
     try {
       const sendRequest = {
         content: [content],
-        attachments: attachmentId ? [attachmentId] : void 0,
+        attachments: attachmentRef ? [attachmentRef] : void 0,
         meta: questionMeta
       };
       this.debug.log("[cortex-chat-widget] handleSend -> controller.sendMessage start", {
