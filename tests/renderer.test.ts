@@ -201,7 +201,8 @@ describe('widget renderer behavior', () => {
     expect(client.uploadedAttachments).toHaveLength(1);
     expect(controller.sendCalls[0]).toMatchObject({
       content: ['Attach this'],
-      attachments: ['attachment:second.txt'],
+      // Widget wraps the string ID into a canonical dict ref (file_id path for non-fa_ IDs).
+      attachments: [{ attachment_id: 'attachment:second.txt', file_id: 'attachment:second.txt' }],
     });
     expect(textarea.value).toBe('Attach this');
     expect(fileChip.textContent).toContain('second.txt');

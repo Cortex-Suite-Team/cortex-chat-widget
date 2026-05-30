@@ -17,6 +17,7 @@ import type {
   CortexChatWidgetState,
   InternalWidgetState,
   NormalizedWidgetOptions,
+  WidgetAttachmentRef,
   WidgetClientLike,
   WidgetDom,
 } from './types.js';
@@ -157,7 +158,7 @@ export class ChatWidget {
     attachmentsAvailable: false,
     selectedFile: null,
     selectedFileValue: null,
-    cachedUploadedAttachmentId: null,
+    cachedUploadedAttachmentRef: null,
     cachedUploadedFile: null,
     draftText: '',
     error: null,
@@ -657,7 +658,7 @@ export class ChatWidget {
       : null;
 
     if (!file || this.ui.cachedUploadedFile !== file) {
-      this.ui.cachedUploadedAttachmentId = null;
+      this.ui.cachedUploadedAttachmentRef = null;
       this.ui.cachedUploadedFile = null;
     }
   }
@@ -670,17 +671,17 @@ export class ChatWidget {
   private clearDraftComposer(): void {
     this.ui.draftText = '';
     this.clearSelectedFile();
-    this.ui.cachedUploadedAttachmentId = null;
+    this.ui.cachedUploadedAttachmentRef = null;
     this.ui.cachedUploadedFile = null;
   }
 
-  private async uploadSelectedFile(): Promise<string | null> {
+  private async uploadSelectedFile(): Promise<WidgetAttachmentRef | null> {
     const file = this.ui.selectedFileValue;
     if (!file) {
       return null;
     }
-    if (this.ui.cachedUploadedAttachmentId && this.ui.cachedUploadedFile === file) {
-      return this.ui.cachedUploadedAttachmentId;
+    if (this.ui.cachedUploadedAttachmentRef && this.ui.cachedUploadedFile === file) {
+      return this.ui.cachedUploadedAttachmentRef;
     }
 
     this.ui.isUploading = true;
@@ -688,11 +689,26 @@ export class ChatWidget {
     this.notifyAndRender();
 
     try {
-      let uploadedId: string;
-      if (typeof this.client.uploadAttachment === 'function') {
-        uploadedId = await this.client.uploadAttachment(file);
+      let attachmentRef: WidgetAttachmentRef;
+
+      // Prefer uploadAttachmentRef (future SDK) which returns the full ref object.
+      // Fall back to uploadAttachment/uploadFile (current published SDK 1.1.13) which
+      // return a string ID — wrap into a minimal canonical ref dict so the SM validator
+      // receives a routable dict (artifact_id for fa_... IDs, file_id for fi_.../file_...).
+      const clientAny = this.client as unknown as Record<string, unknown>;
+      if (typeof clientAny['uploadAttachmentRef'] === 'function') {
+        const raw = await (clientAny['uploadAttachmentRef'] as (f: File) => Promise<unknown>)(file);
+        attachmentRef = raw as WidgetAttachmentRef;
+      } else if (typeof this.client.uploadAttachment === 'function') {
+        const uploadedId = await this.client.uploadAttachment(file);
+        attachmentRef = uploadedId.startsWith('fa_')
+          ? { artifact_id: uploadedId, attachment_id: uploadedId }
+          : { file_id: uploadedId, attachment_id: uploadedId };
       } else if (typeof this.client.uploadFile === 'function') {
-        uploadedId = await this.client.uploadFile(file);
+        const uploadedId = await this.client.uploadFile(file);
+        attachmentRef = uploadedId.startsWith('fa_')
+          ? { artifact_id: uploadedId, attachment_id: uploadedId }
+          : { file_id: uploadedId, attachment_id: uploadedId };
       } else {
         throw createWidgetError(
           'attachments_unavailable',
@@ -700,11 +716,11 @@ export class ChatWidget {
         );
       }
 
-      this.ui.cachedUploadedAttachmentId = uploadedId;
+      this.ui.cachedUploadedAttachmentRef = attachmentRef;
       this.ui.cachedUploadedFile = file;
       this.ui.isUploading = false;
       this.notifyAndRender();
-      return uploadedId;
+      return attachmentRef;
     } catch (error) {
       this.resolveUploadError(error);
       this.notifyAndRender();
@@ -731,10 +747,10 @@ export class ChatWidget {
     }
 
     this.ui.error = null;
-    let attachmentId: string | null = null;
+    let attachmentRef: WidgetAttachmentRef | null = null;
     if (hasFile) {
-      attachmentId = await this.uploadSelectedFile();
-      if (this.ui.selectedFileValue && attachmentId === null) {
+      attachmentRef = await this.uploadSelectedFile();
+      if (this.ui.selectedFileValue && attachmentRef === null) {
         return;
       }
     }
@@ -747,7 +763,7 @@ export class ChatWidget {
     try {
       const sendRequest = {
         content: [content],
-        attachments: attachmentId ? [attachmentId] : undefined,
+        attachments: attachmentRef ? [attachmentRef] : undefined,
         meta: questionMeta,
       };
       this.debug.log('[cortex-chat-widget] handleSend -> controller.sendMessage start', {
