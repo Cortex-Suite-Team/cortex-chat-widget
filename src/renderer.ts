@@ -718,7 +718,12 @@ function renderTranscript(
 
     let statusEl: HTMLElement | null = null;
     const deliveryStatus = typeof message.deliveryStatus === 'string' ? message.deliveryStatus : undefined;
-    if (message.role === 'user' && deliveryStatus) {
+    const isQuestionReply = !!(message.meta?.['question_ref'] ?? message.meta?.['question_id']);
+    const shouldShowDeliveryStatus =
+      message.role === 'user'
+      && !!deliveryStatus
+      && (!isQuestionReply || deliveryStatus === 'failed');
+    if (shouldShowDeliveryStatus) {
       statusEl = document.createElement('div');
       statusEl.className = 'cortex-widget__message-status';
       statusEl.dataset.status = deliveryStatus;
