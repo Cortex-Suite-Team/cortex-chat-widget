@@ -361,18 +361,24 @@ function getDeliveryStatusLabel(status: string): string {
 
 function toAttachmentViewModel(attachment: unknown): TranscriptAttachmentViewModel | null {
   if (typeof attachment === 'string') {
-    const id = attachment.trim();
-    if (!id) {
+    const ref = attachment.trim();
+    if (!ref) {
       return null;
     }
-    // Raw id (e.g. fa_...) is internal only — never surface it as the visible label.
+    // A bare string ref carries no filename/ownership — render degraded, never surface the raw id.
+    const isSessionRef = ref.startsWith('sf_');
     return {
-      id,
+      id: isSessionRef ? ref : null,
       label: 'Attached file',
       url: null,
       fileName: null,
       contentType: null,
       size: null,
+      fileRef: isSessionRef ? ref : null,
+      downloadMintUrl: null,
+      ownerRole: null,
+      direction: null,
+      messageRef: null,
     };
   }
 
@@ -380,34 +386,97 @@ function toAttachmentViewModel(attachment: unknown): TranscriptAttachmentViewMod
     return null;
   }
 
-  const id = toNonEmptyString(attachment.file_id) ?? toNonEmptyString(attachment.attachment_id);
+  // file_ref (sf_) is the only public id. Never surface file_id/artifact_id/attachment_id.
+  const fileRef = toNonEmptyString(attachment.file_ref);
   const fileName = toNonEmptyString(attachment.filename) ?? toNonEmptyString(attachment.file_name) ?? toNonEmptyString(attachment.name);
-  const url = toNonEmptyString(attachment.download_url) ?? toNonEmptyString(attachment.url) ?? toNonEmptyString(attachment.href);
+  const downloadMintUrl = toNonEmptyString(attachment.download_mint_url);
+  const url = downloadMintUrl ?? toNonEmptyString(attachment.download_url) ?? toNonEmptyString(attachment.url) ?? toNonEmptyString(attachment.href);
   const contentType = toNonEmptyString(attachment.content_type) ?? toNonEmptyString(attachment.mime_type) ?? toNonEmptyString(attachment.type);
   const size = typeof attachment.size === 'number'
     ? attachment.size
     : (typeof attachment.size_bytes === 'number' ? attachment.size_bytes : null);
-  // Never fall back to the raw id (file_id/artifact_id/attachment_id) for the visible label.
-  const label = fileName ?? url ?? 'Attached file';
+  const ownerRole = toNonEmptyString(attachment.owner_role);
+  const direction = toNonEmptyString(attachment.direction);
+  const messageRef = toNonEmptyString(attachment.message_ref);
+  // Never fall back to any id/url for the visible label — filename only, else a safe placeholder.
+  const label = fileName ?? 'Attached file';
 
-  // Keep the chip if we have a filename/url to show or an internal id to carry.
-  if (!fileName && !url && !id) {
+  // A legacy ref may carry only an internal id (file_id/artifact_id/attachment_id). We still show a
+  // degraded "Attached file" chip so the user knows a file is present, but the raw id is NEVER
+  // surfaced as text or carried as the actionable file_ref.
+  const hasInternalId = toNonEmptyString(attachment.file_id)
+    ?? toNonEmptyString(attachment.artifact_id)
+    ?? toNonEmptyString(attachment.attachment_id);
+
+  // Keep the chip if we have a filename, a session ref, a download target, or any legacy id.
+  if (!fileName && !fileRef && !url && !hasInternalId) {
     return null;
   }
 
   return {
-    id,
+    id: fileRef,
     label,
     url,
     fileName,
     contentType,
     size,
+    fileRef,
+    downloadMintUrl,
+    ownerRole,
+    direction,
+    messageRef,
   };
+}
+
+function attachmentOwnerMatchesRole(messageRole: string, ownerRole: string | null): boolean {
+  if (!ownerRole) return false;
+  if (messageRole === 'assistant') return ownerRole === 'assistant';
+  if (messageRole === 'operator') return ownerRole === 'operator';
+  if (messageRole === 'user') return ownerRole === 'user';
+  return false;
+}
+
+function attachmentBindingMatchesMessage(
+  message: ChatMessageViewModel,
+  attachment: TranscriptAttachmentViewModel,
+): boolean {
+  if (!attachment.messageRef) return false;
+  return attachment.messageRef === message.clientMsgId || attachment.messageRef === message.id;
+}
+
+// R3/R6: a file renders on a message only when the message's actor owns it.
+// User (inbound) is lenient for legacy refs that lack ownership metadata; assistant/operator
+// (outbound) is strict — owner role match, outbound direction, explicit message binding, and a
+// download link must all be present.
+function attachmentBelongsToMessage(
+  message: ChatMessageViewModel,
+  attachment: TranscriptAttachmentViewModel,
+): boolean {
+  if (message.role === 'user') {
+    if (!attachment.ownerRole) return true; // transitional/legacy tolerance
+    return attachment.ownerRole === 'user';
+  }
+  // Non-user (assistant/operator): strict ownership. The download link is optional — its presence
+  // only decides link-vs-chip; ownership + outbound direction + explicit binding decide visibility.
+  return attachmentOwnerMatchesRole(message.role, attachment.ownerRole)
+    && attachment.direction === 'outbound'
+    && attachmentBindingMatchesMessage(message, attachment);
+}
+
+function hasExplicitOwnedFileDescriptor(message: ChatMessageViewModel): boolean {
+  const attachments = message.meta?.attachments;
+  if (!Array.isArray(attachments)) {
+    return false;
+  }
+  return attachments.some((raw) => {
+    const vm = toAttachmentViewModel(raw);
+    return vm !== null && attachmentBelongsToMessage(message, vm);
+  });
 }
 
 function getMessageAttachments(message: ChatMessageViewModel): TranscriptAttachmentViewModel[] {
   // A worker question must never render user-uploaded attachments. The file belongs to the
-  // user message (and is an internal Runtime handle / operator artifact), not to the question.
+  // user message, not to the question.
   if (message.type === 'chat::question') {
     return [];
   }
@@ -417,9 +486,16 @@ function getMessageAttachments(message: ChatMessageViewModel): TranscriptAttachm
     return [];
   }
 
+  // Transitional guard. Do not render inherited user attachments on non-user messages.
+  // Worker/operator-generated files require explicit SessionFileDescriptor ownership (R6).
+  if (message.role !== 'user' && !hasExplicitOwnedFileDescriptor(message)) {
+    return [];
+  }
+
   return attachments
     .map((attachment) => toAttachmentViewModel(attachment))
-    .filter((attachment): attachment is TranscriptAttachmentViewModel => attachment !== null);
+    .filter((attachment): attachment is TranscriptAttachmentViewModel =>
+      attachment !== null && attachmentBelongsToMessage(message, attachment));
 }
 
 function renderTranscript(
@@ -564,16 +640,26 @@ function renderTranscript(
       for (const attachment of attachments) {
         const item = document.createElement('li');
         item.className = 'cortex-widget__message-attachment';
-        const hasDownloadLink = message.role === 'assistant' && attachment.url;
+        // A descriptor with a mint URL is downloadable regardless of actor (user files included).
+        // The href points at the download/mint endpoint; the actual fetch is mint-on-click,
+        // handled by the widget controller via the data-download-mint-url hook.
+        const downloadTarget = attachment.downloadMintUrl ?? attachment.url;
+        const hasDownloadLink = Boolean(downloadTarget);
 
-        if (hasDownloadLink) {
+        if (hasDownloadLink && downloadTarget) {
           const link = document.createElement('a');
           link.className = 'cortex-widget__message-attachment-link';
-          link.href = attachment.url ?? '#';
-          link.target = '_blank';
+          link.href = downloadTarget;
           link.rel = 'noopener noreferrer';
+          if (attachment.downloadMintUrl) {
+            link.setAttribute('data-download-mint-url', attachment.downloadMintUrl);
+          }
+          if (attachment.fileRef) {
+            link.setAttribute('data-file-ref', attachment.fileRef);
+          }
           if (attachment.fileName) {
             link.download = attachment.fileName;
+            link.setAttribute('data-filename', attachment.fileName);
           }
           link.setAttribute('data-testid', 'message-attachment-link');
 

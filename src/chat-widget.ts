@@ -675,6 +675,34 @@ export class ChatWidget {
     this.ui.cachedUploadedFile = null;
   }
 
+  // Wrap an uploaded id into a canonical attachment ref. New SessionManager builds return an
+  // sf_ file_ref; legacy builds return fa_/fi_ blob ids (still accepted + normalized server-side).
+  private wrapUploadedId(uploadedId: string, file: { name?: string; type?: string; size?: number }): WidgetAttachmentRef {
+    const meta: Partial<WidgetAttachmentRef> = {};
+    if (file && typeof file.name === 'string' && file.name) meta.filename = file.name;
+    if (file && typeof file.type === 'string' && file.type) meta.content_type = file.type;
+    if (file && typeof file.size === 'number') meta.size = file.size;
+
+    if (uploadedId.startsWith('sf_')) {
+      const sessionId = this.client.sessionId ?? null;
+      const downloadMintUrl = sessionId
+        ? `/sessions/${encodeURIComponent(sessionId)}/files/${encodeURIComponent(uploadedId)}/download-token`
+        : undefined;
+      return {
+        file_ref: uploadedId,
+        attachment_id: uploadedId,
+        owner_role: 'user',
+        direction: 'inbound',
+        ...(downloadMintUrl ? { download_mint_url: downloadMintUrl } : {}),
+        ...meta,
+      };
+    }
+    if (uploadedId.startsWith('fa_')) {
+      return { artifact_id: uploadedId, attachment_id: uploadedId, ...meta };
+    }
+    return { file_id: uploadedId, attachment_id: uploadedId, ...meta };
+  }
+
   private async uploadSelectedFile(): Promise<WidgetAttachmentRef | null> {
     const file = this.ui.selectedFileValue;
     if (!file) {
@@ -701,14 +729,10 @@ export class ChatWidget {
         attachmentRef = raw as WidgetAttachmentRef;
       } else if (typeof this.client.uploadAttachment === 'function') {
         const uploadedId = await this.client.uploadAttachment(file);
-        attachmentRef = uploadedId.startsWith('fa_')
-          ? { artifact_id: uploadedId, attachment_id: uploadedId }
-          : { file_id: uploadedId, attachment_id: uploadedId };
+        attachmentRef = this.wrapUploadedId(uploadedId, file);
       } else if (typeof this.client.uploadFile === 'function') {
         const uploadedId = await this.client.uploadFile(file);
-        attachmentRef = uploadedId.startsWith('fa_')
-          ? { artifact_id: uploadedId, attachment_id: uploadedId }
-          : { file_id: uploadedId, attachment_id: uploadedId };
+        attachmentRef = this.wrapUploadedId(uploadedId, file);
       } else {
         throw createWidgetError(
           'attachments_unavailable',
@@ -904,6 +928,16 @@ export class ChatWidget {
   }
 
   private async handleTranscriptClick(event: MouseEvent): Promise<void> {
+    const downloadLink = (event.target as Element).closest('[data-download-mint-url]') as HTMLAnchorElement | null;
+    if (downloadLink) {
+      event.preventDefault();
+      const fileRef = downloadLink.dataset.fileRef;
+      if (fileRef) {
+        await this.downloadSessionFile(fileRef, downloadLink.dataset.filename);
+      }
+      return;
+    }
+
     const retryBtn = (event.target as Element).closest('[data-retry-msg-id]') as HTMLButtonElement | null;
     if (retryBtn) {
       const msgId = retryBtn.dataset.retryMsgId;
@@ -924,6 +958,35 @@ export class ChatWidget {
     if (questionRef && optionId) {
       await this.handleOptionSelect(questionRef, optionId, optionLabel);
     }
+  }
+
+  // Mint-on-click: fetch a fresh single-use download URL, then trigger a plain browser download.
+  private async downloadSessionFile(fileRef: string, filename?: string): Promise<void> {
+    const clientAny = this.client as unknown as Record<string, unknown>;
+    const mint = clientAny['mintSessionFileDownloadUrl'];
+    if (typeof mint !== 'function') {
+      return; // Older SDK without descriptor download support.
+    }
+    try {
+      const url = await (mint as (ref: string) => Promise<string>).call(this.client, fileRef);
+      this.triggerBrowserDownload(url, filename);
+    } catch (error) {
+      this.resolveRuntimeError(error);
+      this.notifyAndRender();
+    }
+  }
+
+  private triggerBrowserDownload(url: string, filename?: string): void {
+    if (typeof document === 'undefined') return;
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.rel = 'noopener noreferrer';
+    if (filename) {
+      anchor.download = filename;
+    }
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
   }
 
   private setOpen(nextOpen: boolean): void {

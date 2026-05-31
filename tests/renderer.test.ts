@@ -359,12 +359,16 @@ describe('widget renderer behavior', () => {
         role: 'assistant',
         content: 'Generated file is ready.',
         meta: {
+          // Assistant-generated file: an explicitly owned outbound descriptor bound to this message.
           attachments: [{
-            file_id: 'file_123',
+            file_ref: 'sf_assistant_1',
+            owner_role: 'assistant',
+            direction: 'outbound',
+            message_ref: 'msg_assistant_file',
             filename: 'summary.pdf',
             content_type: 'application/pdf',
             size: 2048,
-            download_url: 'https://example.test/download/summary.pdf',
+            download_mint_url: '/sessions/sess_1/files/sf_assistant_1/download-token',
           }],
         },
       }],
@@ -373,10 +377,13 @@ describe('widget renderer behavior', () => {
     const link = shadow.querySelector('[data-testid="message-attachment-link"]') as HTMLAnchorElement;
 
     expect(link).toBeTruthy();
-    expect(link.href).toBe('https://example.test/download/summary.pdf');
+    expect(link.getAttribute('href')).toBe('/sessions/sess_1/files/sf_assistant_1/download-token');
+    expect(link.getAttribute('data-download-mint-url')).toBe('/sessions/sess_1/files/sf_assistant_1/download-token');
     expect(link.download).toBe('summary.pdf');
     expect(link.textContent).toContain('summary.pdf');
     expect(link.textContent).toContain('application/pdf');
+    // The internal blob id must never appear in the DOM.
+    expect(shadow.innerHTML).not.toContain('file_123');
   });
 
   it('renders assistant final answers through the html markdown branch', () => {
@@ -445,7 +452,7 @@ describe('widget renderer behavior', () => {
     expect(pre.textContent).toContain('"value": 1');
   });
 
-  it('falls back to a visible chip for assistant attachments without download url', () => {
+  it('falls back to a visible chip for an owned assistant attachment without download url', () => {
     mountWidget();
     const shadow = getShadow();
 
@@ -456,8 +463,12 @@ describe('widget renderer behavior', () => {
         role: 'assistant',
         content: 'Attached result.',
         meta: {
+          // Owned outbound descriptor, but no download mint url yet → renders a plain chip.
           attachments: [{
-            file_id: 'file_456',
+            file_ref: 'sf_assistant_2',
+            owner_role: 'assistant',
+            direction: 'outbound',
+            message_ref: 'msg_assistant_file_id_only',
             filename: 'artifact.txt',
           }],
         },
@@ -467,6 +478,33 @@ describe('widget renderer behavior', () => {
     expect(shadow.querySelector('[data-testid="message-attachment-link"]')).toBeNull();
     const attachments = shadow.querySelector('[data-testid="message-attachments"]') as HTMLElement;
     expect(attachments.textContent).toContain('artifact.txt');
+  });
+
+  it('hides an unowned (inherited) attachment on an assistant message', () => {
+    mountWidget();
+    const shadow = getShadow();
+
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_assistant_inherited',
+        type: 'chat::answer',
+        role: 'assistant',
+        content: 'Worker answer.',
+        meta: {
+          // A user-uploaded file (owner_role=user) must NOT render on a worker/assistant message.
+          attachments: [{
+            file_ref: 'sf_user_1',
+            owner_role: 'user',
+            direction: 'inbound',
+            filename: 'user-upload.pdf',
+            download_mint_url: '/sessions/sess_1/files/sf_user_1/download-token',
+          }],
+        },
+      }],
+    }));
+
+    expect(shadow.querySelector('[data-testid="message-attachments"]')).toBeNull();
+    expect(shadow.innerHTML).not.toContain('user-upload.pdf');
   });
 
   it('does not render attachments on a worker chat::question even when meta carries them', () => {
@@ -1187,9 +1225,12 @@ describe('widget renderer behavior', () => {
         actor: { kind: 'digital_worker', name: 'Robot Vasya' },
         meta: {
           attachments: [{
-            file_id: 'file_reg',
+            file_ref: 'sf_reg',
+            owner_role: 'assistant',
+            direction: 'outbound',
+            message_ref: 'msg_actor_attach',
             filename: 'report.pdf',
-            download_url: 'https://example.test/report.pdf',
+            download_mint_url: '/sessions/sess_1/files/sf_reg/download-token',
             content_type: 'application/pdf',
             size: 1024,
           }],
@@ -1202,7 +1243,7 @@ describe('widget renderer behavior', () => {
 
     expect(actorName.textContent).toBe('Robot Vasya');
     expect(link).toBeTruthy();
-    expect(link.href).toBe('https://example.test/report.pdf');
+    expect(link.getAttribute('href')).toBe('/sessions/sess_1/files/sf_reg/download-token');
   });
 
   it('unlocks on terminal session state', async () => {
