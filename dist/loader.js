@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.17 builtAt=2026-05-30T18:51:34.975Z */
+/* cortex-chat-widget loader build: sdk=1.1.18 builtAt=2026-05-31T10:49:34.281Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -642,9 +642,9 @@
       throw makeError("upload_failed", `Upload failed with status ${res.status}`);
     }
     const body = await res.json();
-    const fileId = body["file_id"] ?? body["attachment_id"];
+    const fileId = body["file_ref"] ?? body["file_id"] ?? body["attachment_id"];
     if (typeof fileId !== "string") {
-      throw makeError("upload_failed", "Upload response did not include file_id");
+      throw makeError("upload_failed", "Upload response did not include a file reference");
     }
     return fileId;
   }
@@ -808,6 +808,26 @@
         return new Blob([await res.arrayBuffer()]);
       }
       throw makeError("file_operation_failed", "File API response does not expose bytes");
+    }
+    /**
+     * Mint a short-lived, single-use download URL for a session file descriptor (sf_ file_ref).
+     *
+     * Returns an absolute, unauthenticated GET URL that a plain anchor navigation can download
+     * (no CORS, no auth header). Mint-on-click: call this each time the user clicks the link so the
+     * token is never stale.
+     */
+    async mintSessionFileDownloadUrl(fileRef, options = {}) {
+      if (!this._accessToken)
+        throw makeError("auth_invalid", "Not connected");
+      const sessionId = this._requireSessionId(options.sessionId);
+      const base2 = this._requireRuntimeHttpBaseUrl();
+      const mintUrl = `${base2}/sessions/${encodeURIComponent(sessionId)}/files/${encodeURIComponent(fileRef)}/download-token`;
+      const body = await this._requestJson(mintUrl, "POST");
+      const downloadUrl = body["download_url"];
+      if (typeof downloadUrl !== "string" || !downloadUrl) {
+        throw makeError("file_operation_failed", "Download token response missing download_url");
+      }
+      return downloadUrl.startsWith("http") ? downloadUrl : `${base2}${downloadUrl}`;
     }
     async listFiles(options = {}) {
       if (!this._accessToken)
@@ -3128,8 +3148,20 @@
   }
 
   // ../sdk-ui/dist/src/normalize.js
+  var INTERNAL_ATTACHMENT_KEYS = ["file_id", "blob_ref", "storage_key"];
+  function stripInternalAttachmentFields(attachments) {
+    return attachments.map((att) => {
+      if (!isRecord(att))
+        return att;
+      const cleaned = { ...att };
+      for (const key of INTERNAL_ATTACHMENT_KEYS) {
+        delete cleaned[key];
+      }
+      return cleaned;
+    });
+  }
   function buildAttachmentMeta(payload) {
-    return Array.isArray(payload["attachments"]) ? { attachments: payload["attachments"] } : {};
+    return Array.isArray(payload["attachments"]) ? { attachments: stripInternalAttachmentFields(payload["attachments"]) } : {};
   }
   function getClientMsgId(meta) {
     return asNonEmptyString(meta["client_msg_id"]) ?? void 0;
@@ -3147,6 +3179,9 @@
   function withoutInternalRefs(meta) {
     const cleaned = { ...meta };
     delete cleaned["resume_event_ref"];
+    for (const key of INTERNAL_ATTACHMENT_KEYS) {
+      delete cleaned[key];
+    }
     return cleaned;
   }
   function resolveActorKind(raw) {
@@ -11997,39 +12032,83 @@
   }
   function toAttachmentViewModel(attachment) {
     if (typeof attachment === "string") {
-      const id2 = attachment.trim();
-      if (!id2) {
+      const ref = attachment.trim();
+      if (!ref) {
         return null;
       }
+      const isSessionRef = ref.startsWith("sf_");
       return {
-        id: id2,
+        id: isSessionRef ? ref : null,
         label: "Attached file",
         url: null,
         fileName: null,
         contentType: null,
-        size: null
+        size: null,
+        fileRef: isSessionRef ? ref : null,
+        downloadMintUrl: null,
+        ownerRole: null,
+        direction: null,
+        messageRef: null
       };
     }
     if (!isRecord2(attachment)) {
       return null;
     }
-    const id = toNonEmptyString(attachment.file_id) ?? toNonEmptyString(attachment.attachment_id);
+    const fileRef = toNonEmptyString(attachment.file_ref);
     const fileName = toNonEmptyString(attachment.filename) ?? toNonEmptyString(attachment.file_name) ?? toNonEmptyString(attachment.name);
-    const url = toNonEmptyString(attachment.download_url) ?? toNonEmptyString(attachment.url) ?? toNonEmptyString(attachment.href);
+    const downloadMintUrl = toNonEmptyString(attachment.download_mint_url);
+    const url = downloadMintUrl ?? toNonEmptyString(attachment.download_url) ?? toNonEmptyString(attachment.url) ?? toNonEmptyString(attachment.href);
     const contentType = toNonEmptyString(attachment.content_type) ?? toNonEmptyString(attachment.mime_type) ?? toNonEmptyString(attachment.type);
     const size = typeof attachment.size === "number" ? attachment.size : typeof attachment.size_bytes === "number" ? attachment.size_bytes : null;
-    const label = fileName ?? url ?? "Attached file";
-    if (!fileName && !url && !id) {
+    const ownerRole = toNonEmptyString(attachment.owner_role);
+    const direction = toNonEmptyString(attachment.direction);
+    const messageRef = toNonEmptyString(attachment.message_ref);
+    const label = fileName ?? "Attached file";
+    const hasInternalId = toNonEmptyString(attachment.file_id) ?? toNonEmptyString(attachment.artifact_id) ?? toNonEmptyString(attachment.attachment_id);
+    if (!fileName && !fileRef && !url && !hasInternalId) {
       return null;
     }
     return {
-      id,
+      id: fileRef,
       label,
       url,
       fileName,
       contentType,
-      size
+      size,
+      fileRef,
+      downloadMintUrl,
+      ownerRole,
+      direction,
+      messageRef
     };
+  }
+  function attachmentOwnerMatchesRole(messageRole, ownerRole) {
+    if (!ownerRole) return false;
+    if (messageRole === "assistant") return ownerRole === "assistant";
+    if (messageRole === "operator") return ownerRole === "operator";
+    if (messageRole === "user") return ownerRole === "user";
+    return false;
+  }
+  function attachmentBindingMatchesMessage(message, attachment) {
+    if (!attachment.messageRef) return false;
+    return attachment.messageRef === message.clientMsgId || attachment.messageRef === message.id;
+  }
+  function attachmentBelongsToMessage(message, attachment) {
+    if (message.role === "user") {
+      if (!attachment.ownerRole) return true;
+      return attachment.ownerRole === "user";
+    }
+    return attachmentOwnerMatchesRole(message.role, attachment.ownerRole) && attachment.direction === "outbound" && attachmentBindingMatchesMessage(message, attachment);
+  }
+  function hasExplicitOwnedFileDescriptor(message) {
+    const attachments = message.meta?.attachments;
+    if (!Array.isArray(attachments)) {
+      return false;
+    }
+    return attachments.some((raw) => {
+      const vm = toAttachmentViewModel(raw);
+      return vm !== null && attachmentBelongsToMessage(message, vm);
+    });
   }
   function getMessageAttachments(message) {
     if (message.type === "chat::question") {
@@ -12039,7 +12118,10 @@
     if (!Array.isArray(attachments)) {
       return [];
     }
-    return attachments.map((attachment) => toAttachmentViewModel(attachment)).filter((attachment) => attachment !== null);
+    if (message.role !== "user" && !hasExplicitOwnedFileDescriptor(message)) {
+      return [];
+    }
+    return attachments.map((attachment) => toAttachmentViewModel(attachment)).filter((attachment) => attachment !== null && attachmentBelongsToMessage(message, attachment));
   }
   function renderTranscript(transcriptEl, state, options) {
     transcriptEl.replaceChildren();
@@ -12159,15 +12241,22 @@
         for (const attachment of attachments) {
           const item = document.createElement("li");
           item.className = "cortex-widget__message-attachment";
-          const hasDownloadLink = message.role === "assistant" && attachment.url;
-          if (hasDownloadLink) {
+          const downloadTarget = attachment.downloadMintUrl ?? attachment.url;
+          const hasDownloadLink = Boolean(downloadTarget);
+          if (hasDownloadLink && downloadTarget) {
             const link2 = document.createElement("a");
             link2.className = "cortex-widget__message-attachment-link";
-            link2.href = attachment.url ?? "#";
-            link2.target = "_blank";
+            link2.href = downloadTarget;
             link2.rel = "noopener noreferrer";
+            if (attachment.downloadMintUrl) {
+              link2.setAttribute("data-download-mint-url", attachment.downloadMintUrl);
+            }
+            if (attachment.fileRef) {
+              link2.setAttribute("data-file-ref", attachment.fileRef);
+            }
             if (attachment.fileName) {
               link2.download = attachment.fileName;
+              link2.setAttribute("data-filename", attachment.fileName);
             }
             link2.setAttribute("data-testid", "message-attachment-link");
             const label = document.createElement("span");
@@ -12994,6 +13083,30 @@ ${token}`;
       this.ui.cachedUploadedAttachmentRef = null;
       this.ui.cachedUploadedFile = null;
     }
+    // Wrap an uploaded id into a canonical attachment ref. New SessionManager builds return an
+    // sf_ file_ref; legacy builds return fa_/fi_ blob ids (still accepted + normalized server-side).
+    wrapUploadedId(uploadedId, file) {
+      const meta = {};
+      if (file && typeof file.name === "string" && file.name) meta.filename = file.name;
+      if (file && typeof file.type === "string" && file.type) meta.content_type = file.type;
+      if (file && typeof file.size === "number") meta.size = file.size;
+      if (uploadedId.startsWith("sf_")) {
+        const sessionId = this.client.sessionId ?? null;
+        const downloadMintUrl = sessionId ? `/sessions/${encodeURIComponent(sessionId)}/files/${encodeURIComponent(uploadedId)}/download-token` : void 0;
+        return {
+          file_ref: uploadedId,
+          attachment_id: uploadedId,
+          owner_role: "user",
+          direction: "inbound",
+          ...downloadMintUrl ? { download_mint_url: downloadMintUrl } : {},
+          ...meta
+        };
+      }
+      if (uploadedId.startsWith("fa_")) {
+        return { artifact_id: uploadedId, attachment_id: uploadedId, ...meta };
+      }
+      return { file_id: uploadedId, attachment_id: uploadedId, ...meta };
+    }
     async uploadSelectedFile() {
       const file = this.ui.selectedFileValue;
       if (!file) {
@@ -13013,10 +13126,10 @@ ${token}`;
           attachmentRef = raw;
         } else if (typeof this.client.uploadAttachment === "function") {
           const uploadedId = await this.client.uploadAttachment(file);
-          attachmentRef = uploadedId.startsWith("fa_") ? { artifact_id: uploadedId, attachment_id: uploadedId } : { file_id: uploadedId, attachment_id: uploadedId };
+          attachmentRef = this.wrapUploadedId(uploadedId, file);
         } else if (typeof this.client.uploadFile === "function") {
           const uploadedId = await this.client.uploadFile(file);
-          attachmentRef = uploadedId.startsWith("fa_") ? { artifact_id: uploadedId, attachment_id: uploadedId } : { file_id: uploadedId, attachment_id: uploadedId };
+          attachmentRef = this.wrapUploadedId(uploadedId, file);
         } else {
           throw createWidgetError(
             "attachments_unavailable",
@@ -13184,6 +13297,15 @@ ${token}`;
       }
     }
     async handleTranscriptClick(event) {
+      const downloadLink = event.target.closest("[data-download-mint-url]");
+      if (downloadLink) {
+        event.preventDefault();
+        const fileRef = downloadLink.dataset.fileRef;
+        if (fileRef) {
+          await this.downloadSessionFile(fileRef, downloadLink.dataset.filename);
+        }
+        return;
+      }
       const retryBtn = event.target.closest("[data-retry-msg-id]");
       if (retryBtn) {
         const msgId = retryBtn.dataset.retryMsgId;
@@ -13203,6 +13325,33 @@ ${token}`;
       if (questionRef && optionId) {
         await this.handleOptionSelect(questionRef, optionId, optionLabel);
       }
+    }
+    // Mint-on-click: fetch a fresh single-use download URL, then trigger a plain browser download.
+    async downloadSessionFile(fileRef, filename) {
+      const clientAny = this.client;
+      const mint = clientAny["mintSessionFileDownloadUrl"];
+      if (typeof mint !== "function") {
+        return;
+      }
+      try {
+        const url = await mint.call(this.client, fileRef);
+        this.triggerBrowserDownload(url, filename);
+      } catch (error2) {
+        this.resolveRuntimeError(error2);
+        this.notifyAndRender();
+      }
+    }
+    triggerBrowserDownload(url, filename) {
+      if (typeof document === "undefined") return;
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.rel = "noopener noreferrer";
+      if (filename) {
+        anchor.download = filename;
+      }
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
     }
     setOpen(nextOpen) {
       if (this.options.mode === "embedded" || this.ui.isDestroyed) {

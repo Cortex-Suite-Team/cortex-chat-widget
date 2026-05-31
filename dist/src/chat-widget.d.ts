@@ -62,12 +62,15 @@ export declare class ChatWidget {
     private setSelectedFile;
     private clearSelectedFile;
     private clearDraftComposer;
+    private wrapUploadedId;
     private uploadSelectedFile;
     private handleSend;
     private handleLoginSubmit;
     private handleOptionSelect;
     private handleQuestionFormSubmit;
     private handleTranscriptClick;
+    private downloadSessionFile;
+    private triggerBrowserDownload;
     private setOpen;
     private handleHistoryError;
     private resolveUploadError;

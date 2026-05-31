@@ -6,16 +6,20 @@ export interface CortexChatWidgetError {
 }
 /**
  * Attachment ref sent in chat::message payload.meta.attachments.
- * Canonical local refs use artifact_id; file-service refs use file_id.
- * attachment_id is a backward-compat alias kept for SDK ≤ 1.1.13 clients.
+ * Canonical session refs use file_ref (sf_...). Legacy local refs use artifact_id; file-service
+ * refs use file_id. attachment_id is a backward-compat alias kept for SDK ≤ 1.1.13 clients.
  */
 export interface WidgetAttachmentRef {
     attachment_id: string;
+    file_ref?: string;
     artifact_id?: string;
     file_id?: string;
     filename?: string;
     content_type?: string;
     size?: number;
+    download_mint_url?: string;
+    owner_role?: string;
+    direction?: string;
 }
 export interface SelectedFileState {
     name: string;
@@ -29,6 +33,14 @@ export interface TranscriptAttachmentViewModel {
     fileName: string | null;
     contentType: string | null;
     size: number | null;
+    /** Session file descriptor reference (sf_...) — the public, render-safe id. */
+    fileRef: string | null;
+    /** Stable mint endpoint used for mint-on-click download. */
+    downloadMintUrl: string | null;
+    /** Descriptor ownership fields used for the rendering ownership check (R3/R6). */
+    ownerRole: string | null;
+    direction: string | null;
+    messageRef: string | null;
 }
 export interface CortexChatWidgetState {
     mode: 'embedded' | 'floating';
