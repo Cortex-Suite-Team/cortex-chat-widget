@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.18 builtAt=2026-05-31T10:49:34.281Z */
+/* cortex-chat-widget loader build: sdk=1.1.20 builtAt=2026-06-01T19:11:26.165Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -69,6 +69,83 @@
     return CATALOG_MAP.get(code2);
   }
 
+  // node_modules/@cortex-suite/sdk/dist/browser/frontend-uuid.js
+  var STORAGE_KEY = "cortex_frontend_uuid";
+  var COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+  function getBrowserGlobal() {
+    return globalThis;
+  }
+  function generateUuid() {
+    const cryptoObj = getBrowserGlobal().crypto;
+    if (cryptoObj && typeof cryptoObj.randomUUID === "function") {
+      return cryptoObj.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      const v = c === "x" ? r : r & 3 | 8;
+      return v.toString(16);
+    });
+  }
+  function readCookie(name) {
+    const doc = getBrowserGlobal().document;
+    if (!doc || typeof doc.cookie !== "string") {
+      return null;
+    }
+    const prefix = `${name}=`;
+    for (const part of doc.cookie.split(";")) {
+      const trimmed = part.trim();
+      if (trimmed.startsWith(prefix)) {
+        return decodeURIComponent(trimmed.slice(prefix.length));
+      }
+    }
+    return null;
+  }
+  function writeCookie(name, value) {
+    const doc = getBrowserGlobal().document;
+    if (!doc) {
+      return;
+    }
+    try {
+      doc.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
+    } catch {
+    }
+  }
+  function ensureFrontendUuid() {
+    const browserGlobal = getBrowserGlobal();
+    const ls = browserGlobal.localStorage;
+    if (ls) {
+      try {
+        const existing = ls.getItem(STORAGE_KEY);
+        if (existing) {
+          return existing;
+        }
+      } catch {
+      }
+    }
+    const fromCookie = readCookie(STORAGE_KEY);
+    if (fromCookie) {
+      if (ls) {
+        try {
+          ls.setItem(STORAGE_KEY, fromCookie);
+        } catch {
+        }
+      }
+      return fromCookie;
+    }
+    if (!ls && !browserGlobal.document) {
+      return void 0;
+    }
+    const generated = generateUuid();
+    if (ls) {
+      try {
+        ls.setItem(STORAGE_KEY, generated);
+      } catch {
+      }
+    }
+    writeCookie(STORAGE_KEY, generated);
+    return generated;
+  }
+
   // node_modules/@cortex-suite/sdk/dist/browser/auth.js
   function parseJwtExp(token) {
     try {
@@ -92,14 +169,20 @@
     }
     return value.slice(0, end);
   }
-  async function exchangeApiKey(apiKey, fetchFn, authBaseUrl = DEFAULT_AUTH_URL, workerRef) {
+  async function exchangeApiKey(apiKey, fetchFn, authBaseUrl = DEFAULT_AUTH_URL, workerRef, frontendUuid) {
+    const bodyPayload = {};
+    if (workerRef)
+      bodyPayload["worker_ref"] = workerRef;
+    if (frontendUuid)
+      bodyPayload["frontend_uuid"] = frontendUuid;
     const requestInit = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `ApiKey ${apiKey}`
+        Authorization: `ApiKey ${apiKey}`,
+        ...frontendUuid ? { "X-Cortex-Frontend-UUID": frontendUuid } : {}
       },
-      ...workerRef ? { body: JSON.stringify({ worker_ref: workerRef }) } : {}
+      ...Object.keys(bodyPayload).length ? { body: JSON.stringify(bodyPayload) } : {}
     };
     const res = await fetchFn(buildAuthEndpoint(authBaseUrl, AUTH_TOKEN_PATH), {
       ...requestInit
@@ -610,6 +693,10 @@
   }
 
   // node_modules/@cortex-suite/sdk/dist/browser/upload.js
+  function resolveUploadFilename(file) {
+    const name = typeof file === "object" && file !== null ? file.name : void 0;
+    return typeof name === "string" && name.trim() ? name : "upload";
+  }
   async function uploadFile(file, accessToken, uploadUrl, fetchFn, FormDataClass) {
     const formData = new FormDataClass();
     let blob;
@@ -622,7 +709,7 @@
     } else {
       blob = file;
     }
-    formData.append("file", blob, "upload");
+    formData.append("file", blob, resolveUploadFilename(file));
     const res = await fetchFn(uploadUrl, {
       method: "POST",
       headers: {
@@ -870,7 +957,7 @@
       this._stopBackgroundActivity();
       this._resetSessionRuntimeState();
       this._channelState = "CLOSED";
-      const authResponse = await exchangeApiKey(this._options.apiKey, this._platform.fetchFn, this._options.authUrl, this._options.workerRef);
+      const authResponse = await exchangeApiKey(this._options.apiKey, this._platform.fetchFn, this._options.authUrl, this._options.workerRef, ensureFrontendUuid());
       this._accessToken = authResponse.access_token;
       this._refreshToken = authResponse.refresh_token;
       this._wsUrl = authResponse.ws_url;

@@ -1,13 +1,13 @@
 {
-  "builtAt": "2026-05-31T10:49:34.281Z",
+  "builtAt": "2026-06-01T19:11:26.165Z",
   "widgetEntry": "dist/index.js",
   "sdk": {
     "name": "@cortex-suite/sdk",
-    "version": "1.1.18",
+    "version": "1.1.20",
     "browserEntry": "@cortex-suite/sdk/browser"
   },
   "sdkUi": {
-    "entry": "/home/runner/work/cortex-chat-widget/cortex-chat-widget/sdk-ui/dist/src/index.js",
+    "entry": "D:\\GitHub\\Cortex\\public\\sdk-ui\\dist\\src\\index.js",
     "source": "file:../sdk-ui"
   },
   "sources": {
