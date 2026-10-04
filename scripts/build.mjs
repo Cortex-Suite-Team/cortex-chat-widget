@@ -55,9 +55,10 @@ async function resolveBuildInfo() {
   const sdkPackage = JSON.parse(await readFile(sdkPackagePath, 'utf8'));
 
   const sdkUiEntry = require.resolve('@cortex-suite/sdk-ui');
+  const sdkUiPackagePath = join(dirname(dirname(dirname(sdkUiEntry))), 'package.json');
+  const sdkUiPackage = JSON.parse(await readFile(sdkUiPackagePath, 'utf8'));
 
   return {
-    builtAt: new Date().toISOString(),
     widgetEntry: 'dist/index.js',
     sdk: {
       name: sdkPackage.name,
@@ -65,7 +66,8 @@ async function resolveBuildInfo() {
       browserEntry: '@cortex-suite/sdk/browser',
     },
     sdkUi: {
-      entry: sdkUiEntry,
+      name: sdkUiPackage.name,
+      version: sdkUiPackage.version,
       source: 'file:../sdk-ui',
     },
     sources: {
@@ -79,7 +81,6 @@ async function resolveBuildInfo() {
 const buildInfo = await resolveBuildInfo();
 console.log(`[chat-widget build] ${buildInfo.sdk.name} version: ${buildInfo.sdk.version}`);
 console.log(`[chat-widget build] ${buildInfo.sdk.name} browser entry: ${sdkBrowserEntryLabel()}`);
-console.log(`[chat-widget build] resolved browser entry path: ${require.resolve('@cortex-suite/sdk/browser')}`);
 
 function sdkBrowserEntryLabel() {
   return '@cortex-suite/sdk/browser';
@@ -94,7 +95,7 @@ await build({
   target: 'es2020',
   sourcemap: true,
   banner: {
-    js: `/* cortex-chat-widget build: sdk=${buildInfo.sdk.version} builtAt=${buildInfo.builtAt} */`,
+    js: `/* cortex-chat-widget build: sdk=${buildInfo.sdk.version} */`,
   },
 });
 await rewriteSourceMapSources('dist/index.js.map');
@@ -109,7 +110,7 @@ await build({
   target: 'es2020',
   sourcemap: true,
   banner: {
-    js: `/* cortex-chat-widget loader build: sdk=${buildInfo.sdk.version} builtAt=${buildInfo.builtAt} */`,
+    js: `/* cortex-chat-widget loader build: sdk=${buildInfo.sdk.version} */`,
   },
 });
 await rewriteSourceMapSources('dist/loader.js.map');

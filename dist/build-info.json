@@ -1,5 +1,4 @@
 {
-  "builtAt": "2026-10-04T08:53:47.231Z",
   "widgetEntry": "dist/index.js",
   "sdk": {
     "name": "@cortex-suite/sdk",
@@ -7,7 +6,8 @@
     "browserEntry": "@cortex-suite/sdk/browser"
   },
   "sdkUi": {
-    "entry": "D:\\GitHub\\Cortex\\public\\sdk-ui\\dist\\src\\index.js",
+    "name": "@cortex-suite/sdk-ui",
+    "version": "0.1.0",
     "source": "file:../sdk-ui"
   },
   "sources": {

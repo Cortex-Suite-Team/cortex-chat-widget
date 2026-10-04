@@ -55,10 +55,6 @@ jobs:
         working-directory: cortex-chat-widget
         run: npm ci
 
-      - name: Sync SDK to latest
-        working-directory: cortex-chat-widget
-        run: npm run sync:sdk
-
       - name: Typecheck
         working-directory: cortex-chat-widget
         run: npm run typecheck
@@ -67,9 +63,9 @@ jobs:
         working-directory: cortex-chat-widget
         run: npm test
 
-      - name: Build dist
+      - name: Verify reproducible dist and package
         working-directory: cortex-chat-widget
-        run: npm run build
+        run: npm run check:reproducible
 
       - name: Commit built dist
         working-directory: cortex-chat-widget
