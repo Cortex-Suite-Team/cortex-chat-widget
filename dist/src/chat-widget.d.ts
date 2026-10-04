@@ -10,12 +10,12 @@ export declare class ChatWidget {
     private controller;
     private liveChatState;
     private historicalTranscript;
+    private historicalTranscriptRevision;
     private chatView;
     private historyController;
     private historyClientKey;
     private liveConnected;
     private liveConnectPromise;
-    private lastTranscriptRenderKey;
     private mounted;
     private readonly domCleanup;
     private unsubscribeController;
@@ -58,7 +58,6 @@ export declare class ChatWidget {
     private syncTextareaValue;
     private resizeComposerTextarea;
     private notifyAndRender;
-    private computeTranscriptKey;
     private setSelectedFile;
     private clearSelectedFile;
     private clearDraftComposer;

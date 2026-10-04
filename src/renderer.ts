@@ -843,7 +843,15 @@ function isTranscriptMessageRenderable(message: ChatMessageViewModel): boolean {
   return hasTextContent || getMessageAttachments(message).length > 0 || hasQuestionControls;
 }
 
-const transcriptVirtualizers = new WeakMap<HTMLElement, TranscriptVirtualizer<ChatMessageViewModel>>();
+interface TranscriptProjection {
+  virtualizer: TranscriptVirtualizer<ChatMessageViewModel>;
+  scopeKey: string;
+  revision: number;
+  transcript: ChatMessageViewModel[];
+  itemIndexByMessageId: Map<string, number>;
+}
+
+const transcriptProjections = new WeakMap<HTMLElement, TranscriptProjection>();
 
 function getMessageVersion(message: ChatMessageViewModel, state: CortexChatWidgetState): string {
   const content = typeof message.content === 'string'
@@ -869,14 +877,64 @@ function renderTranscript(
   state: CortexChatWidgetState,
   options: NormalizedWidgetOptions,
 ): void {
-  const visibleMessages = state.chat.transcript.filter(
-    (message: (typeof state.chat.transcript)[number]) => (
-      !shouldHideTranscriptMessage(message) && isTranscriptMessageRenderable(message)
-    ),
-  );
+  const transcript = state.chat.transcript;
+  const scopeKey = `${state.isHistoricalView ? 'history' : 'live'}:${state.chat.connection.sessionId ?? ''}`;
+  const renderRow = (message: ChatMessageViewModel) => createTranscriptMessage(message, state, options);
+  const existing = transcriptProjections.get(transcriptEl);
+  const mutation = state.chat.transcriptMutation;
+
+  if (
+    existing
+    && existing.scopeKey === scopeKey
+    && existing.transcript === transcript
+    && existing.revision === state.chat.transcriptRevision
+  ) {
+    existing.virtualizer.refreshMounted(renderRow, (message) => getMessageVersion(message, state));
+    return;
+  }
+
+  if (
+    existing
+    && existing.scopeKey === scopeKey
+    && existing.transcript === transcript
+    && mutation
+    && state.chat.transcriptRevision === existing.revision + 1
+  ) {
+    const message = mutation.message;
+    const renderable = !shouldHideTranscriptMessage(message) && isTranscriptMessageRenderable(message);
+    const projectedIndex = existing.itemIndexByMessageId.get(message.id);
+    const item: VirtualTranscriptItem<ChatMessageViewModel> = {
+      key: `${message.id}:0`,
+      version: getMessageVersion(message, state),
+      value: message,
+    };
+    if (mutation.type === 'message_updated' && renderable && projectedIndex !== undefined) {
+      existing.virtualizer.updateItem(projectedIndex, item, renderRow);
+      existing.revision = state.chat.transcriptRevision;
+      existing.virtualizer.refreshMounted(renderRow, (value) => getMessageVersion(value, state));
+      return;
+    }
+    if (
+      mutation.type === 'message_added'
+      && renderable
+      && projectedIndex === undefined
+      && mutation.index === transcript.length - 1
+    ) {
+      const nextIndex = existing.itemIndexByMessageId.size;
+      existing.itemIndexByMessageId.set(message.id, nextIndex);
+      existing.virtualizer.appendItem(item, renderRow);
+      existing.revision = state.chat.transcriptRevision;
+      existing.virtualizer.refreshMounted(renderRow, (value) => getMessageVersion(value, state));
+      return;
+    }
+  }
+
+  const visibleMessages = transcript.filter((message) => (
+    !shouldHideTranscriptMessage(message) && isTranscriptMessageRenderable(message)
+  ));
   if (visibleMessages.length === 0) {
-    transcriptVirtualizers.get(transcriptEl)?.destroy();
-    transcriptVirtualizers.delete(transcriptEl);
+    existing?.virtualizer.destroy();
+    transcriptProjections.delete(transcriptEl);
     const empty = document.createElement('div');
     empty.className = 'cortex-widget__empty';
     empty.textContent = state.isHistoricalView ? 'No messages in this chat yet.' : 'New chat';
@@ -884,11 +942,7 @@ function renderTranscript(
     return;
   }
 
-  let virtualizer = transcriptVirtualizers.get(transcriptEl);
-  if (!virtualizer) {
-    virtualizer = new TranscriptVirtualizer(transcriptEl);
-    transcriptVirtualizers.set(transcriptEl, virtualizer);
-  }
+  const virtualizer = existing?.virtualizer ?? new TranscriptVirtualizer(transcriptEl);
 
   const occurrences = new Map<string, number>();
   const items: VirtualTranscriptItem<ChatMessageViewModel>[] = visibleMessages.map((message) => {
@@ -900,13 +954,21 @@ function renderTranscript(
       value: message,
     };
   });
-  const scopeKey = `${state.isHistoricalView ? 'history' : 'live'}:${state.chat.connection.sessionId ?? ''}`;
-  virtualizer.update(items, (message) => createTranscriptMessage(message, state, options), scopeKey);
+  const itemIndexByMessageId = new Map<string, number>();
+  for (const [index, item] of items.entries()) itemIndexByMessageId.set(item.value.id, index);
+  virtualizer.update(items, renderRow, scopeKey);
+  transcriptProjections.set(transcriptEl, {
+    virtualizer,
+    scopeKey,
+    revision: state.chat.transcriptRevision,
+    transcript,
+    itemIndexByMessageId,
+  });
 }
 
 export function destroyTranscriptRenderer(transcriptEl: HTMLElement): void {
-  transcriptVirtualizers.get(transcriptEl)?.destroy();
-  transcriptVirtualizers.delete(transcriptEl);
+  transcriptProjections.get(transcriptEl)?.virtualizer.destroy();
+  transcriptProjections.delete(transcriptEl);
 }
 
 export function renderWidget(
@@ -915,7 +977,6 @@ export function renderWidget(
   options: NormalizedWidgetOptions,
   attachmentsAvailable: boolean,
   isUploading: boolean,
-  opts?: { skipTranscript?: boolean },
 ): void {
   applyResolvedTheme(dom.host, dom.root, options.theme, {
     dark: 'cortex-widget--dark',
@@ -1038,7 +1099,5 @@ export function renderWidget(
     dom.fileChipRemove.disabled = true;
   }
 
-  if (!opts?.skipTranscript) {
-    renderTranscript(dom.transcript, state, options);
-  }
+  renderTranscript(dom.transcript, state, options);
 }

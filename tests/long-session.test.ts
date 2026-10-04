@@ -31,4 +31,64 @@ describe('long-session transcript contour', () => {
     expect(controller.sendCalls).toHaveLength(transportCallsBefore);
     expect(controller.connectCalls).toBe(connectCallsBefore);
   });
+
+  it.each([10_000, 50_000])(
+    'updates repeated partials in a %i-message transcript without full transcript iteration',
+    (count) => {
+      const { controller } = mountWidget();
+      const messages = Array.from({ length: count }, (_, index) => ({
+        id: index === count - 1 ? 'turn:stream' : `message-${index}`,
+        seq: index,
+        type: index === count - 1 ? 'chat::partial' : 'chat::answer',
+        role: 'assistant' as const,
+        content: index === count - 1 ? 'seed' : `message content ${index}`,
+        status: index === count - 1 ? 'streaming' as const : 'final' as const,
+        actor: { kind: 'digital_worker' as const, name: 'Worker' },
+      }));
+      const scans = { filter: 0, map: 0, iterator: 0 };
+      const transcript = new Proxy(messages, {
+        get(target, property, receiver) {
+          if (property === 'filter' || property === 'map') {
+            return (...args: unknown[]) => {
+              scans[property] += 1;
+              return (Array.prototype[property] as (...values: unknown[]) => unknown).apply(target, args);
+            };
+          }
+          if (property === Symbol.iterator) {
+            scans.iterator += 1;
+          }
+          return Reflect.get(target, property, receiver) as unknown;
+        },
+      });
+      applyChatState(baseChatState({ transcript, transcriptRevision: 1 }));
+      scans.filter = 0;
+      scans.map = 0;
+      scans.iterator = 0;
+
+      for (let revision = 2; revision <= 101; revision += 1) {
+        const message = {
+          ...messages[count - 1],
+          content: `seed${'x'.repeat(revision - 1)}`,
+          seq: count + revision,
+        };
+        transcript[count - 1] = message;
+        applyChatState(baseChatState({
+          transcript,
+          transcriptRevision: revision,
+          transcriptMutation: {
+            type: 'message_updated',
+            index: count - 1,
+            message,
+          },
+        }));
+      }
+
+      const viewport = document.body.firstElementChild!.shadowRoot!
+        .querySelector<HTMLElement>('[data-testid="transcript"]')!;
+      expect(scans).toEqual({ filter: 0, map: 0, iterator: 0 });
+      expect(viewport.querySelectorAll('[data-testid="transcript-message"]')).toHaveLength(17);
+      expect(viewport.textContent).toContain(`seed${'x'.repeat(100)}`);
+      expect(controller.sendCalls).toHaveLength(0);
+    },
+  );
 });

@@ -3644,29 +3644,37 @@
   function createTranscriptStore(options = {}) {
     const transcript = (options.initialTranscript ?? []).map((message) => cloneMessage(message));
     const indexById = /* @__PURE__ */ new Map();
+    const indexByClientMsgId = /* @__PURE__ */ new Map();
     const listeners = /* @__PURE__ */ new Set();
+    let revision = 0;
     for (const [index, message] of transcript.entries()) {
       indexById.set(message.id, index);
+      if (message.clientMsgId)
+        indexByClientMsgId.set(message.clientMsgId, index);
     }
     function snapshot() {
       return transcript.map((message) => cloneMessage(message));
     }
-    function notify() {
-      const nextSnapshot = snapshot();
+    function notify(mutation) {
       for (const listener of Array.from(listeners)) {
-        listener(nextSnapshot);
+        listener(mutation);
       }
     }
     function addMessage(message) {
       transcript.push(message);
-      indexById.set(message.id, transcript.length - 1);
-      notify();
+      const index = transcript.length - 1;
+      indexById.set(message.id, index);
+      if (message.clientMsgId)
+        indexByClientMsgId.set(message.clientMsgId, index);
+      revision += 1;
+      const mutation = {
+        type: "message_added",
+        index,
+        message: cloneMessage(message)
+      };
+      notify(mutation);
       return {
-        transcript: snapshot(),
-        mutation: {
-          type: "message_added",
-          message: cloneMessage(message)
-        }
+        mutation
       };
     }
     function updateMessage(index, message) {
@@ -3675,14 +3683,21 @@
       if (previous && previous.id !== message.id) {
         indexById.delete(previous.id);
       }
+      if (previous?.clientMsgId && previous.clientMsgId !== message.clientMsgId) {
+        indexByClientMsgId.delete(previous.clientMsgId);
+      }
       indexById.set(message.id, index);
-      notify();
+      if (message.clientMsgId)
+        indexByClientMsgId.set(message.clientMsgId, index);
+      revision += 1;
+      const mutation = {
+        type: "message_updated",
+        index,
+        message: cloneMessage(message)
+      };
+      notify(mutation);
       return {
-        transcript: snapshot(),
-        mutation: {
-          type: "message_updated",
-          message: cloneMessage(message)
-        }
+        mutation
       };
     }
     function isReconcileableOutgoingUserMessage(message, clientMsgId) {
@@ -3692,12 +3707,8 @@
       if (!clientMsgId) {
         return void 0;
       }
-      for (const [index, message] of transcript.entries()) {
-        if (isReconcileableOutgoingUserMessage(message, clientMsgId)) {
-          return index;
-        }
-      }
-      return void 0;
+      const index = indexByClientMsgId.get(clientMsgId);
+      return index !== void 0 && isReconcileableOutgoingUserMessage(transcript[index], clientMsgId) ? index : void 0;
     }
     function reconcileOptimisticUserMessage(existing, normalized) {
       const hasServerTs = normalized.ts !== null && normalized.ts !== void 0;
@@ -3757,6 +3768,18 @@
       getSnapshot() {
         return snapshot();
       },
+      getView() {
+        return transcript;
+      },
+      getEntry(id) {
+        const index = indexById.get(id);
+        if (index === void 0)
+          return null;
+        return { index, message: transcript[index] };
+      },
+      getRevision() {
+        return revision;
+      },
       subscribe(listener) {
         listeners.add(listener);
         return () => {
@@ -3765,9 +3788,7 @@
       },
       ingest(message) {
         if (!shouldStoreInTranscript(message)) {
-          return {
-            transcript: snapshot()
-          };
+          return {};
         }
         const payload = asPayload(message);
         if (message.type === "chat::partial" && !asNonEmptyString(payload["turn_id"])) {
@@ -3830,7 +3851,9 @@
       reset() {
         transcript.length = 0;
         indexById.clear();
-        notify();
+        indexByClientMsgId.clear();
+        revision += 1;
+        notify(null);
       },
       upsertLocalMessage(message) {
         const existingIndex = indexById.get(message.id);
@@ -4108,7 +4131,7 @@
     let restoredSessionKey = null;
     let persistenceTimer = null;
     let persistenceOperation = Promise.resolve();
-    const pendingPersistedMessageIds = /* @__PURE__ */ new Set();
+    const pendingPersistedMessages = /* @__PURE__ */ new Map();
     let unsubscribeFromClient = null;
     let destroyed = false;
     let lastError = null;
@@ -4151,7 +4174,7 @@
       if (persistenceTimer !== null)
         clearTimeout(persistenceTimer);
       persistenceTimer = null;
-      pendingPersistedMessageIds.clear();
+      pendingPersistedMessages.clear();
       persistenceSessionKey = null;
     }
     async function flushTranscriptPersistence() {
@@ -4160,14 +4183,11 @@
       persistenceTimer = null;
       const persistence = transcriptPersistence;
       const sessionKey = persistenceSessionKey;
-      if (!persistence || !sessionKey || pendingPersistedMessageIds.size === 0)
+      if (!persistence || !sessionKey || pendingPersistedMessages.size === 0)
         return;
-      const changedIds = Array.from(pendingPersistedMessageIds);
-      pendingPersistedMessageIds.clear();
+      const changedMessages = Array.from(pendingPersistedMessages.values());
+      pendingPersistedMessages.clear();
       const now = Date.now();
-      const snapshot = transcriptStore.getSnapshot();
-      const changedIdSet = new Set(changedIds);
-      const changedMessages = snapshot.flatMap((message, order) => changedIdSet.has(message.id) ? [{ order, message: sanitizeTranscriptMessage(message) }] : []);
       persistenceOperation = persistenceOperation.then(() => persistence.save(sessionKey, {
         version: TRANSCRIPT_SCHEMA_VERSION,
         sessionKey,
@@ -4176,10 +4196,13 @@
       }, changedMessages)).catch(disablePersistence);
       await persistenceOperation;
     }
-    function queueTranscriptPersistence(message) {
-      if (!message || !transcriptPersistence || !persistenceSessionKey)
+    function queueTranscriptPersistence(mutation) {
+      if (!mutation || !transcriptPersistence || !persistenceSessionKey)
         return;
-      pendingPersistedMessageIds.add(message.id);
+      pendingPersistedMessages.set(mutation.message.id, {
+        order: mutation.index,
+        message: sanitizeTranscriptMessage(mutation.message)
+      });
       if (persistenceTimer !== null)
         return;
       persistenceTimer = setTimeout(() => {
@@ -4224,7 +4247,7 @@
       if (persistenceTimer !== null)
         clearTimeout(persistenceTimer);
       persistenceTimer = null;
-      pendingPersistedMessageIds.clear();
+      pendingPersistedMessages.clear();
       persistenceSessionKey = null;
       persistenceOperation = persistenceOperation.then(() => persistence.delete(sessionKey)).catch(disablePersistence);
     }
@@ -4269,7 +4292,7 @@
       }
       return { locked: false };
     }
-    function computeState() {
+    function computeState(transcript, transcriptMutation) {
       const channelState = getChannelState();
       const sessionState = getSessionState();
       const sessionId = getSessionId();
@@ -4295,7 +4318,9 @@
           isConnected: channelState === "OPEN",
           isStale: channelState === "STALE" || channelState === "RECONNECTING"
         },
-        transcript: transcriptStore.getSnapshot().map((message) => cloneMessage(message)),
+        transcript,
+        transcriptRevision: transcriptStore.getRevision(),
+        transcriptMutation,
         input,
         auth: { ...authState },
         escalation: cloneEscalation(escalation),
@@ -4314,8 +4339,8 @@
     function emit(event) {
       options.onEvent?.(event);
     }
-    function emitStateChanged() {
-      const state = computeState();
+    function emitStateChanged(transcriptMutation = null) {
+      const state = computeState(transcriptStore.getView(), transcriptMutation);
       for (const listener of Array.from(listeners)) {
         listener(state);
       }
@@ -4477,7 +4502,7 @@
         return;
       }
       const result = transcriptStore.ingest(message);
-      queueTranscriptPersistence(result.mutation?.message);
+      queueTranscriptPersistence(result.mutation);
       if (result.mutation) {
         emit({
           type: result.mutation.type,
@@ -4535,7 +4560,7 @@
         const payload = asPayload(message);
         lastError = createChatError(typeof payload["code"] === "string" ? payload["code"] : "system_error", typeof payload["message"] === "string" ? payload["message"] : "Runtime error", "system::error");
       }
-      emitStateChanged();
+      emitStateChanged(result.mutation ?? null);
     }
     async function runAction(action) {
       try {
@@ -4549,7 +4574,7 @@
     }
     return {
       getState() {
-        return computeState();
+        return computeState(transcriptStore.getSnapshot(), null);
       },
       subscribe(listener) {
         listeners.add(listener);
@@ -4607,8 +4632,8 @@
           originalPayload: sendPayload
         };
         const optimisticResult = transcriptStore.upsertLocalMessage(optimistic);
-        queueTranscriptPersistence(optimisticResult.mutation?.message);
-        emitStateChanged();
+        queueTranscriptPersistence(optimisticResult.mutation);
+        emitStateChanged(optimisticResult.mutation ?? null);
         try {
           debug.log("[sdk-ui] sendMessage -> client.sendMessage start", summarizeSendPayload2(sendPayload));
           await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
@@ -4618,13 +4643,13 @@
             retryable: false,
             sendError: void 0
           });
-          queueTranscriptPersistence(sentResult.mutation?.message);
+          queueTranscriptPersistence(sentResult.mutation);
           awaitingAnswer = true;
           debug.log("[sdk-ui] sendMessage -> client.sendMessage done", {
             clientMsgId,
             ok: true
           });
-          emitStateChanged();
+          emitStateChanged(sentResult.mutation ?? null);
           return { ok: true, messageId: id, clientMsgId };
         } catch (err) {
           awaitingAnswer = false;
@@ -4634,14 +4659,14 @@
           });
           const sendError = err instanceof Error ? err.message : "Message was not sent";
           const failedResult = transcriptStore.upsertLocalMessage({ ...optimistic, deliveryStatus: "failed", retryable: true, sendError });
-          queueTranscriptPersistence(failedResult.mutation?.message);
-          emitStateChanged();
+          queueTranscriptPersistence(failedResult.mutation);
+          emitStateChanged(failedResult.mutation ?? null);
           return { ok: false, messageId: id, clientMsgId, error: sendError };
         }
       },
       async retryMessage(messageId) {
-        const snapshot = transcriptStore.getSnapshot();
-        const msg = snapshot.find((m) => m.id === messageId && m.role === "user" && m.retryable === true && m.originalPayload !== void 0);
+        const entry = transcriptStore.getEntry(messageId);
+        const msg = entry?.message && entry.message.role === "user" && entry.message.retryable === true && entry.message.originalPayload !== void 0 ? cloneMessage(entry.message) : null;
         if (!msg?.originalPayload || !msg.clientMsgId)
           return null;
         const clientMsgId = msg.clientMsgId;
@@ -4652,8 +4677,8 @@
           sendError: void 0
         };
         const retryingResult = transcriptStore.upsertLocalMessage(updated);
-        queueTranscriptPersistence(retryingResult.mutation?.message);
-        emitStateChanged();
+        queueTranscriptPersistence(retryingResult.mutation);
+        emitStateChanged(retryingResult.mutation ?? null);
         try {
           debug.log("[sdk-ui] retryMessage -> client.sendMessage start", summarizeSendPayload2(msg.originalPayload));
           await withTimeout(options.client.sendMessage(msg.originalPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
@@ -4663,13 +4688,13 @@
             retryable: false,
             sendError: void 0
           });
-          queueTranscriptPersistence(sentResult.mutation?.message);
+          queueTranscriptPersistence(sentResult.mutation);
           awaitingAnswer = true;
           debug.log("[sdk-ui] retryMessage -> client.sendMessage done", {
             clientMsgId,
             ok: true
           });
-          emitStateChanged();
+          emitStateChanged(sentResult.mutation ?? null);
           return { ok: true, messageId, clientMsgId };
         } catch (err) {
           awaitingAnswer = false;
@@ -4679,8 +4704,8 @@
           });
           const sendError = err instanceof Error ? err.message : "Message was not sent";
           const failedResult = transcriptStore.upsertLocalMessage({ ...updated, deliveryStatus: "failed", retryable: true, sendError });
-          queueTranscriptPersistence(failedResult.mutation?.message);
-          emitStateChanged();
+          queueTranscriptPersistence(failedResult.mutation);
+          emitStateChanged(failedResult.mutation ?? null);
           return { ok: false, messageId, clientMsgId, error: sendError };
         }
       },
@@ -12123,6 +12148,68 @@
   var DEFAULT_ROW_HEIGHT = 72;
   var ROW_GAP = 8;
   var BOTTOM_FOLLOW_THRESHOLD = 96;
+  var HeightIndex = class {
+    constructor() {
+      this.values = [];
+      this.tree = [0];
+      this.capacity = 0;
+    }
+    reset(values) {
+      this.values = [...values];
+      this.capacity = 16;
+      while (this.capacity < Math.max(16, values.length * 2)) this.capacity *= 2;
+      this.tree = new Array(this.capacity + 1).fill(0);
+      for (let index = 0; index < values.length; index += 1) this.add(index, values[index]);
+    }
+    append(value) {
+      if (this.values.length >= this.capacity) {
+        this.reset([...this.values, value]);
+        return;
+      }
+      const index = this.values.length;
+      this.values.push(value);
+      this.add(index, value);
+    }
+    get(index) {
+      return this.values[index] ?? 0;
+    }
+    set(index, value) {
+      const delta = value - this.get(index);
+      if (delta === 0) return;
+      this.values[index] = value;
+      this.add(index, delta);
+    }
+    offset(index) {
+      let sum = 0;
+      for (let cursor = Math.min(index, this.values.length); cursor > 0; cursor -= cursor & -cursor) {
+        sum += this.tree[cursor] ?? 0;
+      }
+      return sum;
+    }
+    get total() {
+      return this.offset(this.values.length);
+    }
+    findIndexAtOffset(offset) {
+      if (this.values.length === 0) return 0;
+      let index = 0;
+      let sum = 0;
+      let bit = 1;
+      while (bit << 1 <= this.capacity) bit <<= 1;
+      for (; bit > 0; bit >>= 1) {
+        const next = index + bit;
+        if (next <= this.values.length && sum + this.tree[next] <= offset) {
+          index = next;
+          sum += this.tree[next];
+        }
+      }
+      return Math.min(index, this.values.length - 1);
+    }
+    add(index, delta) {
+      for (let cursor = index + 1; cursor <= this.capacity; cursor += cursor & -cursor) {
+        this.tree[cursor] += delta;
+      }
+    }
+  };
   var TranscriptVirtualizer = class {
     constructor(viewport) {
       this.topSpacer = document.createElement("div");
@@ -12130,8 +12217,9 @@
       this.bottomSpacer = document.createElement("div");
       this.mounted = /* @__PURE__ */ new Map();
       this.heights = /* @__PURE__ */ new Map();
+      this.indexByKey = /* @__PURE__ */ new Map();
+      this.heightIndex = new HeightIndex();
       this.items = [];
-      this.offsets = [0];
       this.renderRow = () => null;
       this.scopeKey = "";
       this.followBottom = true;
@@ -12174,19 +12262,59 @@
         this.followBottom = nearBottom;
       }
       this.items = items;
+      this.indexByKey.clear();
+      for (const [index, item] of items.entries()) this.indexByKey.set(item.key, index);
       this.renderRow = renderRow;
-      this.rebuildOffsets();
+      this.heightIndex.reset(items.map((item) => this.heights.get(item.key) ?? DEFAULT_ROW_HEIGHT));
       let targetScrollTop = this.viewport.scrollTop;
       if (this.followBottom) {
         targetScrollTop = Math.max(0, this.totalHeight - viewportHeight);
       } else if (anchor) {
         const anchorIndex = this.items.findIndex((item) => item.key === anchor.key);
         if (anchorIndex >= 0) {
-          targetScrollTop = this.offsets[anchorIndex] + anchor.offset;
+          targetScrollTop = this.heightIndex.offset(anchorIndex) + anchor.offset;
         }
       }
       this.renderWindow(targetScrollTop);
       this.viewport.scrollTop = targetScrollTop;
+      this.measureMountedRows();
+    }
+    updateItem(index, item, renderRow) {
+      if (this.destroyed || index < 0 || index >= this.items.length) return;
+      const previous = this.items[index];
+      if (previous.key !== item.key) {
+        this.indexByKey.delete(previous.key);
+        this.indexByKey.set(item.key, index);
+        this.heightIndex.set(index, this.heights.get(item.key) ?? DEFAULT_ROW_HEIGHT);
+      }
+      this.items[index] = item;
+      this.renderRow = renderRow;
+      this.renderWindow(this.viewport.scrollTop);
+      this.measureMountedRows();
+    }
+    appendItem(item, renderRow) {
+      if (this.destroyed) return;
+      const followBottom = this.followBottom;
+      this.indexByKey.set(item.key, this.items.length);
+      this.items.push(item);
+      this.heightIndex.append(this.heights.get(item.key) ?? DEFAULT_ROW_HEIGHT);
+      this.renderRow = renderRow;
+      const scrollTop = followBottom ? Math.max(0, this.totalHeight - this.viewportHeight) : this.viewport.scrollTop;
+      this.renderWindow(scrollTop);
+      this.viewport.scrollTop = scrollTop;
+      this.measureMountedRows();
+    }
+    refreshMounted(renderRow, getVersion) {
+      if (this.destroyed) return;
+      this.renderRow = renderRow;
+      for (const key of this.mounted.keys()) {
+        const index = this.indexByKey.get(key);
+        if (index === void 0) continue;
+        const item = this.items[index];
+        const version = getVersion(item.value);
+        if (version !== item.version) this.items[index] = { ...item, version };
+      }
+      this.renderWindow(this.viewport.scrollTop);
       this.measureMountedRows();
     }
     destroy() {
@@ -12200,7 +12328,7 @@
       return this.viewport.clientHeight || 600;
     }
     get totalHeight() {
-      return this.offsets[this.offsets.length - 1] ?? 0;
+      return this.heightIndex.total;
     }
     onResize(entries2) {
       let geometryChanged = false;
@@ -12221,14 +12349,14 @@
         const previousHeight = this.heights.get(key) ?? DEFAULT_ROW_HEIGHT;
         if (Math.abs(previousHeight - nextHeight) < 0.5) continue;
         this.heights.set(key, nextHeight);
-        const changedIndex = this.items.findIndex((item) => item.key === key);
+        const changedIndex = this.indexByKey.get(key) ?? -1;
+        if (changedIndex >= 0) this.heightIndex.set(changedIndex, nextHeight);
         if (!this.followBottom && changedIndex >= 0 && changedIndex < anchorIndex) {
           correction += nextHeight - previousHeight;
         }
         geometryChanged = true;
       }
       if (!geometryChanged) return;
-      this.rebuildOffsets();
       if (this.followBottom) {
         this.viewport.scrollTop = Math.max(0, this.totalHeight - this.viewportHeight);
       } else if (correction !== 0) {
@@ -12236,32 +12364,17 @@
       }
       this.renderWindow(this.viewport.scrollTop);
     }
-    rebuildOffsets() {
-      const offsets = new Array(this.items.length + 1);
-      offsets[0] = 0;
-      for (let index = 0; index < this.items.length; index += 1) {
-        offsets[index + 1] = offsets[index] + (this.heights.get(this.items[index].key) ?? DEFAULT_ROW_HEIGHT);
-      }
-      this.offsets = offsets;
-    }
     captureAnchor() {
       if (this.items.length === 0) return null;
       const index = this.findIndexAtOffset(this.viewport.scrollTop);
       return {
         key: this.items[index]?.key ?? this.items[0].key,
-        offset: this.viewport.scrollTop - this.offsets[index]
+        offset: this.viewport.scrollTop - this.heightIndex.offset(index)
       };
     }
     findIndexAtOffset(offset) {
       if (this.items.length === 0) return 0;
-      let low = 0;
-      let high = this.items.length;
-      while (low < high) {
-        const middle = Math.floor((low + high) / 2);
-        if (this.offsets[middle + 1] <= offset) low = middle + 1;
-        else high = middle;
-      }
-      return Math.min(low, this.items.length - 1);
+      return this.heightIndex.findIndexAtOffset(offset);
     }
     renderWindow(scrollTop) {
       if (this.items.length === 0) {
@@ -12315,8 +12428,8 @@
           cursor = cursor.nextSibling;
         }
       }
-      this.topSpacer.style.height = `${this.offsets[start]}px`;
-      this.bottomSpacer.style.height = `${Math.max(0, this.totalHeight - this.offsets[end])}px`;
+      this.topSpacer.style.height = `${this.heightIndex.offset(start)}px`;
+      this.bottomSpacer.style.height = `${Math.max(0, this.totalHeight - this.heightIndex.offset(end))}px`;
     }
     measureMountedRows() {
       if (this.resizeObserver) return;
@@ -12326,11 +12439,12 @@
         const height = measuredHeight + ROW_GAP;
         if (measuredHeight > 0 && Math.abs((this.heights.get(key) ?? DEFAULT_ROW_HEIGHT) - height) >= 0.5) {
           this.heights.set(key, height);
+          const index = this.indexByKey.get(key);
+          if (index !== void 0) this.heightIndex.set(index, height);
           changed = true;
         }
       }
       if (changed) {
-        this.rebuildOffsets();
         this.renderWindow(this.viewport.scrollTop);
       }
     }
@@ -12983,7 +13097,7 @@
     const hasQuestionControls = message.type === "chat::question" && Array.isArray(message.meta?.["questions"]) && normalizeQuestionFields2(message.meta["questions"]).length > 0;
     return hasTextContent || getMessageAttachments(message).length > 0 || hasQuestionControls;
   }
-  var transcriptVirtualizers = /* @__PURE__ */ new WeakMap();
+  var transcriptProjections = /* @__PURE__ */ new WeakMap();
   function getMessageVersion(message, state) {
     const content = typeof message.content === "string" ? message.content : JSON.stringify(message.content);
     const meta = message.meta ? JSON.stringify(message.meta) : "";
@@ -13001,23 +13115,50 @@
     ].join("\0");
   }
   function renderTranscript(transcriptEl, state, options) {
-    const visibleMessages = state.chat.transcript.filter(
-      (message) => !shouldHideTranscriptMessage(message) && isTranscriptMessageRenderable(message)
-    );
+    const transcript = state.chat.transcript;
+    const scopeKey = `${state.isHistoricalView ? "history" : "live"}:${state.chat.connection.sessionId ?? ""}`;
+    const renderRow = (message) => createTranscriptMessage(message, state, options);
+    const existing = transcriptProjections.get(transcriptEl);
+    const mutation = state.chat.transcriptMutation;
+    if (existing && existing.scopeKey === scopeKey && existing.transcript === transcript && existing.revision === state.chat.transcriptRevision) {
+      existing.virtualizer.refreshMounted(renderRow, (message) => getMessageVersion(message, state));
+      return;
+    }
+    if (existing && existing.scopeKey === scopeKey && existing.transcript === transcript && mutation && state.chat.transcriptRevision === existing.revision + 1) {
+      const message = mutation.message;
+      const renderable = !shouldHideTranscriptMessage(message) && isTranscriptMessageRenderable(message);
+      const projectedIndex = existing.itemIndexByMessageId.get(message.id);
+      const item = {
+        key: `${message.id}:0`,
+        version: getMessageVersion(message, state),
+        value: message
+      };
+      if (mutation.type === "message_updated" && renderable && projectedIndex !== void 0) {
+        existing.virtualizer.updateItem(projectedIndex, item, renderRow);
+        existing.revision = state.chat.transcriptRevision;
+        existing.virtualizer.refreshMounted(renderRow, (value) => getMessageVersion(value, state));
+        return;
+      }
+      if (mutation.type === "message_added" && renderable && projectedIndex === void 0 && mutation.index === transcript.length - 1) {
+        const nextIndex = existing.itemIndexByMessageId.size;
+        existing.itemIndexByMessageId.set(message.id, nextIndex);
+        existing.virtualizer.appendItem(item, renderRow);
+        existing.revision = state.chat.transcriptRevision;
+        existing.virtualizer.refreshMounted(renderRow, (value) => getMessageVersion(value, state));
+        return;
+      }
+    }
+    const visibleMessages = transcript.filter((message) => !shouldHideTranscriptMessage(message) && isTranscriptMessageRenderable(message));
     if (visibleMessages.length === 0) {
-      transcriptVirtualizers.get(transcriptEl)?.destroy();
-      transcriptVirtualizers.delete(transcriptEl);
+      existing?.virtualizer.destroy();
+      transcriptProjections.delete(transcriptEl);
       const empty = document.createElement("div");
       empty.className = "cortex-widget__empty";
       empty.textContent = state.isHistoricalView ? "No messages in this chat yet." : "New chat";
       transcriptEl.replaceChildren(empty);
       return;
     }
-    let virtualizer = transcriptVirtualizers.get(transcriptEl);
-    if (!virtualizer) {
-      virtualizer = new TranscriptVirtualizer(transcriptEl);
-      transcriptVirtualizers.set(transcriptEl, virtualizer);
-    }
+    const virtualizer = existing?.virtualizer ?? new TranscriptVirtualizer(transcriptEl);
     const occurrences = /* @__PURE__ */ new Map();
     const items = visibleMessages.map((message) => {
       const occurrence = occurrences.get(message.id) ?? 0;
@@ -13028,14 +13169,22 @@
         value: message
       };
     });
-    const scopeKey = `${state.isHistoricalView ? "history" : "live"}:${state.chat.connection.sessionId ?? ""}`;
-    virtualizer.update(items, (message) => createTranscriptMessage(message, state, options), scopeKey);
+    const itemIndexByMessageId = /* @__PURE__ */ new Map();
+    for (const [index, item] of items.entries()) itemIndexByMessageId.set(item.value.id, index);
+    virtualizer.update(items, renderRow, scopeKey);
+    transcriptProjections.set(transcriptEl, {
+      virtualizer,
+      scopeKey,
+      revision: state.chat.transcriptRevision,
+      transcript,
+      itemIndexByMessageId
+    });
   }
   function destroyTranscriptRenderer(transcriptEl) {
-    transcriptVirtualizers.get(transcriptEl)?.destroy();
-    transcriptVirtualizers.delete(transcriptEl);
+    transcriptProjections.get(transcriptEl)?.virtualizer.destroy();
+    transcriptProjections.delete(transcriptEl);
   }
-  function renderWidget(dom, state, options, attachmentsAvailable, isUploading, opts) {
+  function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
     applyResolvedTheme(dom.host, dom.root, options.theme, {
       dark: "cortex-widget--dark",
       light: "cortex-widget--light"
@@ -13122,9 +13271,7 @@
       dom.fileChipMeta.textContent = "";
       dom.fileChipRemove.disabled = true;
     }
-    if (!opts?.skipTranscript) {
-      renderTranscript(dom.transcript, state, options);
-    }
+    renderTranscript(dom.transcript, state, options);
   }
 
   // src/chat-widget.ts
@@ -13141,6 +13288,8 @@
       isStale: false
     },
     transcript: [],
+    transcriptRevision: 0,
+    transcriptMutation: null,
     input: {
       locked: false
     },
@@ -13157,7 +13306,9 @@
         correspondent: state.session.correspondent ? { ...state.session.correspondent } : null
       },
       connection: { ...state.connection },
-      transcript: [...state.transcript],
+      transcript: state.transcript,
+      transcriptRevision: state.transcriptRevision,
+      transcriptMutation: state.transcriptMutation,
       input: { ...state.input },
       auth: { ...state.auth },
       escalation: state.escalation ? { ...state.escalation } : null,
@@ -13215,12 +13366,12 @@
     constructor(args) {
       this.liveChatState = EMPTY_CHAT_STATE;
       this.historicalTranscript = [];
+      this.historicalTranscriptRevision = 0;
       this.chatView = { kind: "live" };
       this.historyController = null;
       this.historyClientKey = null;
       this.liveConnected = false;
       this.liveConnectPromise = null;
-      this.lastTranscriptRenderKey = "";
       this.mounted = false;
       this.domCleanup = /* @__PURE__ */ new Set();
       this.unsubscribeController = null;
@@ -13380,6 +13531,7 @@
       }
       this.chatView = { kind: "live" };
       this.historicalTranscript = [];
+      this.historicalTranscriptRevision += 1;
       this.ui.error = null;
       this.notifyAndRender();
     }
@@ -13389,6 +13541,7 @@
       }
       this.chatView = { kind: "historical", sessionId };
       this.historicalTranscript = [...messages];
+      this.historicalTranscriptRevision += 1;
       this.ui.isAwaitingAnswer = false;
       this.ui.isTyping = false;
       this.clearDraftComposer();
@@ -13401,6 +13554,7 @@
       }
       this.chatView = { kind: "live" };
       this.historicalTranscript = [];
+      this.historicalTranscriptRevision += 1;
       this.ui.error = null;
       this.ui.isAwaitingAnswer = false;
       this.ui.isTyping = false;
@@ -13603,7 +13757,9 @@ ${token}`;
           session: {
             correspondent: deriveCorrespondentFromTranscript(this.historicalTranscript)
           },
-          transcript: [...this.historicalTranscript],
+          transcript: this.historicalTranscript,
+          transcriptRevision: this.historicalTranscriptRevision,
+          transcriptMutation: null,
           input: { locked: true, reason: "historical_read_only" }
         };
       }
@@ -13638,34 +13794,10 @@ ${token}`;
       }
       this.syncTextareaValue();
       const state = this.getPublicState();
-      const transcriptKey = this.computeTranscriptKey(state);
-      const skipTranscript = transcriptKey === this.lastTranscriptRenderKey;
-      if (!skipTranscript) {
-        this.lastTranscriptRenderKey = transcriptKey;
-      }
-      renderWidget(this.dom, state, this.options, this.ui.attachmentsAvailable, this.ui.isUploading, { skipTranscript });
+      renderWidget(this.dom, state, this.options, this.ui.attachmentsAvailable, this.ui.isUploading);
       this.resizeComposerTextarea();
       this.historyController?.setLiveSessionId(this.getLiveSessionId());
       this.options.onStateChange?.(state);
-    }
-    computeTranscriptKey(state) {
-      const msgs = state.chat.transcript;
-      if (msgs.length === 0) {
-        return `${state.isHistoricalView ? "1" : "0"}:0:`;
-      }
-      const msgSig = msgs.map((message) => {
-        const content = message.content;
-        const cLen = Array.isArray(content) ? content.join("").length : String(content ?? "").length;
-        return [
-          message.id,
-          message.type,
-          message.status ?? "",
-          String(message.deliveryStatus ?? ""),
-          message.ts ?? "",
-          cLen
-        ].join("|");
-      }).join(";");
-      return `${state.isHistoricalView ? "1" : "0"}:${msgs.length}:${msgSig}`;
     }
     setSelectedFile(file) {
       this.ui.selectedFileValue = file;

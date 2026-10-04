@@ -21,6 +21,75 @@ interface Anchor {
   offset: number;
 }
 
+class HeightIndex {
+  private values: number[] = [];
+  private tree: number[] = [0];
+  private capacity = 0;
+
+  reset(values: number[]): void {
+    this.values = [...values];
+    this.capacity = 16;
+    while (this.capacity < Math.max(16, values.length * 2)) this.capacity *= 2;
+    this.tree = new Array<number>(this.capacity + 1).fill(0);
+    for (let index = 0; index < values.length; index += 1) this.add(index, values[index]);
+  }
+
+  append(value: number): void {
+    if (this.values.length >= this.capacity) {
+      this.reset([...this.values, value]);
+      return;
+    }
+    const index = this.values.length;
+    this.values.push(value);
+    this.add(index, value);
+  }
+
+  get(index: number): number {
+    return this.values[index] ?? 0;
+  }
+
+  set(index: number, value: number): void {
+    const delta = value - this.get(index);
+    if (delta === 0) return;
+    this.values[index] = value;
+    this.add(index, delta);
+  }
+
+  offset(index: number): number {
+    let sum = 0;
+    for (let cursor = Math.min(index, this.values.length); cursor > 0; cursor -= cursor & -cursor) {
+      sum += this.tree[cursor] ?? 0;
+    }
+    return sum;
+  }
+
+  get total(): number {
+    return this.offset(this.values.length);
+  }
+
+  findIndexAtOffset(offset: number): number {
+    if (this.values.length === 0) return 0;
+    let index = 0;
+    let sum = 0;
+    let bit = 1;
+    while ((bit << 1) <= this.capacity) bit <<= 1;
+    for (; bit > 0; bit >>= 1) {
+      const next = index + bit;
+      if (next <= this.values.length && sum + this.tree[next] <= offset) {
+        index = next;
+        sum += this.tree[next];
+      }
+    }
+    return Math.min(index, this.values.length - 1);
+  }
+
+  private add(index: number, delta: number): void {
+    for (let cursor = index + 1; cursor <= this.capacity; cursor += cursor & -cursor) {
+      this.tree[cursor] += delta;
+    }
+  }
+}
+
 export class TranscriptVirtualizer<T> {
   private readonly viewport: HTMLElement;
   private readonly topSpacer = document.createElement('div');
@@ -28,9 +97,10 @@ export class TranscriptVirtualizer<T> {
   private readonly bottomSpacer = document.createElement('div');
   private readonly mounted = new Map<string, MountedRow>();
   private readonly heights = new Map<string, number>();
+  private readonly indexByKey = new Map<string, number>();
+  private readonly heightIndex = new HeightIndex();
   private readonly resizeObserver: ResizeObserver | null;
   private items: VirtualTranscriptItem<T>[] = [];
-  private offsets: number[] = [0];
   private renderRow: (value: T) => HTMLElement | null = () => null;
   private scopeKey = '';
   private followBottom = true;
@@ -82,8 +152,10 @@ export class TranscriptVirtualizer<T> {
     }
 
     this.items = items;
+    this.indexByKey.clear();
+    for (const [index, item] of items.entries()) this.indexByKey.set(item.key, index);
     this.renderRow = renderRow;
-    this.rebuildOffsets();
+    this.heightIndex.reset(items.map((item) => this.heights.get(item.key) ?? DEFAULT_ROW_HEIGHT));
 
     let targetScrollTop = this.viewport.scrollTop;
     if (this.followBottom) {
@@ -91,12 +163,65 @@ export class TranscriptVirtualizer<T> {
     } else if (anchor) {
       const anchorIndex = this.items.findIndex((item) => item.key === anchor.key);
       if (anchorIndex >= 0) {
-        targetScrollTop = this.offsets[anchorIndex] + anchor.offset;
+        targetScrollTop = this.heightIndex.offset(anchorIndex) + anchor.offset;
       }
     }
 
     this.renderWindow(targetScrollTop);
     this.viewport.scrollTop = targetScrollTop;
+    this.measureMountedRows();
+  }
+
+  updateItem(
+    index: number,
+    item: VirtualTranscriptItem<T>,
+    renderRow: (value: T) => HTMLElement | null,
+  ): void {
+    if (this.destroyed || index < 0 || index >= this.items.length) return;
+    const previous = this.items[index];
+    if (previous.key !== item.key) {
+      this.indexByKey.delete(previous.key);
+      this.indexByKey.set(item.key, index);
+      this.heightIndex.set(index, this.heights.get(item.key) ?? DEFAULT_ROW_HEIGHT);
+    }
+    this.items[index] = item;
+    this.renderRow = renderRow;
+    this.renderWindow(this.viewport.scrollTop);
+    this.measureMountedRows();
+  }
+
+  appendItem(
+    item: VirtualTranscriptItem<T>,
+    renderRow: (value: T) => HTMLElement | null,
+  ): void {
+    if (this.destroyed) return;
+    const followBottom = this.followBottom;
+    this.indexByKey.set(item.key, this.items.length);
+    this.items.push(item);
+    this.heightIndex.append(this.heights.get(item.key) ?? DEFAULT_ROW_HEIGHT);
+    this.renderRow = renderRow;
+    const scrollTop = followBottom
+      ? Math.max(0, this.totalHeight - this.viewportHeight)
+      : this.viewport.scrollTop;
+    this.renderWindow(scrollTop);
+    this.viewport.scrollTop = scrollTop;
+    this.measureMountedRows();
+  }
+
+  refreshMounted(
+    renderRow: (value: T) => HTMLElement | null,
+    getVersion: (value: T) => string,
+  ): void {
+    if (this.destroyed) return;
+    this.renderRow = renderRow;
+    for (const key of this.mounted.keys()) {
+      const index = this.indexByKey.get(key);
+      if (index === undefined) continue;
+      const item = this.items[index];
+      const version = getVersion(item.value);
+      if (version !== item.version) this.items[index] = { ...item, version };
+    }
+    this.renderWindow(this.viewport.scrollTop);
     this.measureMountedRows();
   }
 
@@ -113,7 +238,7 @@ export class TranscriptVirtualizer<T> {
   }
 
   private get totalHeight(): number {
-    return this.offsets[this.offsets.length - 1] ?? 0;
+    return this.heightIndex.total;
   }
 
   private readonly onScroll = (): void => {
@@ -147,7 +272,8 @@ export class TranscriptVirtualizer<T> {
       const previousHeight = this.heights.get(key) ?? DEFAULT_ROW_HEIGHT;
       if (Math.abs(previousHeight - nextHeight) < 0.5) continue;
       this.heights.set(key, nextHeight);
-      const changedIndex = this.items.findIndex((item) => item.key === key);
+      const changedIndex = this.indexByKey.get(key) ?? -1;
+      if (changedIndex >= 0) this.heightIndex.set(changedIndex, nextHeight);
       if (!this.followBottom && changedIndex >= 0 && changedIndex < anchorIndex) {
         correction += nextHeight - previousHeight;
       }
@@ -155,7 +281,6 @@ export class TranscriptVirtualizer<T> {
     }
 
     if (!geometryChanged) return;
-    this.rebuildOffsets();
     if (this.followBottom) {
       this.viewport.scrollTop = Math.max(0, this.totalHeight - this.viewportHeight);
     } else if (correction !== 0) {
@@ -164,35 +289,18 @@ export class TranscriptVirtualizer<T> {
     this.renderWindow(this.viewport.scrollTop);
   }
 
-  private rebuildOffsets(): void {
-    const offsets = new Array<number>(this.items.length + 1);
-    offsets[0] = 0;
-    for (let index = 0; index < this.items.length; index += 1) {
-      offsets[index + 1] = offsets[index]
-        + (this.heights.get(this.items[index].key) ?? DEFAULT_ROW_HEIGHT);
-    }
-    this.offsets = offsets;
-  }
-
   private captureAnchor(): Anchor | null {
     if (this.items.length === 0) return null;
     const index = this.findIndexAtOffset(this.viewport.scrollTop);
     return {
       key: this.items[index]?.key ?? this.items[0].key,
-      offset: this.viewport.scrollTop - this.offsets[index],
+      offset: this.viewport.scrollTop - this.heightIndex.offset(index),
     };
   }
 
   private findIndexAtOffset(offset: number): number {
     if (this.items.length === 0) return 0;
-    let low = 0;
-    let high = this.items.length;
-    while (low < high) {
-      const middle = Math.floor((low + high) / 2);
-      if (this.offsets[middle + 1] <= offset) low = middle + 1;
-      else high = middle;
-    }
-    return Math.min(low, this.items.length - 1);
+    return this.heightIndex.findIndexAtOffset(offset);
   }
 
   private renderWindow(scrollTop: number): void {
@@ -252,8 +360,8 @@ export class TranscriptVirtualizer<T> {
       }
     }
 
-    this.topSpacer.style.height = `${this.offsets[start]}px`;
-    this.bottomSpacer.style.height = `${Math.max(0, this.totalHeight - this.offsets[end])}px`;
+    this.topSpacer.style.height = `${this.heightIndex.offset(start)}px`;
+    this.bottomSpacer.style.height = `${Math.max(0, this.totalHeight - this.heightIndex.offset(end))}px`;
   }
 
   private measureMountedRows(): void {
@@ -264,11 +372,12 @@ export class TranscriptVirtualizer<T> {
       const height = measuredHeight + ROW_GAP;
       if (measuredHeight > 0 && Math.abs((this.heights.get(key) ?? DEFAULT_ROW_HEIGHT) - height) >= 0.5) {
         this.heights.set(key, height);
+        const index = this.indexByKey.get(key);
+        if (index !== undefined) this.heightIndex.set(index, height);
         changed = true;
       }
     }
     if (changed) {
-      this.rebuildOffsets();
       this.renderWindow(this.viewport.scrollTop);
     }
   }

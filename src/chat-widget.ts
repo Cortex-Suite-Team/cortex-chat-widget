@@ -35,6 +35,8 @@ const EMPTY_CHAT_STATE: ChatState = {
     isStale: false,
   },
   transcript: [],
+  transcriptRevision: 0,
+  transcriptMutation: null,
   input: {
     locked: false,
   },
@@ -53,7 +55,9 @@ function cloneChatState(state: ChatState): ChatState {
       correspondent: state.session.correspondent ? { ...state.session.correspondent } : null,
     },
     connection: { ...state.connection },
-    transcript: [...state.transcript],
+    transcript: state.transcript,
+    transcriptRevision: state.transcriptRevision,
+    transcriptMutation: state.transcriptMutation,
     input: { ...state.input },
     auth: { ...state.auth },
     escalation: state.escalation ? { ...state.escalation } : null,
@@ -138,12 +142,12 @@ export class ChatWidget {
   private controller!: ChatController;
   private liveChatState: ChatState = EMPTY_CHAT_STATE;
   private historicalTranscript: ChatMessageViewModel[] = [];
+  private historicalTranscriptRevision = 0;
   private chatView: ChatViewMode = { kind: 'live' };
   private historyController: HistoryController | null = null;
   private historyClientKey: string | null = null;
   private liveConnected = false;
   private liveConnectPromise: Promise<void> | null = null;
-  private lastTranscriptRenderKey = '';
   private mounted = false;
   private readonly domCleanup = new Set<() => void>();
   private unsubscribeController: (() => void) | null = null;
@@ -334,6 +338,7 @@ export class ChatWidget {
     }
     this.chatView = { kind: 'live' };
     this.historicalTranscript = [];
+    this.historicalTranscriptRevision += 1;
     this.ui.error = null;
     this.notifyAndRender();
   }
@@ -344,6 +349,7 @@ export class ChatWidget {
     }
     this.chatView = { kind: 'historical', sessionId };
     this.historicalTranscript = [...messages];
+    this.historicalTranscriptRevision += 1;
     this.ui.isAwaitingAnswer = false;
     this.ui.isTyping = false;
     this.clearDraftComposer();
@@ -357,6 +363,7 @@ export class ChatWidget {
     }
     this.chatView = { kind: 'live' };
     this.historicalTranscript = [];
+    this.historicalTranscriptRevision += 1;
     this.ui.error = null;
     this.ui.isAwaitingAnswer = false;
     this.ui.isTyping = false;
@@ -570,7 +577,9 @@ export class ChatWidget {
         session: {
           correspondent: deriveCorrespondentFromTranscript(this.historicalTranscript),
         },
-        transcript: [...this.historicalTranscript],
+        transcript: this.historicalTranscript,
+        transcriptRevision: this.historicalTranscriptRevision,
+        transcriptMutation: null,
         input: { locked: true, reason: 'historical_read_only' },
       };
     }
@@ -613,37 +622,10 @@ export class ChatWidget {
     }
     this.syncTextareaValue();
     const state = this.getPublicState();
-    const transcriptKey = this.computeTranscriptKey(state);
-    const skipTranscript = transcriptKey === this.lastTranscriptRenderKey;
-    if (!skipTranscript) {
-      this.lastTranscriptRenderKey = transcriptKey;
-    }
-    renderWidget(this.dom, state, this.options, this.ui.attachmentsAvailable, this.ui.isUploading, { skipTranscript });
+    renderWidget(this.dom, state, this.options, this.ui.attachmentsAvailable, this.ui.isUploading);
     this.resizeComposerTextarea();
     this.historyController?.setLiveSessionId(this.getLiveSessionId());
     this.options.onStateChange?.(state);
-  }
-
-  private computeTranscriptKey(state: CortexChatWidgetState): string {
-    const msgs = state.chat.transcript;
-    if (msgs.length === 0) {
-      return `${state.isHistoricalView ? '1' : '0'}:0:`;
-    }
-    const msgSig = msgs.map((message) => {
-      const content = message.content;
-      const cLen = Array.isArray(content)
-        ? (content as string[]).join('').length
-        : String(content ?? '').length;
-      return [
-        message.id,
-        message.type,
-        message.status ?? '',
-        String(message.deliveryStatus ?? ''),
-        message.ts ?? '',
-        cLen,
-      ].join('|');
-    }).join(';');
-    return `${state.isHistoricalView ? '1' : '0'}:${msgs.length}:${msgSig}`;
   }
 
   private setSelectedFile(file: File | null): void {

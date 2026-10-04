@@ -129,6 +129,12 @@ export interface ChatState {
     isStale: boolean;
   };
   transcript: ChatMessageViewModel[];
+  transcriptRevision: number;
+  transcriptMutation: {
+    type: 'message_added' | 'message_updated';
+    index: number;
+    message: ChatMessageViewModel;
+  } | null;
   input: {
     locked: boolean;
     reason?: string;
@@ -344,6 +350,8 @@ export function createMockChatState(
       ...(overrides.connection ?? {}),
     },
     transcript: overrides.transcript ?? [],
+    transcriptRevision: overrides.transcriptRevision ?? 0,
+    transcriptMutation: overrides.transcriptMutation ?? null,
     input: {
       locked: false,
       ...(overrides.input ?? {}),
