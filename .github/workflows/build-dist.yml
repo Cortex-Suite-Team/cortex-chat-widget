@@ -51,9 +51,22 @@ jobs:
           npm test
           npm run build
 
+      - name: Pack sdk-ui build artifact
+        working-directory: sdk-ui
+        run: |
+          mkdir -p ../sdk-ui-artifact
+          npm pack --ignore-scripts --pack-destination ../sdk-ui-artifact
+
       - name: Install dependencies
         working-directory: cortex-chat-widget
-        run: npm ci
+        run: |
+          npm install \
+            --no-save \
+            --package-lock=false \
+            --ignore-scripts \
+            --no-audit \
+            --no-fund \
+            ../sdk-ui-artifact/cortex-suite-sdk-ui-0.1.0.tgz
 
       - name: Typecheck
         working-directory: cortex-chat-widget
