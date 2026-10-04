@@ -84,9 +84,9 @@ mountCortexChat({
 
 ## File Attachment Note
 
-Stage 5 supports one file attachment when the active client exposes `uploadAttachment()` or `uploadFile()`.
+The widget supports one file attachment when the active client exposes the canonical `uploadFile()` API.
 
-If the client does not support uploads, the widget disables attachment UI up front instead of failing later.
+Uploads return an opaque session file reference (`sf_...`). The widget does not accept or expose legacy/internal File Layer identifiers. If the client does not support uploads, the widget disables attachment UI up front instead of failing later.
 
 ## Interactive Questions
 
@@ -144,12 +144,17 @@ widget.destroy();
 ## Relationship To Other Packages
 
 - `@cortex-suite/sdk` owns transport, connection lifecycle, and uploads
-- `@cortex-suite/sdk-ui` owns chat transcript and escalation behavior
+- `@cortex-suite/sdk-ui` owns normalized transcript state, browser-local transcript persistence, and escalation behavior
 - `@cortex-suite/chat-widget` owns DOM, styling, and embeddable UX
 
 This package is not the Control Plane operator cockpit.
 
+## Local Development
 
-cd D:\GitHub\Cortex\public\cortex-chat-widget
+Run development commands from the repository root. Do not rely on machine-specific checkout paths.
+
+```bash
+npm ci
 npm run build
 python -m http.server 8080
+```
