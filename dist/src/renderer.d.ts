@@ -3,6 +3,7 @@ export declare function applyResolvedTheme(host: HTMLElement, root: HTMLElement,
     light: string;
     dark: string;
 }): boolean;
+export declare function destroyTranscriptRenderer(transcriptEl: HTMLElement): void;
 export declare function renderWidget(dom: WidgetDom, state: CortexChatWidgetState, options: NormalizedWidgetOptions, attachmentsAvailable: boolean, isUploading: boolean, opts?: {
     skipTranscript?: boolean;
 }): void;

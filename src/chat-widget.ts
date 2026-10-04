@@ -8,7 +8,7 @@ import {
   getMessageFlags,
   isTerminalSessionState,
 } from './message-flags.js';
-import { applyResolvedTheme, renderWidget } from './renderer.js';
+import { applyResolvedTheme, destroyTranscriptRenderer, renderWidget } from './renderer.js';
 import type {
   ChatMessageViewModel,
   ChatViewMode,
@@ -319,6 +319,7 @@ export class ChatWidget {
       dispose();
       this.domCleanup.delete(dispose);
     }
+    destroyTranscriptRenderer(this.dom.transcript);
     const disconnectPromise = this.controller.disconnect();
     this.controller.destroy();
     this.dom.host.remove();

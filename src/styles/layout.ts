@@ -232,7 +232,24 @@ export const layoutStyles = `
   padding: 14px 14px 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
+}
+
+.cortex-widget__virtual-spacer {
+  flex: 0 0 auto;
+  width: 1px;
+  min-height: 0;
+  pointer-events: none;
+}
+
+.cortex-widget__virtual-rows {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+}
+
+.cortex-widget__virtual-rows > .cortex-widget__message {
+  margin-bottom: 8px;
 }
 
 .cortex-widget__message {

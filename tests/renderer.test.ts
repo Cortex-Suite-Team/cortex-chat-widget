@@ -1352,7 +1352,8 @@ describe('widget renderer behavior', () => {
     expect(style.textContent).toContain('flex: 0 0 auto;');
     expect(style.textContent).toContain('.cortex-widget__composer {');
     expect(body).toBeTruthy();
-    expect(transcript.children.length).toBeGreaterThan(10);
+    expect(transcript.children).toHaveLength(3);
+    expect(transcript.querySelectorAll('[data-testid="transcript-message"]').length).toBeGreaterThan(10);
     expect(header).toBeTruthy();
     expect(composer).toBeTruthy();
   });

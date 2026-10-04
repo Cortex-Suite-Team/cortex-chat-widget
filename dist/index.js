@@ -2099,7 +2099,24 @@ var layoutStyles = `
   padding: 14px 14px 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
+}
+
+.cortex-widget__virtual-spacer {
+  flex: 0 0 auto;
+  width: 1px;
+  min-height: 0;
+  pointer-events: none;
+}
+
+.cortex-widget__virtual-rows {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+}
+
+.cortex-widget__virtual-rows > .cortex-widget__message {
+  margin-bottom: 8px;
 }
 
 .cortex-widget__message {
@@ -3667,8 +3684,7 @@ function createTranscriptStore(options = {}) {
     };
   }
   function isReconcileableOutgoingUserMessage(message, clientMsgId) {
-    const originalPayloadMeta = isRecord(message.originalPayload?.meta) ? message.originalPayload.meta : null;
-    return message.id.startsWith("client:") && message.type === "chat::message" && message.role === "user" && message.clientMsgId === clientMsgId && (message.deliveryStatus === "sending" || message.deliveryStatus === "sent" || message.deliveryStatus === "failed") && originalPayloadMeta?.["client_msg_id"] === clientMsgId;
+    return message.id.startsWith("client:") && message.type === "chat::message" && message.role === "user" && message.clientMsgId === clientMsgId && (message.deliveryStatus === "sending" || message.deliveryStatus === "sent" || message.deliveryStatus === "failed") && message.meta?.["client_msg_id"] === clientMsgId && (message.originalPayload !== void 0 || message.meta?.["persisted_outgoing"] === true);
   }
   function findReconcileableOutgoingUserMessageIndex(clientMsgId) {
     if (!clientMsgId) {
@@ -3824,8 +3840,143 @@ function createTranscriptStore(options = {}) {
   };
 }
 
+// ../sdk-ui/dist/src/transcript-persistence.js
+var DEFAULT_TRANSCRIPT_TTL_MS = 7 * 24 * 60 * 60 * 1e3;
+var DATABASE_NAME = "cortex-sdk-ui";
+var DATABASE_VERSION = 1;
+var SESSIONS_STORE = "transcript-sessions";
+var MESSAGES_STORE = "transcript-messages";
+var SENSITIVE_KEY = /^(?:access_token|refresh_token|token|api_key|authorization|credentials?|password|secret|private.*file|file.*private|file_id|storage_id|file_layer_id)$/;
+function sanitizeValue(value) {
+  if (Array.isArray(value))
+    return value.map(sanitizeValue);
+  if (!isRecord(value))
+    return value;
+  const result = {};
+  for (const [key, child] of Object.entries(value)) {
+    const normalizedKey = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/-/g, "_").toLowerCase();
+    if (!SENSITIVE_KEY.test(normalizedKey))
+      result[key] = sanitizeValue(child);
+  }
+  return result;
+}
+function sanitizeTranscriptMessage(message) {
+  const safe = sanitizeValue(cloneMessage(message));
+  if (message.originalPayload && message.id.startsWith("client:")) {
+    safe.meta = { ...safe.meta ?? {}, persisted_outgoing: true };
+  }
+  delete safe.originalPayload;
+  return safe;
+}
+function requestResult(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed"));
+  });
+}
+function transactionDone(transaction) {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB transaction failed"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
+  });
+}
+function openDatabase(factory) {
+  return new Promise((resolve, reject) => {
+    const request = factory.open(DATABASE_NAME, DATABASE_VERSION);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(SESSIONS_STORE)) {
+        database.createObjectStore(SESSIONS_STORE, { keyPath: "sessionKey" });
+      }
+      if (!database.objectStoreNames.contains(MESSAGES_STORE)) {
+        const messages = database.createObjectStore(MESSAGES_STORE, { keyPath: "storageKey" });
+        messages.createIndex("sessionKey", "sessionKey", { unique: false });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("Unable to open transcript database"));
+  });
+}
+async function deleteMessagesForSession(store, sessionKey) {
+  const index = store.index("sessionKey");
+  const keys = await requestResult(index.getAllKeys(IDBKeyRange.only(sessionKey)));
+  for (const key of keys)
+    store.delete(key);
+}
+function createIndexedDbTranscriptPersistence(factory = typeof indexedDB === "undefined" ? void 0 : indexedDB) {
+  if (!factory)
+    return null;
+  const databasePromise = openDatabase(factory);
+  return {
+    async load(sessionKey) {
+      const database = await databasePromise;
+      const transaction = database.transaction([SESSIONS_STORE, MESSAGES_STORE], "readonly");
+      const done = transactionDone(transaction);
+      const session = await requestResult(transaction.objectStore(SESSIONS_STORE).get(sessionKey));
+      if (!session)
+        return null;
+      const rows = await requestResult(transaction.objectStore(MESSAGES_STORE).index("sessionKey").getAll(IDBKeyRange.only(sessionKey)));
+      await done;
+      rows.sort((left, right) => left.order - right.order);
+      return {
+        version: session.version,
+        sessionKey,
+        updatedAt: session.updatedAt,
+        expiresAt: session.expiresAt,
+        messages: rows.map((row) => cloneMessage(row.message))
+      };
+    },
+    async save(sessionKey, transcript, changedMessages) {
+      const database = await databasePromise;
+      const transaction = database.transaction([SESSIONS_STORE, MESSAGES_STORE], "readwrite");
+      const done = transactionDone(transaction);
+      const sessions = transaction.objectStore(SESSIONS_STORE);
+      const messages = transaction.objectStore(MESSAGES_STORE);
+      sessions.put({
+        sessionKey,
+        version: transcript.version,
+        updatedAt: transcript.updatedAt,
+        expiresAt: transcript.expiresAt
+      });
+      for (const { order, message } of changedMessages) {
+        messages.put({
+          storageKey: `${sessionKey}\0${message.id}`,
+          sessionKey,
+          order,
+          message: sanitizeTranscriptMessage(message)
+        });
+      }
+      await done;
+    },
+    async delete(sessionKey) {
+      const database = await databasePromise;
+      const transaction = database.transaction([SESSIONS_STORE, MESSAGES_STORE], "readwrite");
+      const done = transactionDone(transaction);
+      transaction.objectStore(SESSIONS_STORE).delete(sessionKey);
+      await deleteMessagesForSession(transaction.objectStore(MESSAGES_STORE), sessionKey);
+      await done;
+    },
+    async purgeExpired(now) {
+      const database = await databasePromise;
+      const read = database.transaction(SESSIONS_STORE, "readonly");
+      const done = transactionDone(read);
+      const sessions = await requestResult(read.objectStore(SESSIONS_STORE).getAll());
+      await done;
+      for (const session of sessions) {
+        if (session.expiresAt <= now)
+          await this.delete(session.sessionKey);
+      }
+    }
+  };
+}
+
+// ../sdk-ui/dist/src/types.js
+var TRANSCRIPT_SCHEMA_VERSION = 1;
+
 // ../sdk-ui/dist/src/chat-controller.js
 var MESSAGE_SEND_TIMEOUT_MS = 15e3;
+var TRANSCRIPT_SAVE_DEBOUNCE_MS = 250;
 var LIFECYCLE_SESSION_STATE_MAP = {
   active: "ACTIVE",
   waiting: "WAITING",
@@ -3949,6 +4100,13 @@ function createChatController(options) {
   const listeners = /* @__PURE__ */ new Set();
   const transcriptStore = createTranscriptStore();
   const debug = createDebugLogger(options.debug);
+  let transcriptPersistence = options.transcriptPersistence === void 0 ? createIndexedDbTranscriptPersistence() : options.transcriptPersistence;
+  const transcriptTtlMs = options.transcriptTtlMs ?? DEFAULT_TRANSCRIPT_TTL_MS;
+  let persistenceSessionKey = null;
+  let restoredSessionKey = null;
+  let persistenceTimer = null;
+  let persistenceOperation = Promise.resolve();
+  const pendingPersistedMessageIds = /* @__PURE__ */ new Set();
   let unsubscribeFromClient = null;
   let destroyed = false;
   let lastError = null;
@@ -3978,6 +4136,95 @@ function createChatController(options) {
   }
   function getSessionId() {
     return options.client.sessionId ?? options.client.sessionContext?.sessionId ?? null;
+  }
+  function getPersistenceSessionKey() {
+    const sessionId = getSessionId();
+    return sessionId ? `session:${sessionId}` : null;
+  }
+  function disablePersistence(error2) {
+    debug.log("[sdk-ui] transcript persistence disabled", {
+      error: error2 instanceof Error ? error2.message : String(error2)
+    });
+    transcriptPersistence = null;
+    if (persistenceTimer !== null)
+      clearTimeout(persistenceTimer);
+    persistenceTimer = null;
+    pendingPersistedMessageIds.clear();
+    persistenceSessionKey = null;
+  }
+  async function flushTranscriptPersistence() {
+    if (persistenceTimer !== null)
+      clearTimeout(persistenceTimer);
+    persistenceTimer = null;
+    const persistence = transcriptPersistence;
+    const sessionKey = persistenceSessionKey;
+    if (!persistence || !sessionKey || pendingPersistedMessageIds.size === 0)
+      return;
+    const changedIds = Array.from(pendingPersistedMessageIds);
+    pendingPersistedMessageIds.clear();
+    const now = Date.now();
+    const snapshot = transcriptStore.getSnapshot();
+    const changedIdSet = new Set(changedIds);
+    const changedMessages = snapshot.flatMap((message, order) => changedIdSet.has(message.id) ? [{ order, message: sanitizeTranscriptMessage(message) }] : []);
+    persistenceOperation = persistenceOperation.then(() => persistence.save(sessionKey, {
+      version: TRANSCRIPT_SCHEMA_VERSION,
+      sessionKey,
+      updatedAt: now,
+      expiresAt: now + transcriptTtlMs
+    }, changedMessages)).catch(disablePersistence);
+    await persistenceOperation;
+  }
+  function queueTranscriptPersistence(message) {
+    if (!message || !transcriptPersistence || !persistenceSessionKey)
+      return;
+    pendingPersistedMessageIds.add(message.id);
+    if (persistenceTimer !== null)
+      return;
+    persistenceTimer = setTimeout(() => {
+      void flushTranscriptPersistence();
+    }, TRANSCRIPT_SAVE_DEBOUNCE_MS);
+    unrefTimer(persistenceTimer);
+  }
+  async function restoreTranscript() {
+    const persistence = transcriptPersistence;
+    const sessionKey = getPersistenceSessionKey();
+    persistenceSessionKey = sessionKey;
+    if (!persistence || !sessionKey || restoredSessionKey === sessionKey)
+      return;
+    if (restoredSessionKey !== null && restoredSessionKey !== sessionKey)
+      transcriptStore.reset();
+    restoredSessionKey = sessionKey;
+    try {
+      const now = Date.now();
+      await persistence.purgeExpired(now);
+      const persisted = await persistence.load(sessionKey);
+      if (!persisted)
+        return;
+      const valid = persisted.version === TRANSCRIPT_SCHEMA_VERSION && persisted.sessionKey === sessionKey && persisted.expiresAt > now && Array.isArray(persisted.messages) && persisted.messages.every((message) => isRecord(message) && typeof message.id === "string" && typeof message.type === "string" && typeof message.role === "string");
+      if (!valid) {
+        await persistence.delete(sessionKey);
+        return;
+      }
+      const existingIds = new Set(transcriptStore.getSnapshot().map((message) => message.id));
+      for (const message of persisted.messages) {
+        if (!existingIds.has(message.id))
+          transcriptStore.upsertLocalMessage(message);
+      }
+    } catch (error2) {
+      disablePersistence(error2);
+    }
+  }
+  function deletePersistedTranscript() {
+    const persistence = transcriptPersistence;
+    const sessionKey = persistenceSessionKey ?? getPersistenceSessionKey();
+    if (!persistence || !sessionKey)
+      return;
+    if (persistenceTimer !== null)
+      clearTimeout(persistenceTimer);
+    persistenceTimer = null;
+    pendingPersistedMessageIds.clear();
+    persistenceSessionKey = null;
+    persistenceOperation = persistenceOperation.then(() => persistence.delete(sessionKey)).catch(disablePersistence);
   }
   function isSessionReady() {
     return getChannelState() === "OPEN" && getSessionId() !== null;
@@ -4155,6 +4402,7 @@ function createChatController(options) {
     if (TERMINAL_SESSION_STATES.has((nextSessionState ?? "").toUpperCase())) {
       awaitingAnswer = false;
       resetWorkerStateToIdle();
+      deletePersistedTranscript();
       return true;
     }
     return nextSessionState !== null;
@@ -4227,6 +4475,7 @@ function createChatController(options) {
       return;
     }
     const result = transcriptStore.ingest(message);
+    queueTranscriptPersistence(result.mutation?.message);
     if (result.mutation) {
       emit({
         type: result.mutation.type,
@@ -4308,7 +4557,10 @@ function createChatController(options) {
     },
     async connect() {
       ensureClientSubscription();
+      await restoreTranscript();
+      emitStateChanged();
       await options.client.connect();
+      await restoreTranscript();
       emitStateChanged();
     },
     async disconnect() {
@@ -4316,6 +4568,7 @@ function createChatController(options) {
       sessionStateOverride = null;
       authState = { state: "none" };
       if (options.client.disconnect) {
+        await flushTranscriptPersistence();
         await options.client.disconnect();
       }
       teardownClientSubscription();
@@ -4351,17 +4604,19 @@ function createChatController(options) {
         },
         originalPayload: sendPayload
       };
-      transcriptStore.upsertLocalMessage(optimistic);
+      const optimisticResult = transcriptStore.upsertLocalMessage(optimistic);
+      queueTranscriptPersistence(optimisticResult.mutation?.message);
       emitStateChanged();
       try {
         debug.log("[sdk-ui] sendMessage -> client.sendMessage start", summarizeSendPayload2(sendPayload));
         await withTimeout(options.client.sendMessage(sendPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
-        transcriptStore.upsertLocalMessage({
+        const sentResult = transcriptStore.upsertLocalMessage({
           ...optimistic,
           deliveryStatus: "sent",
           retryable: false,
           sendError: void 0
         });
+        queueTranscriptPersistence(sentResult.mutation?.message);
         awaitingAnswer = true;
         debug.log("[sdk-ui] sendMessage -> client.sendMessage done", {
           clientMsgId,
@@ -4376,7 +4631,8 @@ function createChatController(options) {
           error: err instanceof Error ? err.message : String(err)
         });
         const sendError = err instanceof Error ? err.message : "Message was not sent";
-        transcriptStore.upsertLocalMessage({ ...optimistic, deliveryStatus: "failed", retryable: true, sendError });
+        const failedResult = transcriptStore.upsertLocalMessage({ ...optimistic, deliveryStatus: "failed", retryable: true, sendError });
+        queueTranscriptPersistence(failedResult.mutation?.message);
         emitStateChanged();
         return { ok: false, messageId: id, clientMsgId, error: sendError };
       }
@@ -4393,17 +4649,19 @@ function createChatController(options) {
         retryable: false,
         sendError: void 0
       };
-      transcriptStore.upsertLocalMessage(updated);
+      const retryingResult = transcriptStore.upsertLocalMessage(updated);
+      queueTranscriptPersistence(retryingResult.mutation?.message);
       emitStateChanged();
       try {
         debug.log("[sdk-ui] retryMessage -> client.sendMessage start", summarizeSendPayload2(msg.originalPayload));
         await withTimeout(options.client.sendMessage(msg.originalPayload), MESSAGE_SEND_TIMEOUT_MS, "Message was not sent");
-        transcriptStore.upsertLocalMessage({
+        const sentResult = transcriptStore.upsertLocalMessage({
           ...updated,
           deliveryStatus: "sent",
           retryable: false,
           sendError: void 0
         });
+        queueTranscriptPersistence(sentResult.mutation?.message);
         awaitingAnswer = true;
         debug.log("[sdk-ui] retryMessage -> client.sendMessage done", {
           clientMsgId,
@@ -4418,7 +4676,8 @@ function createChatController(options) {
           error: err instanceof Error ? err.message : String(err)
         });
         const sendError = err instanceof Error ? err.message : "Message was not sent";
-        transcriptStore.upsertLocalMessage({ ...updated, deliveryStatus: "failed", retryable: true, sendError });
+        const failedResult = transcriptStore.upsertLocalMessage({ ...updated, deliveryStatus: "failed", retryable: true, sendError });
+        queueTranscriptPersistence(failedResult.mutation?.message);
         emitStateChanged();
         return { ok: false, messageId, clientMsgId, error: sendError };
       }
@@ -11856,6 +12115,225 @@ function buildStatusText(state, isAwaitingAnswer, isTyping) {
   return "Connected";
 }
 
+// src/transcript-virtualizer.ts
+var TRANSCRIPT_OVERSCAN_ROWS = 8;
+var MAX_MOUNTED_TRANSCRIPT_ROWS = 80;
+var DEFAULT_ROW_HEIGHT = 72;
+var ROW_GAP = 8;
+var BOTTOM_FOLLOW_THRESHOLD = 96;
+var TranscriptVirtualizer = class {
+  constructor(viewport) {
+    this.topSpacer = document.createElement("div");
+    this.rows = document.createElement("div");
+    this.bottomSpacer = document.createElement("div");
+    this.mounted = /* @__PURE__ */ new Map();
+    this.heights = /* @__PURE__ */ new Map();
+    this.items = [];
+    this.offsets = [0];
+    this.renderRow = () => null;
+    this.scopeKey = "";
+    this.followBottom = true;
+    this.destroyed = false;
+    this.onScroll = () => {
+      if (this.destroyed) return;
+      this.followBottom = this.totalHeight - (this.viewport.scrollTop + this.viewportHeight) <= BOTTOM_FOLLOW_THRESHOLD;
+      this.renderWindow(this.viewport.scrollTop);
+    };
+    this.viewport = viewport;
+    this.topSpacer.className = "cortex-widget__virtual-spacer";
+    this.topSpacer.dataset.virtualSpacer = "top";
+    this.rows.className = "cortex-widget__virtual-rows";
+    this.rows.dataset.testid = "transcript-window";
+    this.bottomSpacer.className = "cortex-widget__virtual-spacer";
+    this.bottomSpacer.dataset.virtualSpacer = "bottom";
+    this.viewport.replaceChildren(this.topSpacer, this.rows, this.bottomSpacer);
+    this.viewport.addEventListener("scroll", this.onScroll, { passive: true });
+    this.resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver((entries2) => this.onResize(entries2));
+    this.resizeObserver?.observe(this.viewport);
+  }
+  update(items, renderRow, scopeKey) {
+    if (this.destroyed) return;
+    const scopeChanged = scopeKey !== this.scopeKey;
+    const wasEmpty = this.items.length === 0;
+    const previousTotal = this.totalHeight;
+    const viewportHeight = this.viewportHeight;
+    const nearBottom = wasEmpty || previousTotal - (this.viewport.scrollTop + viewportHeight) <= BOTTOM_FOLLOW_THRESHOLD;
+    const anchor = scopeChanged || nearBottom ? null : this.captureAnchor();
+    if (scopeChanged) {
+      this.scopeKey = scopeKey;
+      this.heights.clear();
+      for (const mounted of this.mounted.values()) {
+        this.resizeObserver?.unobserve(mounted.element);
+        mounted.element.remove();
+      }
+      this.mounted.clear();
+      this.followBottom = true;
+    } else {
+      this.followBottom = nearBottom;
+    }
+    this.items = items;
+    this.renderRow = renderRow;
+    this.rebuildOffsets();
+    let targetScrollTop = this.viewport.scrollTop;
+    if (this.followBottom) {
+      targetScrollTop = Math.max(0, this.totalHeight - viewportHeight);
+    } else if (anchor) {
+      const anchorIndex = this.items.findIndex((item) => item.key === anchor.key);
+      if (anchorIndex >= 0) {
+        targetScrollTop = this.offsets[anchorIndex] + anchor.offset;
+      }
+    }
+    this.renderWindow(targetScrollTop);
+    this.viewport.scrollTop = targetScrollTop;
+    this.measureMountedRows();
+  }
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.viewport.removeEventListener("scroll", this.onScroll);
+    this.resizeObserver?.disconnect();
+    this.mounted.clear();
+  }
+  get viewportHeight() {
+    return this.viewport.clientHeight || 600;
+  }
+  get totalHeight() {
+    return this.offsets[this.offsets.length - 1] ?? 0;
+  }
+  onResize(entries2) {
+    let geometryChanged = false;
+    let correction = 0;
+    const anchor = this.captureAnchor();
+    const anchorIndex = anchor ? this.items.findIndex((item) => item.key === anchor.key) : -1;
+    for (const entry of entries2) {
+      if (entry.target === this.viewport) {
+        geometryChanged = true;
+        continue;
+      }
+      const row = entry.target;
+      const key = row.dataset.virtualKey;
+      if (!key) continue;
+      const measuredHeight = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height ?? row.getBoundingClientRect().height;
+      if (!(measuredHeight > 0)) continue;
+      const nextHeight = measuredHeight + ROW_GAP;
+      const previousHeight = this.heights.get(key) ?? DEFAULT_ROW_HEIGHT;
+      if (Math.abs(previousHeight - nextHeight) < 0.5) continue;
+      this.heights.set(key, nextHeight);
+      const changedIndex = this.items.findIndex((item) => item.key === key);
+      if (!this.followBottom && changedIndex >= 0 && changedIndex < anchorIndex) {
+        correction += nextHeight - previousHeight;
+      }
+      geometryChanged = true;
+    }
+    if (!geometryChanged) return;
+    this.rebuildOffsets();
+    if (this.followBottom) {
+      this.viewport.scrollTop = Math.max(0, this.totalHeight - this.viewportHeight);
+    } else if (correction !== 0) {
+      this.viewport.scrollTop += correction;
+    }
+    this.renderWindow(this.viewport.scrollTop);
+  }
+  rebuildOffsets() {
+    const offsets = new Array(this.items.length + 1);
+    offsets[0] = 0;
+    for (let index = 0; index < this.items.length; index += 1) {
+      offsets[index + 1] = offsets[index] + (this.heights.get(this.items[index].key) ?? DEFAULT_ROW_HEIGHT);
+    }
+    this.offsets = offsets;
+  }
+  captureAnchor() {
+    if (this.items.length === 0) return null;
+    const index = this.findIndexAtOffset(this.viewport.scrollTop);
+    return {
+      key: this.items[index]?.key ?? this.items[0].key,
+      offset: this.viewport.scrollTop - this.offsets[index]
+    };
+  }
+  findIndexAtOffset(offset) {
+    if (this.items.length === 0) return 0;
+    let low = 0;
+    let high = this.items.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (this.offsets[middle + 1] <= offset) low = middle + 1;
+      else high = middle;
+    }
+    return Math.min(low, this.items.length - 1);
+  }
+  renderWindow(scrollTop) {
+    if (this.items.length === 0) {
+      for (const mounted of this.mounted.values()) {
+        this.resizeObserver?.unobserve(mounted.element);
+      }
+      this.mounted.clear();
+      this.rows.replaceChildren();
+      this.topSpacer.style.height = "0px";
+      this.bottomSpacer.style.height = "0px";
+      return;
+    }
+    const firstVisible = this.findIndexAtOffset(Math.max(0, scrollTop));
+    const lastVisible = this.findIndexAtOffset(Math.max(0, scrollTop) + this.viewportHeight);
+    let start = Math.max(0, firstVisible - TRANSCRIPT_OVERSCAN_ROWS);
+    let end = Math.min(this.items.length, lastVisible + TRANSCRIPT_OVERSCAN_ROWS + 1);
+    if (end - start > MAX_MOUNTED_TRANSCRIPT_ROWS) {
+      end = Math.min(this.items.length, start + MAX_MOUNTED_TRANSCRIPT_ROWS);
+    }
+    const desiredKeys = new Set(this.items.slice(start, end).map((item) => item.key));
+    for (const [key, mounted] of this.mounted) {
+      if (!desiredKeys.has(key)) {
+        this.resizeObserver?.unobserve(mounted.element);
+        mounted.element.remove();
+        this.mounted.delete(key);
+      }
+    }
+    let cursor = this.rows.firstChild;
+    for (let index = start; index < end; index += 1) {
+      const item = this.items[index];
+      let mounted = this.mounted.get(item.key);
+      if (!mounted || mounted.version !== item.version) {
+        const element = this.renderRow(item.value);
+        if (!element) continue;
+        element.dataset.virtualKey = item.key;
+        element.dataset.virtualIndex = String(index);
+        if (mounted) {
+          if (mounted.element === cursor) cursor = cursor.nextSibling;
+          this.resizeObserver?.unobserve(mounted.element);
+          mounted.element.replaceWith(element);
+        }
+        mounted = { element, version: item.version };
+        this.mounted.set(item.key, mounted);
+        this.resizeObserver?.observe(element);
+      } else {
+        mounted.element.dataset.virtualIndex = String(index);
+      }
+      if (mounted.element !== cursor) {
+        this.rows.insertBefore(mounted.element, cursor);
+      } else {
+        cursor = cursor.nextSibling;
+      }
+    }
+    this.topSpacer.style.height = `${this.offsets[start]}px`;
+    this.bottomSpacer.style.height = `${Math.max(0, this.totalHeight - this.offsets[end])}px`;
+  }
+  measureMountedRows() {
+    if (this.resizeObserver) return;
+    let changed = false;
+    for (const [key, mounted] of this.mounted) {
+      const measuredHeight = mounted.element.getBoundingClientRect().height;
+      const height = measuredHeight + ROW_GAP;
+      if (measuredHeight > 0 && Math.abs((this.heights.get(key) ?? DEFAULT_ROW_HEIGHT) - height) >= 0.5) {
+        this.heights.set(key, height);
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.rebuildOffsets();
+      this.renderWindow(this.viewport.scrollTop);
+    }
+  }
+};
+
 // src/renderer.ts
 var _warnedMissingActorIds = /* @__PURE__ */ new Set();
 function messageRequiresActor(message) {
@@ -12209,312 +12687,351 @@ function getMessageAttachments(message) {
   }
   return attachments.map((attachment) => toAttachmentViewModel(attachment)).filter((attachment) => attachment !== null && attachmentBelongsToMessage(message, attachment));
 }
-function renderTranscript(transcriptEl, state, options) {
-  transcriptEl.replaceChildren();
-  const visibleMessages = state.chat.transcript.filter((message) => !shouldHideTranscriptMessage(message));
-  if (visibleMessages.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "cortex-widget__empty";
-    empty.textContent = state.isHistoricalView ? "No messages in this chat yet." : "New chat";
-    transcriptEl.appendChild(empty);
-    return;
+function createTranscriptMessage(message, state, options) {
+  const rendered = renderChatMessageContent(message);
+  const attachments = getMessageAttachments(message);
+  const hasTextContent = rendered.format === "html" ? rendered.html.trim().length > 0 : rendered.text.trim().length > 0;
+  const hasQuestionControls = message.type === "chat::question" && Array.isArray(message.meta?.["questions"]) && normalizeQuestionFields2(message.meta["questions"]).length > 0;
+  if (!hasTextContent && attachments.length === 0 && !hasQuestionControls) {
+    return null;
   }
-  for (const message of visibleMessages) {
-    const rendered = renderChatMessageContent(message);
-    const attachments = getMessageAttachments(message);
-    const hasTextContent = rendered.format === "html" ? rendered.html.trim().length > 0 : rendered.text.trim().length > 0;
-    const hasQuestionControls = message.type === "chat::question" && Array.isArray(message.meta?.["questions"]) && normalizeQuestionFields2(message.meta["questions"]).length > 0;
-    if (!hasTextContent && attachments.length === 0 && !hasQuestionControls) {
-      continue;
+  const wrapper = document.createElement("article");
+  wrapper.className = "cortex-widget__message";
+  wrapper.dataset.role = message.role;
+  wrapper.dataset.type = message.type;
+  wrapper.setAttribute("data-testid", "transcript-message");
+  const actor = message.actor ?? null;
+  const actorRequired = messageRequiresActor(message);
+  const hasActorHeader = actor !== null && actorRequired;
+  const hasMissingActor = actor === null && actorRequired;
+  if (hasActorHeader) {
+    const actorHeader = document.createElement("div");
+    actorHeader.className = "cortex-widget__actor";
+    actorHeader.setAttribute("data-testid", "actor-header");
+    const avatarUrl = normalizeAvatarUrl(actor.avatarUrl ?? null, options);
+    if (avatarUrl) {
+      const img = document.createElement("img");
+      img.className = "cortex-widget__actor-avatar";
+      img.src = avatarUrl;
+      img.alt = "";
+      img.setAttribute("aria-hidden", "true");
+      img.setAttribute("data-testid", "actor-avatar");
+      actorHeader.appendChild(img);
     }
-    const wrapper = document.createElement("article");
-    wrapper.className = "cortex-widget__message";
-    wrapper.dataset.role = message.role;
-    wrapper.dataset.type = message.type;
-    wrapper.setAttribute("data-testid", "transcript-message");
-    const actor = message.actor ?? null;
-    const actorRequired = messageRequiresActor(message);
-    const hasActorHeader = actor !== null && actorRequired;
-    const hasMissingActor = actor === null && actorRequired;
-    if (hasActorHeader) {
-      const actorHeader = document.createElement("div");
-      actorHeader.className = "cortex-widget__actor";
-      actorHeader.setAttribute("data-testid", "actor-header");
-      const avatarUrl = normalizeAvatarUrl(actor.avatarUrl ?? null, options);
-      if (avatarUrl) {
-        const img = document.createElement("img");
-        img.className = "cortex-widget__actor-avatar";
-        img.src = avatarUrl;
-        img.alt = "";
-        img.setAttribute("aria-hidden", "true");
-        img.setAttribute("data-testid", "actor-avatar");
-        actorHeader.appendChild(img);
-      }
-      const actorInfo = document.createElement("div");
-      actorInfo.className = "cortex-widget__actor-info";
-      const nameEl = document.createElement("span");
-      nameEl.className = "cortex-widget__actor-name";
-      nameEl.textContent = actor.name;
-      nameEl.setAttribute("data-testid", "actor-name");
-      actorInfo.appendChild(nameEl);
-      const actorTitle = actor.title ?? null;
-      if (actorTitle) {
-        const titleEl = document.createElement("span");
-        titleEl.className = "cortex-widget__actor-title";
-        titleEl.textContent = actorTitle;
-        actorInfo.appendChild(titleEl);
-      }
-      actorHeader.appendChild(actorInfo);
-      wrapper.appendChild(actorHeader);
+    const actorInfo = document.createElement("div");
+    actorInfo.className = "cortex-widget__actor-info";
+    const nameEl = document.createElement("span");
+    nameEl.className = "cortex-widget__actor-name";
+    nameEl.textContent = actor.name;
+    nameEl.setAttribute("data-testid", "actor-name");
+    actorInfo.appendChild(nameEl);
+    const actorTitle = actor.title ?? null;
+    if (actorTitle) {
+      const titleEl = document.createElement("span");
+      titleEl.className = "cortex-widget__actor-title";
+      titleEl.textContent = actorTitle;
+      actorInfo.appendChild(titleEl);
     }
-    if (hasMissingActor) {
-      if (!_warnedMissingActorIds.has(message.id)) {
-        _warnedMissingActorIds.add(message.id);
-        console.warn("[cortex] Missing actor on non-user message", { type: message.type, id: message.id });
-      }
-      const isDebug = options.debug === true || typeof localStorage !== "undefined" && localStorage.getItem("cortex_debug") === "1";
-      if (isDebug) {
-        const marker = document.createElement("div");
-        marker.className = "cortex-widget__actor-missing";
-        marker.setAttribute("data-testid", "actor-missing");
-        marker.textContent = "\xB7 unknown actor";
-        wrapper.appendChild(marker);
-      }
+    actorHeader.appendChild(actorInfo);
+    wrapper.appendChild(actorHeader);
+  }
+  if (hasMissingActor) {
+    if (!_warnedMissingActorIds.has(message.id)) {
+      _warnedMissingActorIds.add(message.id);
+      console.warn("[cortex] Missing actor on non-user message", { type: message.type, id: message.id });
     }
-    const bubble = document.createElement("div");
-    bubble.className = "cortex-widget__bubble";
-    bubble.setAttribute("data-testid", "message-bubble");
-    if (message.status) {
-      bubble.dataset.status = message.status;
+    const isDebug = options.debug === true || typeof localStorage !== "undefined" && localStorage.getItem("cortex_debug") === "1";
+    if (isDebug) {
+      const marker = document.createElement("div");
+      marker.className = "cortex-widget__actor-missing";
+      marker.setAttribute("data-testid", "actor-missing");
+      marker.textContent = "\xB7 unknown actor";
+      wrapper.appendChild(marker);
     }
-    if (rendered.format === "html") {
-      const htmlContent = rendered.html.trim();
-      if (htmlContent.length > 0) {
-        bubble.classList.add("cortex-widget__bubble--markdown");
-        const text3 = document.createElement("div");
-        text3.className = "cortex-widget__bubble-text cortex-widget__markdown";
-        text3.innerHTML = rendered.html;
-        bubble.appendChild(text3);
-      } else if (attachments.length > 0) {
-        const fallback = document.createElement("div");
-        fallback.className = "cortex-widget__bubble-text";
-        fallback.textContent = "Attachment sent";
-        bubble.appendChild(fallback);
-      }
-    } else if (rendered.style === "plain") {
-      const textContent = rendered.text.trim();
-      if (textContent.length > 0) {
-        const text3 = document.createElement("div");
-        text3.className = "cortex-widget__bubble-text";
-        text3.textContent = rendered.text;
-        bubble.appendChild(text3);
-      } else if (attachments.length > 0) {
-        const fallback = document.createElement("div");
-        fallback.className = "cortex-widget__bubble-text";
-        fallback.textContent = "Attachment sent";
-        bubble.appendChild(fallback);
-      }
-    } else {
-      const pre = document.createElement("pre");
-      pre.className = "cortex-widget__formatted";
-      pre.textContent = rendered.text;
-      bubble.appendChild(pre);
+  }
+  const bubble = document.createElement("div");
+  bubble.className = "cortex-widget__bubble";
+  bubble.setAttribute("data-testid", "message-bubble");
+  if (message.status) {
+    bubble.dataset.status = message.status;
+  }
+  if (rendered.format === "html") {
+    const htmlContent = rendered.html.trim();
+    if (htmlContent.length > 0) {
+      bubble.classList.add("cortex-widget__bubble--markdown");
+      const text3 = document.createElement("div");
+      text3.className = "cortex-widget__bubble-text cortex-widget__markdown";
+      text3.innerHTML = rendered.html;
+      bubble.appendChild(text3);
+    } else if (attachments.length > 0) {
+      const fallback = document.createElement("div");
+      fallback.className = "cortex-widget__bubble-text";
+      fallback.textContent = "Attachment sent";
+      bubble.appendChild(fallback);
     }
-    if (attachments.length > 0) {
-      const attachmentList = document.createElement("ul");
-      attachmentList.className = "cortex-widget__message-attachments";
-      attachmentList.setAttribute("data-testid", "message-attachments");
-      for (const attachment of attachments) {
-        const item = document.createElement("li");
-        item.className = "cortex-widget__message-attachment";
-        const downloadTarget = attachment.downloadMintUrl ?? attachment.url;
-        const hasDownloadLink = Boolean(downloadTarget);
-        if (hasDownloadLink && downloadTarget) {
-          const link2 = document.createElement("a");
-          link2.className = "cortex-widget__message-attachment-link";
-          link2.href = downloadTarget;
-          link2.rel = "noopener noreferrer";
-          if (attachment.downloadMintUrl) {
-            link2.setAttribute("data-download-mint-url", attachment.downloadMintUrl);
+  } else if (rendered.style === "plain") {
+    const textContent = rendered.text.trim();
+    if (textContent.length > 0) {
+      const text3 = document.createElement("div");
+      text3.className = "cortex-widget__bubble-text";
+      text3.textContent = rendered.text;
+      bubble.appendChild(text3);
+    } else if (attachments.length > 0) {
+      const fallback = document.createElement("div");
+      fallback.className = "cortex-widget__bubble-text";
+      fallback.textContent = "Attachment sent";
+      bubble.appendChild(fallback);
+    }
+  } else {
+    const pre = document.createElement("pre");
+    pre.className = "cortex-widget__formatted";
+    pre.textContent = rendered.text;
+    bubble.appendChild(pre);
+  }
+  if (attachments.length > 0) {
+    const attachmentList = document.createElement("ul");
+    attachmentList.className = "cortex-widget__message-attachments";
+    attachmentList.setAttribute("data-testid", "message-attachments");
+    for (const attachment of attachments) {
+      const item = document.createElement("li");
+      item.className = "cortex-widget__message-attachment";
+      const downloadTarget = attachment.downloadMintUrl ?? attachment.url;
+      const hasDownloadLink = Boolean(downloadTarget);
+      if (hasDownloadLink && downloadTarget) {
+        const link2 = document.createElement("a");
+        link2.className = "cortex-widget__message-attachment-link";
+        link2.href = downloadTarget;
+        link2.rel = "noopener noreferrer";
+        if (attachment.downloadMintUrl) {
+          link2.setAttribute("data-download-mint-url", attachment.downloadMintUrl);
+        }
+        if (attachment.fileRef) {
+          link2.setAttribute("data-file-ref", attachment.fileRef);
+        }
+        if (attachment.fileName) {
+          link2.download = attachment.fileName;
+          link2.setAttribute("data-filename", attachment.fileName);
+        }
+        link2.setAttribute("data-testid", "message-attachment-link");
+        const label = document.createElement("span");
+        label.className = "cortex-widget__message-attachment-label";
+        label.textContent = attachment.label;
+        const detailsParts = [];
+        if (attachment.contentType) {
+          detailsParts.push(attachment.contentType);
+        }
+        if (attachment.size !== null) {
+          detailsParts.push(formatFileSize(attachment.size));
+        }
+        link2.appendChild(label);
+        if (detailsParts.length > 0) {
+          const details = document.createElement("span");
+          details.className = "cortex-widget__message-attachment-details";
+          details.textContent = detailsParts.join(" \xB7 ");
+          link2.appendChild(details);
+        }
+        item.appendChild(link2);
+      } else {
+        item.textContent = attachment.label;
+      }
+      attachmentList.appendChild(item);
+    }
+    bubble.appendChild(attachmentList);
+  }
+  if (message.type === "chat::question" && Array.isArray(message.meta?.["questions"])) {
+    const questionRef = toNonEmptyString(message.meta?.["question_ref"]) ?? toNonEmptyString(message.meta?.["question_id"]);
+    const questions = normalizeQuestionFields2(message.meta?.["questions"]);
+    const choiceQuestion = singleChoiceQuestion(questions) ?? (questionRef ? synthesizeAskUserChoiceQuestion(message.meta?.["questions"], questionRef) : null);
+    if (questionRef && choiceQuestion) {
+      const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
+      const optionsDisabled = !isActive || state.isAwaitingAnswer;
+      const optionsContainer = document.createElement("div");
+      optionsContainer.className = "cortex-widget__question-options";
+      optionsContainer.setAttribute("data-testid", "question-options");
+      for (const option of choiceQuestion.options) {
+        const btn = document.createElement("button");
+        btn.className = "cortex-widget__question-option";
+        btn.type = "button";
+        btn.textContent = option.label;
+        btn.dataset.questionRef = questionRef;
+        btn.dataset.questionKey = choiceQuestion.key;
+        btn.dataset.optionId = option.id;
+        btn.disabled = optionsDisabled;
+        btn.setAttribute("data-testid", "question-option");
+        optionsContainer.appendChild(btn);
+      }
+      bubble.appendChild(optionsContainer);
+    } else if (questionRef && questions.length > 0) {
+      const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
+      const controlsDisabled = !isActive || state.isAwaitingAnswer;
+      const form = document.createElement("form");
+      form.className = "cortex-widget__question-form";
+      form.dataset.questionRef = questionRef;
+      form.setAttribute("data-testid", "question-form");
+      for (const question of questions) {
+        const field = document.createElement("label");
+        field.className = "cortex-widget__question-field";
+        const label = document.createElement("span");
+        label.className = "cortex-widget__question-label";
+        label.textContent = question.label;
+        field.appendChild(label);
+        let control;
+        if (question.type === "select" && question.options.length > 0) {
+          const select = document.createElement("select");
+          const placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = "Select";
+          select.appendChild(placeholder);
+          for (const option of question.options) {
+            const item = document.createElement("option");
+            item.value = option.id;
+            item.textContent = option.label;
+            select.appendChild(item);
           }
-          if (attachment.fileRef) {
-            link2.setAttribute("data-file-ref", attachment.fileRef);
-          }
-          if (attachment.fileName) {
-            link2.download = attachment.fileName;
-            link2.setAttribute("data-filename", attachment.fileName);
-          }
-          link2.setAttribute("data-testid", "message-attachment-link");
-          const label = document.createElement("span");
-          label.className = "cortex-widget__message-attachment-label";
-          label.textContent = attachment.label;
-          const detailsParts = [];
-          if (attachment.contentType) {
-            detailsParts.push(attachment.contentType);
-          }
-          if (attachment.size !== null) {
-            detailsParts.push(formatFileSize(attachment.size));
-          }
-          link2.appendChild(label);
-          if (detailsParts.length > 0) {
-            const details = document.createElement("span");
-            details.className = "cortex-widget__message-attachment-details";
-            details.textContent = detailsParts.join(" \xB7 ");
-            link2.appendChild(details);
-          }
-          item.appendChild(link2);
+          control = select;
         } else {
-          item.textContent = attachment.label;
+          const input = document.createElement("input");
+          input.type = question.type === "boolean" ? "checkbox" : question.type;
+          control = input;
         }
-        attachmentList.appendChild(item);
+        control.name = question.key;
+        control.required = question.required;
+        control.disabled = controlsDisabled;
+        control.className = "cortex-widget__question-control";
+        control.setAttribute("data-question-type", question.type);
+        field.appendChild(control);
+        form.appendChild(field);
       }
-      bubble.appendChild(attachmentList);
+      const submit = document.createElement("button");
+      submit.className = "cortex-widget__question-submit cortex-widget__question-option";
+      submit.type = "submit";
+      submit.textContent = "Submit";
+      submit.disabled = controlsDisabled;
+      submit.setAttribute("data-testid", "question-form-submit");
+      form.appendChild(submit);
+      bubble.appendChild(form);
     }
-    if (message.type === "chat::question" && Array.isArray(message.meta?.["questions"])) {
-      const questionRef = toNonEmptyString(message.meta?.["question_ref"]) ?? toNonEmptyString(message.meta?.["question_id"]);
-      const questions = normalizeQuestionFields2(message.meta?.["questions"]);
-      const choiceQuestion = singleChoiceQuestion(questions) ?? (questionRef ? synthesizeAskUserChoiceQuestion(message.meta?.["questions"], questionRef) : null);
-      if (questionRef && choiceQuestion) {
-        const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
-        const optionsDisabled = !isActive || state.isAwaitingAnswer;
-        const optionsContainer = document.createElement("div");
-        optionsContainer.className = "cortex-widget__question-options";
-        optionsContainer.setAttribute("data-testid", "question-options");
-        for (const option of choiceQuestion.options) {
-          const btn = document.createElement("button");
-          btn.className = "cortex-widget__question-option";
-          btn.type = "button";
-          btn.textContent = option.label;
-          btn.dataset.questionRef = questionRef;
-          btn.dataset.questionKey = choiceQuestion.key;
-          btn.dataset.optionId = option.id;
-          btn.disabled = optionsDisabled;
-          btn.setAttribute("data-testid", "question-option");
-          optionsContainer.appendChild(btn);
-        }
-        bubble.appendChild(optionsContainer);
-      } else if (questionRef && questions.length > 0) {
-        const isActive = getQuestionRef(state.chat.activeQuestion) === questionRef;
-        const controlsDisabled = !isActive || state.isAwaitingAnswer;
-        const form = document.createElement("form");
-        form.className = "cortex-widget__question-form";
-        form.dataset.questionRef = questionRef;
-        form.setAttribute("data-testid", "question-form");
-        for (const question of questions) {
-          const field = document.createElement("label");
-          field.className = "cortex-widget__question-field";
-          const label = document.createElement("span");
-          label.className = "cortex-widget__question-label";
-          label.textContent = question.label;
-          field.appendChild(label);
-          let control;
-          if (question.type === "select" && question.options.length > 0) {
-            const select = document.createElement("select");
-            const placeholder = document.createElement("option");
-            placeholder.value = "";
-            placeholder.textContent = "Select";
-            select.appendChild(placeholder);
-            for (const option of question.options) {
-              const item = document.createElement("option");
-              item.value = option.id;
-              item.textContent = option.label;
-              select.appendChild(item);
-            }
-            control = select;
-          } else {
-            const input = document.createElement("input");
-            input.type = question.type === "boolean" ? "checkbox" : question.type;
-            control = input;
-          }
-          control.name = question.key;
-          control.required = question.required;
-          control.disabled = controlsDisabled;
-          control.className = "cortex-widget__question-control";
-          control.setAttribute("data-question-type", question.type);
-          field.appendChild(control);
-          form.appendChild(field);
-        }
-        const submit = document.createElement("button");
-        submit.className = "cortex-widget__question-submit cortex-widget__question-option";
-        submit.type = "submit";
-        submit.textContent = "Submit";
-        submit.disabled = controlsDisabled;
-        submit.setAttribute("data-testid", "question-form-submit");
-        form.appendChild(submit);
-        bubble.appendChild(form);
-      }
-    }
-    const meta = document.createElement("div");
-    meta.className = "cortex-widget__meta";
-    const metaText = document.createElement("span");
-    metaText.className = "cortex-widget__meta-text";
-    metaText.setAttribute("data-testid", "message-meta-text");
-    const timestampText = formatMessageTime(message.ts ?? null);
-    const timestampSource = getTimestampSource(message);
-    metaText.dataset.timestampSource = timestampSource ?? "unknown";
-    if (timestampSource === "client") {
-      metaText.dataset.provisional = "true";
-    }
-    if (hasActorHeader || hasMissingActor) {
-      metaText.textContent = timestampText ?? (message.status === "streaming" ? "streaming" : "");
-    } else {
-      const metaParts = [];
-      if (message.role !== "user") {
-        const displayName = message.role === "assistant" ? "Assistant" : message.role;
-        metaParts.push(displayName);
-      }
-      if (timestampText) {
-        metaParts.push(timestampText);
-      }
-      if (message.status === "streaming") {
-        metaParts.push("streaming");
-      }
-      metaText.textContent = metaParts.join(" \xB7 ");
-    }
-    meta.appendChild(metaText);
-    let statusEl = null;
-    const deliveryStatus = typeof message.deliveryStatus === "string" ? message.deliveryStatus : void 0;
-    if (message.role === "user" && deliveryStatus) {
-      statusEl = document.createElement("div");
-      statusEl.className = "cortex-widget__message-status";
-      statusEl.dataset.status = deliveryStatus;
-      statusEl.setAttribute("data-testid", "message-delivery-status");
-      const iconName = getDeliveryStatusIconName(deliveryStatus);
-      if (iconName) {
-        const icon = document.createElement("span");
-        icon.className = "cortex-widget__message-status-icon";
-        icon.setAttribute("aria-label", getDeliveryStatusLabel(deliveryStatus));
-        icon.setAttribute("title", getDeliveryStatusLabel(deliveryStatus));
-        icon.setAttribute("data-testid", "message-delivery-icon");
-        icon.innerHTML = getIconSvg(iconName);
-        statusEl.appendChild(icon);
-      }
-      if (deliveryStatus === "failed" && message.retryable) {
-        const retryBtn = document.createElement("button");
-        retryBtn.className = "cortex-widget__message-retry";
-        retryBtn.type = "button";
-        retryBtn.setAttribute("aria-label", "Retry message");
-        retryBtn.setAttribute("title", "Retry message");
-        retryBtn.setAttribute("data-testid", "message-retry-button");
-        retryBtn.dataset.retryMsgId = message.id;
-        retryBtn.innerHTML = getIconSvg("arrow-clockwise");
-        statusEl.appendChild(retryBtn);
-      }
-    }
-    if (statusEl) {
-      meta.appendChild(statusEl);
-    }
-    wrapper.append(bubble, meta);
-    transcriptEl.appendChild(wrapper);
   }
-  if (transcriptEl.childElementCount === 0) {
+  const meta = document.createElement("div");
+  meta.className = "cortex-widget__meta";
+  const metaText = document.createElement("span");
+  metaText.className = "cortex-widget__meta-text";
+  metaText.setAttribute("data-testid", "message-meta-text");
+  const timestampText = formatMessageTime(message.ts ?? null);
+  const timestampSource = getTimestampSource(message);
+  metaText.dataset.timestampSource = timestampSource ?? "unknown";
+  if (timestampSource === "client") {
+    metaText.dataset.provisional = "true";
+  }
+  if (hasActorHeader || hasMissingActor) {
+    metaText.textContent = timestampText ?? (message.status === "streaming" ? "streaming" : "");
+  } else {
+    const metaParts = [];
+    if (message.role !== "user") {
+      const displayName = message.role === "assistant" ? "Assistant" : message.role;
+      metaParts.push(displayName);
+    }
+    if (timestampText) {
+      metaParts.push(timestampText);
+    }
+    if (message.status === "streaming") {
+      metaParts.push("streaming");
+    }
+    metaText.textContent = metaParts.join(" \xB7 ");
+  }
+  meta.appendChild(metaText);
+  let statusEl = null;
+  const deliveryStatus = typeof message.deliveryStatus === "string" ? message.deliveryStatus : void 0;
+  if (message.role === "user" && deliveryStatus) {
+    statusEl = document.createElement("div");
+    statusEl.className = "cortex-widget__message-status";
+    statusEl.dataset.status = deliveryStatus;
+    statusEl.setAttribute("data-testid", "message-delivery-status");
+    const iconName = getDeliveryStatusIconName(deliveryStatus);
+    if (iconName) {
+      const icon = document.createElement("span");
+      icon.className = "cortex-widget__message-status-icon";
+      icon.setAttribute("aria-label", getDeliveryStatusLabel(deliveryStatus));
+      icon.setAttribute("title", getDeliveryStatusLabel(deliveryStatus));
+      icon.setAttribute("data-testid", "message-delivery-icon");
+      icon.innerHTML = getIconSvg(iconName);
+      statusEl.appendChild(icon);
+    }
+    if (deliveryStatus === "failed" && message.retryable) {
+      const retryBtn = document.createElement("button");
+      retryBtn.className = "cortex-widget__message-retry";
+      retryBtn.type = "button";
+      retryBtn.setAttribute("aria-label", "Retry message");
+      retryBtn.setAttribute("title", "Retry message");
+      retryBtn.setAttribute("data-testid", "message-retry-button");
+      retryBtn.dataset.retryMsgId = message.id;
+      retryBtn.innerHTML = getIconSvg("arrow-clockwise");
+      statusEl.appendChild(retryBtn);
+    }
+  }
+  if (statusEl) {
+    meta.appendChild(statusEl);
+  }
+  wrapper.append(bubble, meta);
+  return wrapper;
+}
+function isTranscriptMessageRenderable(message) {
+  const rendered = renderChatMessageContent(message);
+  const hasTextContent = rendered.format === "html" ? rendered.html.trim().length > 0 : rendered.text.trim().length > 0;
+  const hasQuestionControls = message.type === "chat::question" && Array.isArray(message.meta?.["questions"]) && normalizeQuestionFields2(message.meta["questions"]).length > 0;
+  return hasTextContent || getMessageAttachments(message).length > 0 || hasQuestionControls;
+}
+var transcriptVirtualizers = /* @__PURE__ */ new WeakMap();
+function getMessageVersion(message, state) {
+  const content = typeof message.content === "string" ? message.content : JSON.stringify(message.content);
+  const meta = message.meta ? JSON.stringify(message.meta) : "";
+  return [
+    message.type,
+    message.role,
+    message.status ?? "",
+    message.deliveryStatus ?? "",
+    message.ts ?? "",
+    message.retryable ? "1" : "0",
+    content,
+    meta,
+    getQuestionRef(state.chat.activeQuestion) ?? "",
+    state.isAwaitingAnswer ? "1" : "0"
+  ].join("\0");
+}
+function renderTranscript(transcriptEl, state, options) {
+  const visibleMessages = state.chat.transcript.filter(
+    (message) => !shouldHideTranscriptMessage(message) && isTranscriptMessageRenderable(message)
+  );
+  if (visibleMessages.length === 0) {
+    transcriptVirtualizers.get(transcriptEl)?.destroy();
+    transcriptVirtualizers.delete(transcriptEl);
     const empty = document.createElement("div");
     empty.className = "cortex-widget__empty";
     empty.textContent = state.isHistoricalView ? "No messages in this chat yet." : "New chat";
-    transcriptEl.appendChild(empty);
+    transcriptEl.replaceChildren(empty);
     return;
   }
-  transcriptEl.scrollTop = transcriptEl.scrollHeight;
+  let virtualizer = transcriptVirtualizers.get(transcriptEl);
+  if (!virtualizer) {
+    virtualizer = new TranscriptVirtualizer(transcriptEl);
+    transcriptVirtualizers.set(transcriptEl, virtualizer);
+  }
+  const occurrences = /* @__PURE__ */ new Map();
+  const items = visibleMessages.map((message) => {
+    const occurrence = occurrences.get(message.id) ?? 0;
+    occurrences.set(message.id, occurrence + 1);
+    return {
+      key: `${message.id}:${occurrence}`,
+      version: getMessageVersion(message, state),
+      value: message
+    };
+  });
+  const scopeKey = `${state.isHistoricalView ? "history" : "live"}:${state.chat.connection.sessionId ?? ""}`;
+  virtualizer.update(items, (message) => createTranscriptMessage(message, state, options), scopeKey);
+}
+function destroyTranscriptRenderer(transcriptEl) {
+  transcriptVirtualizers.get(transcriptEl)?.destroy();
+  transcriptVirtualizers.delete(transcriptEl);
 }
 function renderWidget(dom, state, options, attachmentsAvailable, isUploading, opts) {
   applyResolvedTheme(dom.host, dom.root, options.theme, {
@@ -12846,6 +13363,7 @@ var ChatWidget = class {
       dispose();
       this.domCleanup.delete(dispose);
     }
+    destroyTranscriptRenderer(this.dom.transcript);
     const disconnectPromise = this.controller.disconnect();
     this.controller.destroy();
     this.dom.host.remove();
