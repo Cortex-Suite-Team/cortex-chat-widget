@@ -85,7 +85,6 @@ export interface CortexChatWidgetOptions {
     historyTarget?: string | HTMLElement;
     authUrl?: string;
     controlPlaneUrl?: string;
-    uploadUrl?: string;
     title?: string;
     subtitle?: string;
     placeholder?: string;

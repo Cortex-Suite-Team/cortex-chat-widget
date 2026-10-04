@@ -4,11 +4,13 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const npmCli = process.env.npm_execpath;
+const sdkTarballInput = process.env.CORTEX_SDK_TARBALL;
 const sdkUiTarballInput = process.env.CORTEX_SDK_UI_TARBALL;
 if (!npmCli) throw new Error('npm_execpath is required');
 if (!sdkUiTarballInput) throw new Error('CORTEX_SDK_UI_TARBALL must point to a packed sdk-ui artifact');
 
 const sdkUiTarball = await realpath(resolve(sdkUiTarballInput));
+const sdkTarball = sdkTarballInput ? await realpath(resolve(sdkTarballInput)) : null;
 const qualificationRoot = await mkdtemp(join(tmpdir(), 'cortex-chat-widget-package-'));
 
 function runNpm(args, cwd, capture = false) {
@@ -45,14 +47,15 @@ try {
     '',
   ].join('\n'), 'utf8');
 
-  runNpm([
+  const installInputs = [
     'install',
     '--ignore-scripts',
     '--no-audit',
     '--no-fund',
-    sdkUiTarball,
-    widgetTarball,
-  ], consumerRoot);
+  ];
+  if (sdkTarball) installInputs.push(sdkTarball);
+  installInputs.push(sdkUiTarball, widgetTarball);
+  runNpm(installInputs, consumerRoot);
 
   const installedWidget = JSON.parse(await readFile(
     join(consumerRoot, 'node_modules', '@cortex-suite', 'chat-widget', 'package.json'),
@@ -61,12 +64,18 @@ try {
   if (installedWidget.dependencies?.['@cortex-suite/sdk-ui'] !== '0.1.0') {
     throw new Error('Installed widget does not declare @cortex-suite/sdk-ui@0.1.0');
   }
+  if (installedWidget.dependencies?.['@cortex-suite/sdk'] !== '1.1.21') {
+    throw new Error('Installed widget does not declare @cortex-suite/sdk@1.1.21');
+  }
   const buildInfo = JSON.parse(await readFile(
     join(consumerRoot, 'node_modules', '@cortex-suite', 'chat-widget', 'dist', 'build-info.json'),
     'utf8',
   ));
   if (buildInfo.sdkUi?.source !== 'npm:@cortex-suite/sdk-ui@0.1.0') {
     throw new Error(`Unexpected sdk-ui build source: ${buildInfo.sdkUi?.source}`);
+  }
+  if (buildInfo.sdk?.source !== 'npm:@cortex-suite/sdk@1.1.21') {
+    throw new Error(`Unexpected SDK build source: ${buildInfo.sdk?.source}`);
   }
 
   const imported = spawnSync(process.execPath, ['entry.mjs'], {

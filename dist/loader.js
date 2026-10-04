@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.20 */
+/* cortex-chat-widget loader build: sdk=1.1.21 */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -39,15 +39,20 @@
     { code: "session_terminal", retryable: false, fatal: true },
     { code: "resync_timeout", retryable: true, fatal: false },
     { code: "replay_unavailable", retryable: true, fatal: false },
-    { code: "upload_failed", retryable: true, fatal: false },
-    { code: "upload_too_large", retryable: false, fatal: false },
-    { code: "upload_type_rejected", retryable: false, fatal: false },
     { code: "session_not_ready", retryable: true, fatal: false },
     { code: "file_api_unavailable", retryable: false, fatal: false },
     { code: "file_not_found", retryable: false, fatal: false },
     { code: "file_access_denied", retryable: false, fatal: false },
     { code: "file_expired", retryable: false, fatal: false },
-    { code: "file_operation_failed", retryable: true, fatal: false }
+    { code: "file_operation_failed", retryable: true, fatal: false },
+    { code: "file_transport_unavailable", retryable: true, fatal: false },
+    { code: "file_too_large", retryable: false, fatal: false },
+    { code: "file_type_rejected", retryable: false, fatal: false },
+    { code: "invalid_file_transfer", retryable: false, fatal: false },
+    { code: "file_transfer_interrupted", retryable: true, fatal: false },
+    { code: "file_upload_failed", retryable: true, fatal: false },
+    { code: "file_download_failed", retryable: true, fatal: false },
+    { code: "file_unavailable", retryable: true, fatal: false }
   ];
 
   // node_modules/@cortex-suite/sdk/dist/browser/errors.js
@@ -251,10 +256,10 @@
   }
 
   // node_modules/@cortex-suite/sdk/dist/browser/transport.js
-  function _asCloseReason(reason) {
-    if (typeof reason === "string") {
+  var BINARY_BUFFER_LIMIT = 1024 * 1024;
+  function asCloseReason(reason) {
+    if (typeof reason === "string")
       return reason;
-    }
     if (reason instanceof Uint8Array) {
       try {
         return new TextDecoder().decode(reason);
@@ -264,108 +269,133 @@
     }
     return "";
   }
-  function _buildOpenError(wsUrl, baseMessage, details = {}) {
+  function buildOpenError(wsUrl, baseMessage, details = {}) {
     const suffix = [];
-    if (typeof details.closeCode === "number") {
+    if (typeof details.closeCode === "number")
       suffix.push(`close_code=${details.closeCode}`);
-    }
-    if (details.closeReason) {
+    if (details.closeReason)
       suffix.push(`close_reason=${details.closeReason}`);
-    }
     suffix.push(`ws_url=${wsUrl}`);
-    const error2 = makeError("transport_open_failed", suffix.length ? `${baseMessage} (${suffix.join(", ")})` : baseMessage);
-    error2.wsUrl = wsUrl;
-    error2.closeCode = details.closeCode;
-    error2.closeReason = details.closeReason;
-    error2.phase = details.phase;
+    const error2 = makeError("transport_open_failed", `${baseMessage} (${suffix.join(", ")})`);
+    Object.assign(error2, { wsUrl, closeCode: details.closeCode, closeReason: details.closeReason, phase: details.phase });
     return error2;
   }
   function createTransport(WS, connectTimeoutMs, _isDebugEnabled = () => false) {
     let ws = null;
+    let connectionGeneration = 0;
     const transport = {
-      onMessage: null,
+      onText: null,
+      onBinary: null,
       onClose: null,
       onError: null,
       open(wsUrl, accessToken) {
         return new Promise((resolve, reject) => {
-          const protocols = [
-            WS_SUBPROTOCOL,
-            `${WS_SUBPROTOCOL_JWT_PREFIX}${accessToken}`
-          ];
-          const socket = new WS(wsUrl, protocols);
+          const socket = new WS(wsUrl, [WS_SUBPROTOCOL, `${WS_SUBPROTOCOL_JWT_PREFIX}${accessToken}`]);
           ws = socket;
+          connectionGeneration++;
+          if ("binaryType" in socket)
+            socket.binaryType = "arraybuffer";
           let settled = false;
           let opened = false;
           let openErrorMessage = "WebSocket error";
           const timer = setTimeout(() => {
             socket.close();
-            if (settled) {
-              return;
+            if (!settled) {
+              settled = true;
+              reject(makeError("transport_connect_timeout", `WebSocket connect timed out (ws_url=${wsUrl})`));
             }
-            settled = true;
-            reject(makeError("transport_connect_timeout", `WebSocket connect timed out (ws_url=${wsUrl})`));
           }, connectTimeoutMs);
           socket.onopen = () => {
             clearTimeout(timer);
-            if (settled) {
-              return;
+            if (!settled) {
+              opened = true;
+              settled = true;
+              resolve();
             }
-            opened = true;
-            settled = true;
-            resolve();
           };
           socket.onerror = (event) => {
-            const msg = event instanceof Error ? event.message : "WebSocket error";
-            openErrorMessage = msg;
-            if (opened) {
-              transport.onError?.(_buildOpenError(wsUrl, msg, {
-                phase: "connected"
-              }));
-            }
+            const message = event instanceof Error ? event.message : "WebSocket error";
+            openErrorMessage = message;
+            if (opened)
+              transport.onError?.(buildOpenError(wsUrl, message, { phase: "connected" }));
           };
           socket.onclose = (event) => {
             clearTimeout(timer);
-            const reason = _asCloseReason(event.reason);
+            if (ws === socket) {
+              ws = null;
+              connectionGeneration++;
+            }
+            const reason = asCloseReason(event.reason);
             if (!opened && !settled) {
               settled = true;
-              reject(_buildOpenError(wsUrl, openErrorMessage, {
-                closeCode: event.code,
-                closeReason: reason,
-                phase: "connect"
-              }));
+              reject(buildOpenError(wsUrl, openErrorMessage, { closeCode: event.code, closeReason: reason, phase: "connect" }));
             }
             transport.onClose?.(event.code, reason);
           };
           socket.onmessage = (event) => {
-            transport.onMessage?.(event.data);
+            const data = event.data;
+            if (typeof data === "string") {
+              transport.onText?.(data);
+              return;
+            }
+            if (data instanceof ArrayBuffer) {
+              transport.onBinary?.(new Uint8Array(data));
+              return;
+            }
+            if (ArrayBuffer.isView(data)) {
+              transport.onBinary?.(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+              return;
+            }
+            if (typeof Blob !== "undefined" && data instanceof Blob) {
+              void data.arrayBuffer().then((buffer) => transport.onBinary?.(new Uint8Array(buffer)));
+            }
           };
         });
       },
-      send(message, timeoutMs) {
-        return new Promise((resolve, reject) => {
-          if (!ws) {
-            reject(makeError("transport_send_timeout", "No open connection"));
-            return;
-          }
-          const timer = setTimeout(() => {
-            reject(makeError("transport_send_timeout", "Send timed out"));
-          }, timeoutMs);
-          try {
-            ws.send(JSON.stringify(message));
-            clearTimeout(timer);
-            resolve();
-          } catch (err) {
-            clearTimeout(timer);
-            reject(makeError("transport_send_timeout", String(err)));
-          }
-        });
+      async sendJson(message, timeoutMs) {
+        const socket = ws;
+        if (!socket)
+          throw makeError("transport_send_timeout", "No open connection");
+        await sendWithTimeout(() => socket.send(JSON.stringify(message)), timeoutMs);
+      },
+      async sendBinary(data, timeoutMs) {
+        const socket = ws;
+        if (!socket)
+          throw makeError("file_transfer_interrupted", "No open connection");
+        const generation = connectionGeneration;
+        const deadline = Date.now() + timeoutMs;
+        while (socket.bufferedAmount > BINARY_BUFFER_LIMIT) {
+          if (ws !== socket || generation !== connectionGeneration)
+            throw makeError("file_transfer_interrupted", "Connection closed while waiting for binary backpressure");
+          if (Date.now() >= deadline)
+            throw makeError("transport_send_timeout", "Binary send backpressure timed out");
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        if (ws !== socket || generation !== connectionGeneration)
+          throw makeError("file_transfer_interrupted", "Connection closed before binary send");
+        await sendWithTimeout(() => socket.send(data), Math.max(1, deadline - Date.now()));
       },
       close(code2 = 1e3, reason = "disconnect") {
-        ws?.close(code2, reason);
+        const socket = ws;
         ws = null;
+        connectionGeneration++;
+        socket?.close(code2, reason);
       }
     };
     return transport;
+  }
+  function sendWithTimeout(send, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(makeError("transport_send_timeout", "Send timed out")), timeoutMs);
+      try {
+        send();
+        clearTimeout(timer);
+        resolve();
+      } catch (error2) {
+        clearTimeout(timer);
+        reject(makeError("transport_send_timeout", String(error2)));
+      }
+    });
   }
 
   // node_modules/@cortex-suite/sdk/dist/browser/liveness.js
@@ -399,7 +429,7 @@
       };
       if (sessionId)
         envelope["session_id"] = sessionId;
-      transport.send(envelope, 5e3).catch(() => {
+      transport.sendJson(envelope, 5e3).catch(() => {
       });
       pongTimer = setTimeout(() => {
         if (pendingHeartbeatId === heartbeatId && running) {
@@ -439,6 +469,84 @@
         }
       }
     };
+  }
+
+  // node_modules/@cortex-suite/sdk/dist/browser/files.js
+  var FILE_REF_PATTERN = /^sf_[A-Za-z0-9][A-Za-z0-9_-]*$/;
+  var ATTACHMENT_KEYS = /* @__PURE__ */ new Set(["file_ref", "filename", "content_type", "size"]);
+  var FILE_DESCRIPTOR_KEYS = [
+    "filename",
+    "content_type",
+    "size",
+    "scope_type",
+    "scope_id",
+    "status",
+    "created_at",
+    "updated_at",
+    "expires_at"
+  ];
+  function requireSessionFileRef(value, context = "file_ref") {
+    if (typeof value !== "string" || !FILE_REF_PATTERN.test(value)) {
+      throw makeError("file_operation_failed", `${context} must be a canonical sf_ file_ref`);
+    }
+    return value;
+  }
+  function normalizeSessionFileAttachments(attachments) {
+    return attachments.map((attachment, index) => {
+      if (typeof attachment === "string") {
+        return { file_ref: requireSessionFileRef(attachment, `attachments[${index}]`) };
+      }
+      if (!attachment || typeof attachment !== "object" || Array.isArray(attachment)) {
+        throw makeError("transport_protocol_violation", `attachments[${index}] must be a file_ref or attachment object`);
+      }
+      const record = attachment;
+      const unsupported = Object.keys(record).filter((key) => !ATTACHMENT_KEYS.has(key));
+      if (unsupported.length > 0) {
+        throw makeError("transport_protocol_violation", `attachments[${index}] contains unsupported fields: ${unsupported.join(", ")}`);
+      }
+      const normalized = {
+        file_ref: requireSessionFileRef(record["file_ref"], `attachments[${index}].file_ref`)
+      };
+      for (const key of ["filename", "content_type"]) {
+        if (record[key] !== void 0) {
+          if (typeof record[key] !== "string") {
+            throw makeError("transport_protocol_violation", `attachments[${index}].${key} must be a string`);
+          }
+          normalized[key] = record[key];
+        }
+      }
+      if (record["size"] !== void 0) {
+        if (typeof record["size"] !== "number" || !Number.isFinite(record["size"]) || record["size"] < 0) {
+          throw makeError("transport_protocol_violation", `attachments[${index}].size must be a non-negative number`);
+        }
+        normalized["size"] = record["size"];
+      }
+      return normalized;
+    });
+  }
+  function parsePublicFileRef(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw makeError("file_operation_failed", "File API response contained an invalid descriptor");
+    }
+    const record = value;
+    const result = {
+      file_ref: requireSessionFileRef(record["file_ref"], "File API response file_ref")
+    };
+    for (const key of FILE_DESCRIPTOR_KEYS) {
+      if (record[key] !== void 0)
+        result[key] = record[key];
+    }
+    return result;
+  }
+  function parsePublicFileList(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw makeError("file_operation_failed", "File list response must be an object");
+    }
+    const record = value;
+    if (!Array.isArray(record["files"]) || typeof record["total"] !== "number") {
+      throw makeError("file_operation_failed", "File list response is missing files or total");
+    }
+    return { files: record["files"].map(parsePublicFileRef), total: record["total"] };
   }
 
   // node_modules/@cortex-suite/sdk/dist/browser/session.js
@@ -497,7 +605,7 @@
     function send(envelope) {
       if (!_transport)
         return Promise.reject(new Error("No transport"));
-      return _transport.send(envelope, _sendTimeoutMs);
+      return _transport.sendJson(envelope, _sendTimeoutMs);
     }
     function reset() {
       _sessionId = null;
@@ -517,7 +625,7 @@
         env["session_id"] = _sessionId;
       return env;
     }
-    function makeClientMsgId(prefix) {
+    function makeClientMsgId2(prefix) {
       const cryptoRef = globalThis.crypto;
       if (cryptoRef && typeof cryptoRef.randomUUID === "function") {
         return `${prefix}_${cryptoRef.randomUUID()}`;
@@ -529,8 +637,9 @@
       const combinedMeta = {};
       if (meta)
         Object.assign(combinedMeta, meta);
-      if (attachments && attachments.length > 0)
-        combinedMeta["attachments"] = attachments;
+      if (attachments && attachments.length > 0) {
+        combinedMeta["attachments"] = normalizeSessionFileAttachments(attachments);
+      }
       if (Object.keys(combinedMeta).length > 0)
         payload["meta"] = combinedMeta;
       return payload;
@@ -611,7 +720,7 @@
           type: "system::init",
           schema: SCHEMA_VERSION,
           payload: bootstrap,
-          meta: { client_msg_id: makeClientMsgId("cli_init") },
+          meta: { client_msg_id: makeClientMsgId2("cli_init") },
           ts: (/* @__PURE__ */ new Date()).toISOString()
         };
         if (_tenantId)
@@ -653,7 +762,7 @@
           type: "system::trigger",
           schema: SCHEMA_VERSION,
           payload: payload || {},
-          meta: { client_msg_id: makeClientMsgId("cli_trigger") },
+          meta: { client_msg_id: makeClientMsgId2("cli_trigger") },
           ts: (/* @__PURE__ */ new Date()).toISOString()
         });
       },
@@ -664,6 +773,9 @@
         } catch {
           return;
         }
+        this.handleMessage(msg);
+      },
+      handleMessage(msg) {
         if (!_opened) {
           if (msg.type === "system::opened") {
             if (!msg.session_id) {
@@ -693,47 +805,324 @@
   }
 
   // node_modules/@cortex-suite/sdk/dist/browser/upload.js
-  function resolveUploadFilename(file) {
-    const name = typeof file === "object" && file !== null ? file.name : void 0;
-    return typeof name === "string" && name.trim() ? name : "upload";
-  }
-  async function uploadFile(file, accessToken, uploadUrl, fetchFn, FormDataClass) {
-    const formData = new FormDataClass();
-    let blob;
-    if (typeof file === "string") {
-      throw new Error("File path upload is not supported in browser entry \u2014 use Blob or ArrayBuffer");
-    } else if (file instanceof ArrayBuffer) {
-      blob = new Blob([file]);
-    } else if (ArrayBuffer.isView(file)) {
-      blob = new Blob([file.buffer]);
-    } else {
-      blob = file;
-    }
-    formData.append("file", blob, resolveUploadFilename(file));
-    const res = await fetchFn(uploadUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-        // Content-Type is set automatically with boundary when using FormData
+  function createUploadSource(file, options = {}) {
+    if (typeof file === "string")
+      throw makeError("file_type_rejected", "File paths require the Node entry point");
+    const blob = file instanceof Blob ? file : file instanceof ArrayBuffer ? new Blob([file]) : new Blob([Uint8Array.from(file).buffer]);
+    const named = file;
+    const fileName = typeof named.name === "string" ? named.name : void 0;
+    return {
+      filename: options.filename ?? fileName ?? "upload",
+      contentType: blob.type || options.contentType || "application/octet-stream",
+      size: blob.size,
+      async *chunks(chunkBytes) {
+        for (let offset = 0; offset < blob.size; offset += chunkBytes) {
+          yield new Uint8Array(await blob.slice(offset, offset + chunkBytes).arrayBuffer());
+        }
       },
-      body: formData
-      // fetchFn accepts FormData via unknown cast
-    });
-    if (!res.ok) {
-      if (res.status === 413) {
-        throw makeError("upload_too_large", "File exceeds the allowed size limit");
+      async cleanup() {
       }
-      if (res.status === 415) {
-        throw makeError("upload_type_rejected", "File type not accepted by the runtime");
+    };
+  }
+
+  // node_modules/@cortex-suite/sdk/dist/browser/file-transfer.js
+  var MAGIC = new Uint8Array([67, 70, 84, 49]);
+  var HEADER_BYTES = 24;
+  var TRANSFER_ID = /^ft_[0-9a-f]{32}$/;
+  var SHA256 = /^[0-9a-f]{64}$/;
+  var FORBIDDEN_KEYS = /* @__PURE__ */ new Set(["file_id", "snapshot_id", "blob_ref", "storage_key", "ticket", "upload_ticket", "delivery_ticket", "file_link_secret", "instance_id"]);
+  var FILE_RESPONSE_TYPES = /* @__PURE__ */ new Set(["file::upload.ready", "file::upload.complete", "file::download.ready", "file::download.complete", "file::list.result"]);
+  function encodeCft1(transferId, sequence, payload) {
+    if (!TRANSFER_ID.test(transferId))
+      throw makeError("invalid_file_transfer", "Invalid CFT1 transfer_id");
+    if (!Number.isInteger(sequence) || sequence < 0 || sequence > 4294967295)
+      throw makeError("invalid_file_transfer", "Invalid CFT1 sequence");
+    const frame = new Uint8Array(HEADER_BYTES + payload.byteLength);
+    frame.set(MAGIC, 0);
+    for (let index = 0; index < 16; index++)
+      frame[4 + index] = Number.parseInt(transferId.slice(3 + index * 2, 5 + index * 2), 16);
+    new DataView(frame.buffer).setUint32(20, sequence, false);
+    frame.set(payload, HEADER_BYTES);
+    return frame;
+  }
+  function decodeCft1(frame) {
+    if (frame.byteLength < HEADER_BYTES)
+      throw makeError("invalid_file_transfer", "CFT1 frame is shorter than its header");
+    if (!MAGIC.every((value, index) => frame[index] === value))
+      throw makeError("invalid_file_transfer", "Invalid CFT1 magic");
+    let hex = "";
+    for (const value of frame.subarray(4, 20))
+      hex += value.toString(16).padStart(2, "0");
+    return { transferId: `ft_${hex}`, sequence: new DataView(frame.buffer, frame.byteOffset, frame.byteLength).getUint32(20, false), payload: frame.subarray(HEADER_BYTES) };
+  }
+  var FileTransferManager = class {
+    constructor(transport, sendTimeoutMs) {
+      this.transport = transport;
+      this.sendTimeoutMs = sendTimeoutMs;
+      this.pending = /* @__PURE__ */ new Map();
+      this.uploads = /* @__PURE__ */ new Map();
+      this.downloads = /* @__PURE__ */ new Map();
+    }
+    async upload(sessionId, source, sha256) {
+      if (sha256 !== void 0 && !SHA256.test(sha256))
+        throw makeError("invalid_file_transfer", "sha256 must be 64 lowercase hex characters");
+      let activeTransferId;
+      try {
+        const payload = { filename: source.filename, content_type: source.contentType, size: source.size };
+        if (sha256)
+          payload["sha256"] = sha256;
+        const ready = await this.request(sessionId, "file::upload.prepare", "file::upload.ready", payload);
+        assertSafePublicControl(ready.payload);
+        const transferId = requireTransferId(ready.payload["transfer_id"]);
+        activeTransferId = transferId;
+        const chunkBytes = requirePositiveInteger(ready.payload["chunk_bytes"], "chunk_bytes");
+        const maxBytes = requirePositiveInteger(ready.payload["max_bytes"], "max_bytes");
+        if (source.size > 0 && chunkBytes > maxBytes)
+          throw makeError("invalid_file_transfer", "chunk_bytes exceeds max_bytes");
+        if (source.size > maxBytes)
+          throw makeError("file_too_large", "File exceeds server max_bytes");
+        this.uploads.set(transferId, null);
+        let sequence = 0;
+        for await (const chunk of source.chunks(chunkBytes)) {
+          this.throwUploadError(transferId);
+          if (chunk.byteLength === 0)
+            continue;
+          if (sequence > 4294967295)
+            throw makeError("invalid_file_transfer", "CFT1 sequence overflow");
+          await this.transport.sendBinary(encodeCft1(transferId, sequence, chunk), this.sendTimeoutMs);
+          this.throwUploadError(transferId);
+          sequence++;
+        }
+        this.throwUploadError(transferId);
+        const complete = await this.request(sessionId, "file::upload.commit", "file::upload.complete", { transfer_id: transferId }, transferId);
+        assertSafePublicControl(complete.payload);
+        if (requireTransferId(complete.payload["transfer_id"]) !== transferId)
+          throw makeError("invalid_file_transfer", "Upload completion transfer_id mismatch");
+        return requireSessionFileRef(complete.payload["file_ref"], "Upload completion file_ref");
+      } finally {
+        if (activeTransferId)
+          this.uploads.delete(activeTransferId);
+        await source.cleanup();
       }
-      throw makeError("upload_failed", `Upload failed with status ${res.status}`);
     }
-    const body = await res.json();
-    const fileId = body["file_ref"] ?? body["file_id"] ?? body["attachment_id"];
-    if (typeof fileId !== "string") {
-      throw makeError("upload_failed", "Upload response did not include a file reference");
+    async download(sessionId, fileRef) {
+      let resolveDownload;
+      let rejectDownload;
+      const result = new Promise((resolve, reject) => {
+        resolveDownload = resolve;
+        rejectDownload = reject;
+      });
+      await this.request(sessionId, "file::download.prepare", "file::download.ready", { file_ref: requireSessionFileRef(fileRef) }, void 0, (ready) => {
+        assertSafePublicControl(ready.payload);
+        const transferId = requireTransferId(ready.payload["transfer_id"]);
+        const size = requireNonNegativeInteger(ready.payload["size"], "size");
+        requirePositiveInteger(ready.payload["chunk_bytes"], "chunk_bytes");
+        const contentType = typeof ready.payload["content_type"] === "string" ? ready.payload["content_type"] : "application/octet-stream";
+        this.downloads.set(transferId, { expectedSequence: 0, declaredSize: size, receivedSize: 0, chunks: [], contentType, completeReceived: false, resolve: resolveDownload, reject: rejectDownload });
+      });
+      return result;
     }
-    return fileId;
+    async list(sessionId) {
+      const result = await this.request(sessionId, "file::list", "file::list.result", {});
+      assertSafePublicControl(result.payload);
+      return parsePublicFileList(result.payload);
+    }
+    handleMessage(message) {
+      if (FILE_RESPONSE_TYPES.has(message.type)) {
+        try {
+          assertSafePublicControl(message.payload);
+          if (message.type === "file::download.complete") {
+            this.handleDownloadComplete(message.payload);
+            return true;
+          }
+          const clientMsgId2 = message.meta?.["client_msg_id"];
+          if (typeof clientMsgId2 !== "string")
+            throw makeError("invalid_file_transfer", `${message.type} missing meta.client_msg_id`);
+          const pending2 = this.pending.get(clientMsgId2);
+          if (!pending2 || pending2.expectedType !== message.type)
+            throw makeError("invalid_file_transfer", `Uncorrelated ${message.type}`);
+          pending2.onResponse?.(message);
+          this.pending.delete(clientMsgId2);
+          clearTimeout(pending2.timer);
+          pending2.resolve(message);
+        } catch (error3) {
+          this.rejectRelevant(message, asError(error3));
+        }
+        return true;
+      }
+      if (message.type !== "system::error")
+        return false;
+      const clientMsgId = message.meta?.["client_msg_id"];
+      const transferId = message.payload["transfer_id"];
+      const pending = typeof clientMsgId === "string" ? this.pending.get(clientMsgId) : void 0;
+      const hasTransfer = typeof transferId === "string" && (this.uploads.has(transferId) || this.downloads.has(transferId));
+      if (!pending && !hasTransfer)
+        return false;
+      if (pending?.transferId && transferId !== void 0 && pending.transferId !== transferId) {
+        pending.reject(makeError("invalid_file_transfer", "Error correlation fields disagree"));
+        return true;
+      }
+      const code2 = typeof message.payload["code"] === "string" ? message.payload["code"] : "invalid_file_transfer";
+      const text3 = typeof message.payload["message"] === "string" ? message.payload["message"] : "File operation failed";
+      const error2 = makeError(code2, text3);
+      if (pending && typeof clientMsgId === "string") {
+        this.pending.delete(clientMsgId);
+        clearTimeout(pending.timer);
+        pending.reject(error2);
+      }
+      if (typeof transferId === "string")
+        this.rejectTransfer(transferId, error2);
+      return true;
+    }
+    handleBinary(frame) {
+      let decoded;
+      try {
+        decoded = decodeCft1(frame);
+      } catch {
+        this.abortAll(makeError("invalid_file_transfer", "Malformed inbound CFT1 frame"));
+        return;
+      }
+      const state = this.downloads.get(decoded.transferId);
+      if (!state) {
+        this.abortAll(makeError("invalid_file_transfer", `Unknown inbound transfer_id: ${decoded.transferId}`));
+        return;
+      }
+      if (decoded.sequence !== state.expectedSequence) {
+        this.rejectTransfer(decoded.transferId, makeError("invalid_file_transfer", "Download sequence mismatch"));
+        return;
+      }
+      if (state.receivedSize + decoded.payload.byteLength > state.declaredSize) {
+        this.rejectTransfer(decoded.transferId, makeError("file_download_failed", "Download exceeds declared size"));
+        return;
+      }
+      state.chunks.push(decoded.payload.slice());
+      state.receivedSize += decoded.payload.byteLength;
+      state.expectedSequence++;
+      this.finishDownloadIfReady(decoded.transferId, state);
+    }
+    abortAll(error2 = makeError("file_transfer_interrupted", "File transfer interrupted by connection close")) {
+      for (const [id, pending] of this.pending) {
+        clearTimeout(pending.timer);
+        pending.reject(error2);
+        this.pending.delete(id);
+      }
+      for (const id of Array.from(this.downloads.keys()))
+        this.rejectTransfer(id, error2);
+      for (const transferId of this.uploads.keys())
+        this.uploads.set(transferId, error2);
+    }
+    request(sessionId, type, expectedType, payload, transferId, onResponse) {
+      const clientMsgId = makeClientMsgId(type);
+      const response = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          this.pending.delete(clientMsgId);
+          reject(makeError("file_transport_unavailable", `${type} response timed out`));
+        }, this.sendTimeoutMs);
+        this.pending.set(clientMsgId, { expectedType, transferId, resolve, reject, timer, onResponse });
+      });
+      const envelope = { type, schema: SCHEMA_VERSION, session_id: sessionId, payload, meta: { client_msg_id: clientMsgId }, ts: (/* @__PURE__ */ new Date()).toISOString() };
+      void this.transport.sendJson(envelope, this.sendTimeoutMs).catch((error2) => {
+        const pending = this.pending.get(clientMsgId);
+        if (!pending)
+          return;
+        this.pending.delete(clientMsgId);
+        clearTimeout(pending.timer);
+        pending.reject(asError(error2));
+      });
+      return response;
+    }
+    handleDownloadComplete(payload) {
+      const transferId = requireTransferId(payload["transfer_id"]);
+      const state = this.downloads.get(transferId);
+      if (!state)
+        return;
+      state.completeReceived = true;
+      this.finishDownloadIfReady(transferId, state);
+    }
+    finishDownloadIfReady(transferId, state) {
+      if (!state.completeReceived)
+        return;
+      if (state.receivedSize !== state.declaredSize) {
+        this.rejectTransfer(transferId, makeError("file_download_failed", "Download size mismatch"));
+        return;
+      }
+      this.downloads.delete(transferId);
+      state.resolve(new Blob(state.chunks.map((chunk) => Uint8Array.from(chunk).buffer), { type: state.contentType }));
+    }
+    rejectRelevant(message, error2) {
+      const clientMsgId = message.meta?.["client_msg_id"];
+      if (typeof clientMsgId === "string") {
+        const pending = this.pending.get(clientMsgId);
+        if (pending) {
+          this.pending.delete(clientMsgId);
+          clearTimeout(pending.timer);
+          pending.reject(error2);
+        }
+      }
+      const transferId = message.payload["transfer_id"];
+      if (typeof transferId === "string")
+        this.rejectTransfer(transferId, error2);
+    }
+    rejectTransfer(transferId, error2) {
+      const download = this.downloads.get(transferId);
+      if (download) {
+        this.downloads.delete(transferId);
+        download.reject(error2);
+      }
+      if (this.uploads.has(transferId))
+        this.uploads.set(transferId, error2);
+      for (const [clientMsgId, pending] of this.pending) {
+        if (pending.transferId === transferId) {
+          this.pending.delete(clientMsgId);
+          clearTimeout(pending.timer);
+          pending.reject(error2);
+        }
+      }
+    }
+    throwUploadError(transferId) {
+      const error2 = this.uploads.get(transferId);
+      if (error2)
+        throw error2;
+    }
+  };
+  function assertSafePublicControl(value) {
+    if (typeof value === "string") {
+      if (value.startsWith("fi_"))
+        throw makeError("invalid_file_transfer", "Internal File Layer identity leaked");
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(assertSafePublicControl);
+      return;
+    }
+    if (!value || typeof value !== "object")
+      return;
+    for (const [key, nested] of Object.entries(value)) {
+      if (FORBIDDEN_KEYS.has(key))
+        throw makeError("invalid_file_transfer", `Forbidden public field: ${key}`);
+      assertSafePublicControl(nested);
+    }
+  }
+  function requireTransferId(value) {
+    if (typeof value !== "string" || !TRANSFER_ID.test(value))
+      throw makeError("invalid_file_transfer", "Invalid transfer_id");
+    return value;
+  }
+  function requirePositiveInteger(value, name) {
+    if (!Number.isInteger(value) || value <= 0)
+      throw makeError("invalid_file_transfer", `${name} must be a positive integer`);
+    return value;
+  }
+  function requireNonNegativeInteger(value, name) {
+    if (!Number.isInteger(value) || value < 0)
+      throw makeError("invalid_file_transfer", `${name} must be a non-negative integer`);
+    return value;
+  }
+  function makeClientMsgId(type) {
+    return `cli_file_${type.replace(/[^a-z]+/g, "_")}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+  }
+  function asError(value) {
+    return value instanceof Error ? value : makeError("invalid_file_transfer", String(value));
   }
 
   // node_modules/@cortex-suite/sdk/dist/browser/client.js
@@ -754,7 +1143,6 @@
       this._accessToken = null;
       this._refreshToken = null;
       this._wsUrl = null;
-      this._runtimeHttpBaseUrl = null;
       this._cpApiUrl = null;
       this._sessionMeta = null;
       this._sessionContext = null;
@@ -792,7 +1180,18 @@
         onMessage: (msg) => this._handleSessionMessage(msg),
         onFatalError: (err) => this._handleSessionFatalError(err)
       });
-      this._transport.onMessage = (data) => this._session.handleIncoming(data);
+      this._fileTransfers = new FileTransferManager(this._transport, this._options.sendTimeout);
+      this._transport.onText = (data) => {
+        let message;
+        try {
+          message = JSON.parse(data);
+        } catch {
+          return;
+        }
+        if (!this._fileTransfers.handleMessage(message))
+          this._session.handleMessage(message);
+      };
+      this._transport.onBinary = (data) => this._fileTransfers.handleBinary(data);
       this._transport.onClose = (code2, reason) => this._handleClose(code2, reason);
       this._transport.onError = () => {
       };
@@ -842,6 +1241,7 @@
     async disconnect() {
       this._disconnectRequested = true;
       this._stopBackgroundActivity();
+      this._fileTransfers.abortAll();
       this._resetConnectionRuntimeState();
       this._transport.close();
     }
@@ -862,28 +1262,25 @@
       await this._session.sendEscalationReply(options.escalationId, options.waitToken, options.action, options.content, options.meta);
     }
     async uploadFile(file, options = {}) {
-      if (!this._accessToken)
-        throw makeError("auth_invalid", "Not connected");
-      const sessionId = this._requireSessionId(options.sessionId);
-      return uploadFile(file, this._accessToken, withQueryParams(this._resolveRuntimeUrl(this._platform.uploadUrl), { session_id: sessionId }), this._platform.fetchFn, this._platform.FormDataClass);
+      return this._uploadSessionSource(createUploadSource(file, options), options);
     }
     async uploadAttachment(file) {
       return this.uploadFile(file);
     }
-    async downloadFile(fileId, options = {}) {
+    async downloadFile(fileRef, options = {}) {
       if (!this._accessToken)
         throw makeError("auth_invalid", "Not connected");
+      const canonicalFileRef = requireSessionFileRef(fileRef);
       const scope = options.scope ?? "session";
-      let url;
       if (scope === "session") {
-        const sessionId = this._requireSessionId(options.sessionId);
-        url = `${this._requireRuntimeHttpBaseUrl()}/download/${encodeURIComponent(fileId)}`;
-        url = withQueryParams(url, { session_id: sessionId });
-      } else if (scope === "project") {
+        return this._fileTransfers.download(this._requireActiveSessionId(options.sessionId), canonicalFileRef);
+      }
+      let url;
+      if (scope === "project") {
         if (options.projectId === void 0) {
           throw makeError("file_operation_failed", "projectId is required for project file download");
         }
-        url = `${this._requireCpApiUrl()}/api/workspace/projects/${encodeURIComponent(String(options.projectId))}/files/${encodeURIComponent(fileId)}/download/`;
+        url = `${this._requireCpApiUrl()}/api/workspace/projects/${encodeURIComponent(String(options.projectId))}/files/${encodeURIComponent(canonicalFileRef)}/download/`;
       } else {
         throw makeError("file_operation_failed", `Unsupported file scope: ${scope}`);
       }
@@ -896,40 +1293,19 @@
       }
       throw makeError("file_operation_failed", "File API response does not expose bytes");
     }
-    /**
-     * Mint a short-lived, single-use download URL for a session file descriptor (sf_ file_ref).
-     *
-     * Returns an absolute, unauthenticated GET URL that a plain anchor navigation can download
-     * (no CORS, no auth header). Mint-on-click: call this each time the user clicks the link so the
-     * token is never stale.
-     */
-    async mintSessionFileDownloadUrl(fileRef, options = {}) {
-      if (!this._accessToken)
-        throw makeError("auth_invalid", "Not connected");
-      const sessionId = this._requireSessionId(options.sessionId);
-      const base2 = this._requireRuntimeHttpBaseUrl();
-      const mintUrl = `${base2}/sessions/${encodeURIComponent(sessionId)}/files/${encodeURIComponent(fileRef)}/download-token`;
-      const body = await this._requestJson(mintUrl, "POST");
-      const downloadUrl = body["download_url"];
-      if (typeof downloadUrl !== "string" || !downloadUrl) {
-        throw makeError("file_operation_failed", "Download token response missing download_url");
-      }
-      return downloadUrl.startsWith("http") ? downloadUrl : `${base2}${downloadUrl}`;
-    }
     async listFiles(options = {}) {
       if (!this._accessToken)
         throw makeError("auth_invalid", "Not connected");
       const scope = options.scope ?? "session";
+      if (scope === "session")
+        return this._fileTransfers.list(this._requireActiveSessionId(options.sessionId));
       const query = {
         limit: options.limit ?? 50,
         offset: options.offset ?? 0,
         include_trashed: String(options.includeTrashed ?? false)
       };
       let url;
-      if (scope === "session") {
-        const sessionId = this._requireSessionId(options.sessionId);
-        url = `${this._requireRuntimeHttpBaseUrl()}/sessions/${encodeURIComponent(sessionId)}/files/`;
-      } else if (scope === "project") {
+      if (scope === "project") {
         if (options.projectId === void 0) {
           throw makeError("file_operation_failed", "projectId is required for project file list");
         }
@@ -938,14 +1314,15 @@
         throw makeError("file_operation_failed", `Unsupported file scope: ${scope}`);
       }
       const body = await this._requestJson(withQueryParams(url, query));
-      return body;
+      return parsePublicFileList(body);
     }
-    async promoteFile(fileId, options) {
+    async promoteFile(fileRef, options) {
       if (!this._accessToken)
         throw makeError("auth_invalid", "Not connected");
-      const url = `${this._requireCpApiUrl()}/api/workspace/projects/${encodeURIComponent(String(options.projectId))}/files/${encodeURIComponent(fileId)}/promote/`;
+      const canonicalFileRef = requireSessionFileRef(fileRef);
+      const url = `${this._requireCpApiUrl()}/api/workspace/projects/${encodeURIComponent(String(options.projectId))}/files/${encodeURIComponent(canonicalFileRef)}/promote/`;
       const body = await this._requestJson(url, "POST");
-      return body;
+      return parsePublicFileRef(body);
     }
     async stop() {
       this._requireActiveSessionId();
@@ -961,8 +1338,6 @@
       this._accessToken = authResponse.access_token;
       this._refreshToken = authResponse.refresh_token;
       this._wsUrl = authResponse.ws_url;
-      this._runtimeHttpBaseUrl = deriveRuntimeHttpBaseUrl(authResponse.ws_url);
-      this._runtimeHttpBaseUrl = deriveRuntimeHttpBaseUrlFromHttpUrl(this._platform.uploadUrl) ?? this._runtimeHttpBaseUrl;
       this._cpApiUrl = normalizeOptionalBaseUrl(authResponse.cp_api_url);
       if (authResponse.auth_required === true) {
         this._authRequired = true;
@@ -1045,6 +1420,7 @@
       this._transport.close(1001, "stale");
     }
     _handleClose(code2, reason) {
+      this._fileTransfers.abortAll();
       if (this._disconnectRequested)
         return;
       if (this._channelState === "AUTH_FAILED")
@@ -1105,6 +1481,7 @@
       this._dispatchMessage(msg);
     }
     _handleSessionFatalError(err) {
+      this._fileTransfers.abortAll();
       this._rejectSessionOpen(err);
       this._channelState = "AUTH_FAILED";
       this._stopBackgroundActivity();
@@ -1260,15 +1637,14 @@
       this._accessToken = null;
       this._refreshToken = null;
       this._wsUrl = null;
-      this._runtimeHttpBaseUrl = null;
       this._cpApiUrl = null;
     }
     _closeTransportWithoutReconnect(code2, reason) {
       this._suppressNextReconnect = true;
       this._transport.close(code2, reason);
     }
-    _requireActiveSessionId() {
-      const effectiveSessionId = this.sessionId;
+    _requireActiveSessionId(sessionId) {
+      const effectiveSessionId = sessionId ?? this.sessionId;
       if (!effectiveSessionId || !this._isSessionReady()) {
         throw makeError("session_not_ready", "Session is not ready");
       }
@@ -1281,22 +1657,24 @@
       }
       return effectiveSessionId;
     }
-    _requireRuntimeHttpBaseUrl() {
-      if (!this._runtimeHttpBaseUrl) {
-        throw makeError("file_api_unavailable", "Runtime file API is unavailable");
-      }
-      return this._runtimeHttpBaseUrl;
-    }
     _requireCpApiUrl() {
       if (!this._cpApiUrl) {
         throw makeError("file_api_unavailable", "Control Plane file API is unavailable");
       }
       return this._cpApiUrl;
     }
-    _resolveRuntimeUrl(pathOrUrl) {
-      if (/^https?:\/\//i.test(pathOrUrl))
-        return pathOrUrl;
-      return `${this._requireRuntimeHttpBaseUrl()}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+    async _uploadSessionSource(source, options = {}) {
+      let delegated = false;
+      try {
+        if (!this._accessToken)
+          throw makeError("auth_invalid", "Not connected");
+        const sessionId = this._requireActiveSessionId(options.sessionId);
+        delegated = true;
+        return await this._fileTransfers.upload(sessionId, source, options.sha256);
+      } finally {
+        if (!delegated)
+          await source.cleanup();
+      }
     }
     async _requestJson(url, method = "GET") {
       const res = await this._request(url, method);
@@ -1320,25 +1698,6 @@
     }
   };
   var CANCELLED = Symbol("cancelled");
-  function deriveRuntimeHttpBaseUrl(wsUrl) {
-    if (!wsUrl)
-      return null;
-    const parsed = new URL(wsUrl);
-    parsed.protocol = parsed.protocol === "wss:" ? "https:" : parsed.protocol === "ws:" ? "http:" : parsed.protocol;
-    parsed.pathname = "";
-    parsed.search = "";
-    parsed.hash = "";
-    return parsed.toString().replace(/\/$/, "");
-  }
-  function deriveRuntimeHttpBaseUrlFromHttpUrl(httpUrl) {
-    if (!/^https?:\/\//i.test(httpUrl))
-      return null;
-    const parsed = new URL(httpUrl);
-    parsed.pathname = "";
-    parsed.search = "";
-    parsed.hash = "";
-    return parsed.toString().replace(/\/$/, "");
-  }
   function normalizeOptionalBaseUrl(url) {
     if (typeof url !== "string" || url.trim() === "")
       return null;
@@ -1447,18 +1806,15 @@
   }
 
   // node_modules/@cortex-suite/sdk/dist/browser/index.js
-  var UPLOAD_URL = "/upload";
-  function makePlatform() {
+  function makePlatform(_options) {
     return {
       WS: WebSocket,
-      fetchFn: (url, init) => fetch(url, init),
-      FormDataClass: FormData,
-      uploadUrl: UPLOAD_URL
+      fetchFn: (url, init) => fetch(url, init)
     };
   }
   var CortexBrowserClient = class extends CortexClient {
     constructor(options) {
-      super(options, makePlatform());
+      super(options, makePlatform(options));
     }
   };
 
@@ -15273,7 +15629,6 @@ ${token}`;
       apiKey: baseOptions.apiKey,
       authUrl: baseOptions.authUrl,
       controlPlaneUrl: baseOptions.controlPlaneUrl,
-      uploadUrl: baseOptions.uploadUrl,
       target: baseOptions.target,
       historyTarget: baseOptions.historyTarget,
       theme: baseOptions.theme,
@@ -15348,7 +15703,6 @@ ${token}`;
       apiKey: options.apiKey,
       workerRef: options.workerRef,
       authUrl: options.authUrl,
-      uploadUrl: options.uploadUrl,
       debug: options.debug,
       onMessage: () => {
       }

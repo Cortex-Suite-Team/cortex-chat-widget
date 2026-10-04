@@ -54,7 +54,6 @@ function resolveOptions(
     apiKey: baseOptions.apiKey,
     authUrl: baseOptions.authUrl,
     controlPlaneUrl: baseOptions.controlPlaneUrl,
-    uploadUrl: baseOptions.uploadUrl,
     target: baseOptions.target,
     historyTarget: baseOptions.historyTarget,
     theme: baseOptions.theme,
@@ -136,7 +135,6 @@ function createClient(options: NormalizedWidgetOptions): WidgetClientLike {
     apiKey: options.apiKey,
     workerRef: options.workerRef,
     authUrl: options.authUrl,
-    uploadUrl: options.uploadUrl,
     debug: options.debug,
     onMessage: () => {},
   });

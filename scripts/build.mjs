@@ -50,6 +50,12 @@ async function resolveBuildInfo() {
   const sdkBrowserEntry = require.resolve('@cortex-suite/sdk/browser');
   const sdkPackagePath = join(dirname(dirname(dirname(sdkBrowserEntry))), 'package.json');
   const sdkPackage = JSON.parse(await readFile(sdkPackagePath, 'utf8'));
+  const sdkDependency = widgetPackage.dependencies?.['@cortex-suite/sdk'];
+  if (sdkDependency !== sdkPackage.version) {
+    throw new Error(
+      `Installed @cortex-suite/sdk ${sdkPackage.version} does not match package dependency ${sdkDependency}`,
+    );
+  }
 
   const sdkUiEntry = require.resolve('@cortex-suite/sdk-ui');
   const sdkUiPackagePath = join(dirname(dirname(dirname(sdkUiEntry))), 'package.json');
@@ -67,6 +73,7 @@ async function resolveBuildInfo() {
       name: sdkPackage.name,
       version: sdkPackage.version,
       browserEntry: '@cortex-suite/sdk/browser',
+      source: `npm:${sdkPackage.name}@${sdkPackage.version}`,
     },
     sdkUi: {
       name: sdkUiPackage.name,
