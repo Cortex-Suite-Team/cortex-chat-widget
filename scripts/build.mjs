@@ -15,10 +15,6 @@ const GITHUB_SOURCE_BASES = [
     sourceBase: 'https://raw.githubusercontent.com/Cortex-Suite-Team/cortex-sdk/main/js/browser/',
   },
   {
-    localPrefix: '../../sdk-ui/src/',
-    sourceBase: 'https://raw.githubusercontent.com/Cortex-Suite-Team/cortex-sdk-ui/main/src/',
-  },
-  {
     localPrefix: '../src/',
     sourceBase: 'https://raw.githubusercontent.com/Cortex-Suite-Team/cortex-chat-widget/main/src/',
   },
@@ -50,6 +46,7 @@ async function rewriteSourceMapSources(mapPath) {
 }
 
 async function resolveBuildInfo() {
+  const widgetPackage = JSON.parse(await readFile('package.json', 'utf8'));
   const sdkBrowserEntry = require.resolve('@cortex-suite/sdk/browser');
   const sdkPackagePath = join(dirname(dirname(dirname(sdkBrowserEntry))), 'package.json');
   const sdkPackage = JSON.parse(await readFile(sdkPackagePath, 'utf8'));
@@ -57,6 +54,12 @@ async function resolveBuildInfo() {
   const sdkUiEntry = require.resolve('@cortex-suite/sdk-ui');
   const sdkUiPackagePath = join(dirname(dirname(dirname(sdkUiEntry))), 'package.json');
   const sdkUiPackage = JSON.parse(await readFile(sdkUiPackagePath, 'utf8'));
+  const sdkUiDependency = widgetPackage.dependencies?.['@cortex-suite/sdk-ui'];
+  if (sdkUiDependency !== sdkUiPackage.version) {
+    throw new Error(
+      `Installed @cortex-suite/sdk-ui ${sdkUiPackage.version} does not match package dependency ${sdkUiDependency}`,
+    );
+  }
 
   return {
     widgetEntry: 'dist/index.js',
@@ -68,7 +71,7 @@ async function resolveBuildInfo() {
     sdkUi: {
       name: sdkUiPackage.name,
       version: sdkUiPackage.version,
-      source: 'file:../sdk-ui',
+      source: `npm:${sdkUiPackage.name}@${sdkUiPackage.version}`,
     },
     sources: {
       widget: 'https://github.com/Cortex-Suite-Team/cortex-chat-widget',

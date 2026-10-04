@@ -128,7 +128,7 @@ export interface ChatState {
     isConnected: boolean;
     isStale: boolean;
   };
-  transcript: ChatMessageViewModel[];
+  transcript: readonly ChatMessageViewModel[];
   transcriptRevision: number;
   transcriptMutation: {
     type: 'message_added' | 'message_updated';

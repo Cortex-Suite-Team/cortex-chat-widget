@@ -153,8 +153,19 @@ This package is not the Control Plane operator cockpit.
 
 Run development commands from the repository root. Do not rely on machine-specific checkout paths.
 
+The published package uses the exact versioned dependency `@cortex-suite/sdk-ui@0.1.0`.
+After that version is available from the configured npm registry, use the standard workflow:
+
 ```bash
 npm ci
 npm run build
 python -m http.server 8080
+```
+
+Before release, set `CORTEX_SDK_UI_TARBALL` to a packed `sdk-ui` artifact and install it without
+changing `package.json`:
+
+```bash
+npm install --no-save "$CORTEX_SDK_UI_TARBALL"
+npm run build
 ```

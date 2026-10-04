@@ -847,7 +847,7 @@ interface TranscriptProjection {
   virtualizer: TranscriptVirtualizer<ChatMessageViewModel>;
   scopeKey: string;
   revision: number;
-  transcript: ChatMessageViewModel[];
+  transcript: readonly ChatMessageViewModel[];
   itemIndexByMessageId: Map<string, number>;
 }
 
