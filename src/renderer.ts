@@ -365,16 +365,17 @@ function toAttachmentViewModel(attachment: unknown): TranscriptAttachmentViewMod
     if (!ref) {
       return null;
     }
-    // A bare string ref carries no filename/ownership — render degraded, never surface the raw id.
-    const isSessionRef = ref.startsWith('sf_');
+    if (!ref.startsWith('sf_')) {
+      return null;
+    }
     return {
-      id: isSessionRef ? ref : null,
+      id: ref,
       label: 'Attached file',
       url: null,
       fileName: null,
       contentType: null,
       size: null,
-      fileRef: isSessionRef ? ref : null,
+      fileRef: ref,
       downloadMintUrl: null,
       ownerRole: null,
       direction: null,
@@ -401,15 +402,7 @@ function toAttachmentViewModel(attachment: unknown): TranscriptAttachmentViewMod
   // Never fall back to any id/url for the visible label — filename only, else a safe placeholder.
   const label = fileName ?? 'Attached file';
 
-  // A legacy ref may carry only an internal id (file_id/artifact_id/attachment_id). We still show a
-  // degraded "Attached file" chip so the user knows a file is present, but the raw id is NEVER
-  // surfaced as text or carried as the actionable file_ref.
-  const hasInternalId = toNonEmptyString(attachment.file_id)
-    ?? toNonEmptyString(attachment.artifact_id)
-    ?? toNonEmptyString(attachment.attachment_id);
-
-  // Keep the chip if we have a filename, a session ref, a download target, or any legacy id.
-  if (!fileName && !fileRef && !url && !hasInternalId) {
+  if (!fileName && !fileRef && !url) {
     return null;
   }
 

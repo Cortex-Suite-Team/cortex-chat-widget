@@ -399,8 +399,7 @@ export class ChatWidget {
       debug: this.options.debug,
     });
     this.liveChatState = this.controller.getState();
-    this.ui.attachmentsAvailable = typeof this.client.uploadAttachment === 'function'
-      || typeof this.client.uploadFile === 'function';
+    this.ui.attachmentsAvailable = typeof this.client.uploadFile === 'function';
     this.bindControllerListeners();
   }
 
@@ -504,8 +503,7 @@ export class ChatWidget {
       debug: this.options.debug,
     });
     this.liveChatState = this.controller.getState();
-    this.ui.attachmentsAvailable = typeof this.client.uploadAttachment === 'function'
-      || typeof this.client.uploadFile === 'function';
+    this.ui.attachmentsAvailable = typeof this.client.uploadFile === 'function';
     this.liveConnected = false;
     this.liveConnectPromise = null;
     this.bindControllerListeners();
@@ -675,32 +673,15 @@ export class ChatWidget {
     this.ui.cachedUploadedFile = null;
   }
 
-  // Wrap an uploaded id into a canonical attachment ref. New SessionManager builds return an
-  // sf_ file_ref; legacy builds return fa_/fi_ blob ids (still accepted + normalized server-side).
-  private wrapUploadedId(uploadedId: string, file: { name?: string; type?: string; size?: number }): WidgetAttachmentRef {
+  private buildUploadedAttachment(fileRef: string, file: File): WidgetAttachmentRef {
+    if (!/^sf_[A-Za-z0-9][A-Za-z0-9_-]*$/.test(fileRef)) {
+      throw createWidgetError('upload_failed', 'Upload did not return a canonical sf_ file_ref.');
+    }
     const meta: Partial<WidgetAttachmentRef> = {};
-    if (file && typeof file.name === 'string' && file.name) meta.filename = file.name;
-    if (file && typeof file.type === 'string' && file.type) meta.content_type = file.type;
-    if (file && typeof file.size === 'number') meta.size = file.size;
-
-    if (uploadedId.startsWith('sf_')) {
-      const sessionId = this.client.sessionId ?? null;
-      const downloadMintUrl = sessionId
-        ? `/sessions/${encodeURIComponent(sessionId)}/files/${encodeURIComponent(uploadedId)}/download-token`
-        : undefined;
-      return {
-        file_ref: uploadedId,
-        attachment_id: uploadedId,
-        owner_role: 'user',
-        direction: 'inbound',
-        ...(downloadMintUrl ? { download_mint_url: downloadMintUrl } : {}),
-        ...meta,
-      };
-    }
-    if (uploadedId.startsWith('fa_')) {
-      return { artifact_id: uploadedId, attachment_id: uploadedId, ...meta };
-    }
-    return { file_id: uploadedId, attachment_id: uploadedId, ...meta };
+    if (file.name) meta.filename = file.name;
+    if (file.type) meta.content_type = file.type;
+    meta.size = file.size;
+    return { file_ref: fileRef, ...meta };
   }
 
   private async uploadSelectedFile(): Promise<WidgetAttachmentRef | null> {
@@ -717,28 +698,14 @@ export class ChatWidget {
     this.notifyAndRender();
 
     try {
-      let attachmentRef: WidgetAttachmentRef;
-
-      // Prefer uploadAttachmentRef (future SDK) which returns the full ref object.
-      // Fall back to uploadAttachment/uploadFile (current published SDK 1.1.13) which
-      // return a string ID — wrap into a minimal canonical ref dict so the SM validator
-      // receives a routable dict (artifact_id for fa_... IDs, file_id for fi_.../file_...).
-      const clientAny = this.client as unknown as Record<string, unknown>;
-      if (typeof clientAny['uploadAttachmentRef'] === 'function') {
-        const raw = await (clientAny['uploadAttachmentRef'] as (f: File) => Promise<unknown>)(file);
-        attachmentRef = raw as WidgetAttachmentRef;
-      } else if (typeof this.client.uploadAttachment === 'function') {
-        const uploadedId = await this.client.uploadAttachment(file);
-        attachmentRef = this.wrapUploadedId(uploadedId, file);
-      } else if (typeof this.client.uploadFile === 'function') {
-        const uploadedId = await this.client.uploadFile(file);
-        attachmentRef = this.wrapUploadedId(uploadedId, file);
-      } else {
+      if (typeof this.client.uploadFile !== 'function') {
         throw createWidgetError(
           'attachments_unavailable',
           'Attachments are unavailable for the current client.',
         );
       }
+      const fileRef = await this.client.uploadFile(file);
+      const attachmentRef = this.buildUploadedAttachment(fileRef, file);
 
       this.ui.cachedUploadedAttachmentRef = attachmentRef;
       this.ui.cachedUploadedFile = file;

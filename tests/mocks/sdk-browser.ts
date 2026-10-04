@@ -68,13 +68,13 @@ export class CortexClient {
   async uploadAttachment(file: File): Promise<string> {
     this.uploadAttachmentCalls += 1;
     this.uploads.push(file);
-    return `attachment:${file.name}`;
+    return `sf_${file.name.replace(/[^A-Za-z0-9_-]/g, '_')}`;
   }
 
   async uploadFile(file: File): Promise<string> {
     this.uploadFileCalls += 1;
     this.uploadFiles.push(file);
-    return `file:${file.name}`;
+    return `sf_${file.name.replace(/[^A-Za-z0-9_-]/g, '_')}`;
   }
 
   emit(message: Record<string, unknown>): void {

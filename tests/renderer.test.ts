@@ -167,7 +167,7 @@ describe('widget renderer behavior', () => {
 
   it('supports one-file selection, replacement, removal, upload, and retryable send failure state', async () => {
     const client = new CustomClient();
-    client.uploadAttachmentImpl = async (file) => `attachment:${file.name}`;
+    client.uploadFileImpl = async () => 'sf_second_file';
 
     const { controller } = mountWidget({
       client,
@@ -198,11 +198,10 @@ describe('widget renderer behavior', () => {
     submitComposer(form);
     await flushAsyncWork();
 
-    expect(client.uploadedAttachments).toHaveLength(1);
+    expect(client.uploadedFiles).toHaveLength(1);
     expect(controller.sendCalls[0]).toMatchObject({
       content: ['Attach this'],
-      // Widget wraps the string ID into a canonical dict ref (file_id path for non-fa_ IDs).
-      attachments: [{ attachment_id: 'attachment:second.txt', file_id: 'attachment:second.txt' }],
+      attachments: [{ file_ref: 'sf_second_file', filename: 'second.txt', content_type: 'text/plain', size: 1 }],
     });
     expect(textarea.value).toBe('Attach this');
     expect(fileChip.textContent).toContain('second.txt');
@@ -210,13 +209,13 @@ describe('widget renderer behavior', () => {
     submitComposer(form);
     await flushAsyncWork();
 
-    expect(client.uploadedAttachments).toHaveLength(1);
+    expect(client.uploadedFiles).toHaveLength(1);
     expect(controller.sendCalls).toHaveLength(2);
   });
 
   it('prevents send when upload fails', async () => {
     const client = new CustomClient();
-    client.uploadAttachmentImpl = async () => {
+    client.uploadFileImpl = async () => {
       throw new Error('Upload failed');
     };
 
@@ -238,6 +237,25 @@ describe('widget renderer behavior', () => {
     expect(controller.sendCalls).toHaveLength(0);
     const banner = shadow.querySelector('[data-testid="error-banner"]') as HTMLElement;
     expect(banner.textContent).toContain('Upload failed');
+  });
+
+  it.each(['fa_legacy', 'fi_legacy', 'file_legacy'])('rejects a legacy upload id: %s', async (legacyId) => {
+    const client = new CustomClient();
+    client.uploadFileImpl = async () => legacyId;
+    const { controller } = mountWidget({ client });
+    const shadow = getShadow();
+    const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
+    const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
+    const fileInput = shadow.querySelector('[data-testid="file-input"]') as HTMLInputElement;
+
+    changeInput(textarea, 'Needs canonical file');
+    setFileInput(fileInput, new File(['data'], 'legacy.txt', { type: 'text/plain' }));
+    submitComposer(form);
+    await flushAsyncWork();
+
+    expect(controller.sendCalls).toHaveLength(0);
+    expect((shadow.querySelector('[data-testid="error-banner"]') as HTMLElement).textContent)
+      .toContain('canonical sf_ file_ref');
   });
 
   it('renders escalation pending card', () => {
@@ -306,7 +324,7 @@ describe('widget renderer behavior', () => {
         content: '',
         meta: {
           attachments: [{
-            file_id: 'mock_file_1_report',
+            file_ref: 'sf_mock_file_1_report',
             filename: 'report.xlsx',
           }],
         },
@@ -334,7 +352,7 @@ describe('widget renderer behavior', () => {
         content: 'Please review this file',
         meta: {
           attachments: [{
-            file_id: 'mock_file_2_contract',
+            file_ref: 'sf_mock_file_2_contract',
             filename: 'contract.pdf',
           }],
         },
@@ -534,7 +552,7 @@ describe('widget renderer behavior', () => {
     expect(shadow.textContent).not.toContain('report.xlsx');
   });
 
-  it('renders a bare string attachment ref as "Attached file" instead of the raw id', () => {
+  it('ignores a legacy bare string attachment ref', () => {
     mountWidget();
     const shadow = getShadow();
 
@@ -550,13 +568,11 @@ describe('widget renderer behavior', () => {
       }],
     }));
 
-    const attachments = shadow.querySelector('[data-testid="message-attachments"]') as HTMLElement;
-    expect(attachments).toBeTruthy();
-    expect(attachments.textContent).toContain('Attached file');
-    expect(attachments.textContent).not.toContain('fa_ea6e1234');
+    expect(shadow.querySelector('[data-testid="message-attachments"]')).toBeNull();
+    expect(shadow.textContent).not.toContain('fa_ea6e1234');
   });
 
-  it('renders an object attachment with only an id as "Attached file" instead of the id', () => {
+  it('ignores an object attachment carrying only internal ids', () => {
     mountWidget();
     const shadow = getShadow();
 
@@ -572,10 +588,8 @@ describe('widget renderer behavior', () => {
       }],
     }));
 
-    const attachments = shadow.querySelector('[data-testid="message-attachments"]') as HTMLElement;
-    expect(attachments).toBeTruthy();
-    expect(attachments.textContent).toContain('Attached file');
-    expect(attachments.textContent).not.toContain('fa_ea6e1234');
+    expect(shadow.querySelector('[data-testid="message-attachments"]')).toBeNull();
+    expect(shadow.textContent).not.toContain('fa_ea6e1234');
   });
 
   it('does not render an empty bubble when message content and attachments are both absent', () => {

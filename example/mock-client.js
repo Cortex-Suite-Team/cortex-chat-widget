@@ -93,7 +93,7 @@ export function createMockCortexClient() {
     const stored = uploadedAttachments.get(id);
     if (!stored) {
       return {
-        file_id: id,
+        file_ref: id,
         filename: id,
         content_type: 'application/octet-stream',
         size: null,
@@ -102,7 +102,7 @@ export function createMockCortexClient() {
     }
 
     return {
-      file_id: id,
+      file_ref: id,
       filename: stored.filename,
       content_type: stored.content_type,
       size: stored.size,
@@ -121,11 +121,8 @@ export function createMockCortexClient() {
       }
 
       if (attachment && typeof attachment === 'object') {
-        if (typeof attachment.file_id === 'string') {
-          return toResolvedAttachment(attachment.file_id);
-        }
-        if (typeof attachment.attachment_id === 'string') {
-          return toResolvedAttachment(attachment.attachment_id);
+        if (typeof attachment.file_ref === 'string') {
+          return toResolvedAttachment(attachment.file_ref);
         }
       }
 
@@ -168,7 +165,7 @@ export function createMockCortexClient() {
       const fileName = typeof file === 'string'
         ? file
         : (file && typeof file === 'object' && 'name' in file ? file.name : 'attachment');
-      const id = `mock_file_${uploadNumber}_${sanitizeFileName(fileName)}`;
+      const id = `sf_mock_${uploadNumber}_${sanitizeFileName(fileName)}`;
       const objectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function' && file instanceof Blob
         ? URL.createObjectURL(file)
         : null;
@@ -208,8 +205,10 @@ export function createMockCortexClient() {
       emit(createEnvelope('chat::echo', sessionId, nextSeq(), {
         role: 'user',
         content,
-        meta: meta && typeof meta === 'object' ? { ...meta } : undefined,
-        attachments: resolvedAttachments,
+        meta: {
+          ...(meta && typeof meta === 'object' ? meta : {}),
+          ...(resolvedAttachments.length ? { attachments: resolvedAttachments } : {}),
+        },
       }));
 
       schedule(180, () => {
@@ -275,8 +274,10 @@ export function createMockCortexClient() {
           turn_id: turnId,
           answer_kind: 'final',
           content: finalContent,
-          attachments: resolvedAttachments,
-          meta: { actor: DEMO_ACTOR },
+          meta: {
+            actor: DEMO_ACTOR,
+            ...(resolvedAttachments.length ? { attachments: resolvedAttachments } : {}),
+          },
         }));
       });
 

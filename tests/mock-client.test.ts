@@ -66,13 +66,13 @@ describe('example mock client attachments', () => {
     expect(userMessage?.payload).toMatchObject({
       role: 'user',
       content: '',
-      attachments: [{
-        file_id: attachmentId,
+      meta: { attachments: [{
+        file_ref: attachmentId,
         filename: 'plan-4.md',
         content_type: 'text/markdown',
         size: file.size,
         download_url: 'blob:plan-4',
-      }],
+      }] },
     });
 
     const finalAnswer = messages.find((message) => message.type === 'chat::answer');
@@ -80,13 +80,13 @@ describe('example mock client attachments', () => {
       role: 'assistant',
       answer_kind: 'final',
       content: 'I received your file.',
-      attachments: [{
-        file_id: attachmentId,
+      meta: { attachments: [{
+        file_ref: attachmentId,
         filename: 'plan-4.md',
         content_type: 'text/markdown',
         size: file.size,
         download_url: 'blob:plan-4',
-      }],
+      }] },
     });
     expect(finalAnswer?.payload.content).not.toContain('[attachment only message]');
     expect(finalAnswer?.payload.content).not.toContain('Mock attachments received');
@@ -112,11 +112,11 @@ describe('example mock client attachments', () => {
     const finalAnswer = messages.find((message) => message.type === 'chat::answer');
     expect(finalAnswer?.payload).toMatchObject({
       content: 'Echo: Please check this',
-      attachments: [{
-        file_id: attachmentId,
+      meta: { attachments: [{
+        file_ref: attachmentId,
         filename: 'contract.pdf',
         download_url: 'blob:contract',
-      }],
+      }] },
     });
   });
 

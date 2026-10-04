@@ -32,20 +32,19 @@
     "LICENSE"
   ],
   "scripts": {
-    "sync:sdk": "node ./scripts/ensure-latest-sdk.mjs",
-    "prebuild": "npm --prefix ../sdk-ui run build && npm run sync:sdk",
+    "prebuild": "npm --prefix ../sdk-ui run build",
     "build": "npm run clean && npm run build:types && npm run build:bundle",
     "build:bundle": "node ./scripts/build.mjs",
     "real-runtime:prepare": "npm run build",
     "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
     "clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('dist', { recursive: true, force: true }))\"",
-    "pretypecheck": "npm --prefix ../sdk-ui run build && npm run sync:sdk",
+    "pretypecheck": "npm --prefix ../sdk-ui run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pretest": "npm --prefix ../sdk-ui run build && npm run sync:sdk",
+    "pretest": "npm --prefix ../sdk-ui run build",
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
   },
   "dependencies": {
-    "@cortex-suite/sdk": "^1.1.20",
+    "@cortex-suite/sdk": "1.1.20",
     "@cortex-suite/sdk-ui": "file:../sdk-ui"
   },
   "devDependencies": {

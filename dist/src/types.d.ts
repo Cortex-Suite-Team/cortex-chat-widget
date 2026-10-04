@@ -6,20 +6,13 @@ export interface CortexChatWidgetError {
 }
 /**
  * Attachment ref sent in chat::message payload.meta.attachments.
- * Canonical session refs use file_ref (sf_...). Legacy local refs use artifact_id; file-service
- * refs use file_id. attachment_id is a backward-compat alias kept for SDK ≤ 1.1.13 clients.
+ * The public boundary carries only the canonical SessionManager file_ref.
  */
 export interface WidgetAttachmentRef {
-    attachment_id: string;
-    file_ref?: string;
-    artifact_id?: string;
-    file_id?: string;
+    file_ref: string;
     filename?: string;
     content_type?: string;
     size?: number;
-    download_mint_url?: string;
-    owner_role?: string;
-    direction?: string;
 }
 export interface SelectedFileState {
     name: string;
@@ -119,7 +112,6 @@ export interface CortexChatWidgetHandle {
     getState(): CortexChatWidgetState;
 }
 export interface WidgetClientLike extends CortexClientLike {
-    uploadAttachment?(file: File | Blob | ArrayBuffer | Uint8Array | string): Promise<string>;
     uploadFile?(file: File | Blob | ArrayBuffer | Uint8Array | string, options?: {
         sessionId?: string;
     }): Promise<string>;

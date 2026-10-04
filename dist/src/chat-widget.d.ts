@@ -62,7 +62,7 @@ export declare class ChatWidget {
     private setSelectedFile;
     private clearSelectedFile;
     private clearDraftComposer;
-    private wrapUploadedId;
+    private buildUploadedAttachment;
     private uploadSelectedFile;
     private handleSend;
     private handleLoginSubmit;

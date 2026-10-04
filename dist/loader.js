@@ -1,4 +1,4 @@
-/* cortex-chat-widget loader build: sdk=1.1.20 builtAt=2026-06-01T19:13:26.455Z */
+/* cortex-chat-widget loader build: sdk=1.1.20 builtAt=2026-10-04T08:53:47.231Z */
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
@@ -12123,15 +12123,17 @@
       if (!ref) {
         return null;
       }
-      const isSessionRef = ref.startsWith("sf_");
+      if (!ref.startsWith("sf_")) {
+        return null;
+      }
       return {
-        id: isSessionRef ? ref : null,
+        id: ref,
         label: "Attached file",
         url: null,
         fileName: null,
         contentType: null,
         size: null,
-        fileRef: isSessionRef ? ref : null,
+        fileRef: ref,
         downloadMintUrl: null,
         ownerRole: null,
         direction: null,
@@ -12151,8 +12153,7 @@
     const direction = toNonEmptyString(attachment.direction);
     const messageRef = toNonEmptyString(attachment.message_ref);
     const label = fileName ?? "Attached file";
-    const hasInternalId = toNonEmptyString(attachment.file_id) ?? toNonEmptyString(attachment.artifact_id) ?? toNonEmptyString(attachment.attachment_id);
-    if (!fileName && !fileRef && !url && !hasInternalId) {
+    if (!fileName && !fileRef && !url) {
       return null;
     }
     return {
@@ -12922,7 +12923,7 @@
         debug: this.options.debug
       });
       this.liveChatState = this.controller.getState();
-      this.ui.attachmentsAvailable = typeof this.client.uploadAttachment === "function" || typeof this.client.uploadFile === "function";
+      this.ui.attachmentsAvailable = typeof this.client.uploadFile === "function";
       this.bindControllerListeners();
     }
     bindControllerListeners() {
@@ -13021,7 +13022,7 @@
         debug: this.options.debug
       });
       this.liveChatState = this.controller.getState();
-      this.ui.attachmentsAvailable = typeof this.client.uploadAttachment === "function" || typeof this.client.uploadFile === "function";
+      this.ui.attachmentsAvailable = typeof this.client.uploadFile === "function";
       this.liveConnected = false;
       this.liveConnectPromise = null;
       this.bindControllerListeners();
@@ -13170,29 +13171,15 @@ ${token}`;
       this.ui.cachedUploadedAttachmentRef = null;
       this.ui.cachedUploadedFile = null;
     }
-    // Wrap an uploaded id into a canonical attachment ref. New SessionManager builds return an
-    // sf_ file_ref; legacy builds return fa_/fi_ blob ids (still accepted + normalized server-side).
-    wrapUploadedId(uploadedId, file) {
+    buildUploadedAttachment(fileRef, file) {
+      if (!/^sf_[A-Za-z0-9][A-Za-z0-9_-]*$/.test(fileRef)) {
+        throw createWidgetError("upload_failed", "Upload did not return a canonical sf_ file_ref.");
+      }
       const meta = {};
-      if (file && typeof file.name === "string" && file.name) meta.filename = file.name;
-      if (file && typeof file.type === "string" && file.type) meta.content_type = file.type;
-      if (file && typeof file.size === "number") meta.size = file.size;
-      if (uploadedId.startsWith("sf_")) {
-        const sessionId = this.client.sessionId ?? null;
-        const downloadMintUrl = sessionId ? `/sessions/${encodeURIComponent(sessionId)}/files/${encodeURIComponent(uploadedId)}/download-token` : void 0;
-        return {
-          file_ref: uploadedId,
-          attachment_id: uploadedId,
-          owner_role: "user",
-          direction: "inbound",
-          ...downloadMintUrl ? { download_mint_url: downloadMintUrl } : {},
-          ...meta
-        };
-      }
-      if (uploadedId.startsWith("fa_")) {
-        return { artifact_id: uploadedId, attachment_id: uploadedId, ...meta };
-      }
-      return { file_id: uploadedId, attachment_id: uploadedId, ...meta };
+      if (file.name) meta.filename = file.name;
+      if (file.type) meta.content_type = file.type;
+      meta.size = file.size;
+      return { file_ref: fileRef, ...meta };
     }
     async uploadSelectedFile() {
       const file = this.ui.selectedFileValue;
@@ -13206,23 +13193,14 @@ ${token}`;
       this.ui.error = null;
       this.notifyAndRender();
       try {
-        let attachmentRef;
-        const clientAny = this.client;
-        if (typeof clientAny["uploadAttachmentRef"] === "function") {
-          const raw = await clientAny["uploadAttachmentRef"](file);
-          attachmentRef = raw;
-        } else if (typeof this.client.uploadAttachment === "function") {
-          const uploadedId = await this.client.uploadAttachment(file);
-          attachmentRef = this.wrapUploadedId(uploadedId, file);
-        } else if (typeof this.client.uploadFile === "function") {
-          const uploadedId = await this.client.uploadFile(file);
-          attachmentRef = this.wrapUploadedId(uploadedId, file);
-        } else {
+        if (typeof this.client.uploadFile !== "function") {
           throw createWidgetError(
             "attachments_unavailable",
             "Attachments are unavailable for the current client."
           );
         }
+        const fileRef = await this.client.uploadFile(file);
+        const attachmentRef = this.buildUploadedAttachment(fileRef, file);
         this.ui.cachedUploadedAttachmentRef = attachmentRef;
         this.ui.cachedUploadedFile = file;
         this.ui.isUploading = false;
