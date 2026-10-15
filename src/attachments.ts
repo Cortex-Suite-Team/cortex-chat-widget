@@ -52,21 +52,35 @@ function toGeneratedFile(raw: unknown, turnRef: string): TranscriptAttachmentVie
   };
 }
 
-// A user message shows its own files: refs it is still sending (no owner yet)
-// or user/inbound descriptors confirmed for its client_msg_id. Display only.
-function toUserFile(raw: unknown, clientMsgId: string | null): TranscriptAttachmentViewModel | null {
+const OWNERSHIP_FIELDS = ['owner_role', 'direction', 'message_ref', 'message_ref_kind'];
+
+// A user message shows its own files, display only:
+// - on the locally sent chat::message, refs still being sent (no ownership fields yet);
+// - otherwise only user/inbound descriptors confirmed for exactly this client_msg_id.
+function toUserFile(
+  raw: unknown,
+  clientMsgId: string | null,
+  pendingAllowed: boolean,
+): TranscriptAttachmentViewModel | null {
   if (typeof raw === 'string') {
-    return FILE_REF_PATTERN.test(raw)
+    return pendingAllowed && FILE_REF_PATTERN.test(raw)
       ? { fileRef: raw, label: 'Attached file', fileName: null, contentType: null, size: null, state: null, generated: false }
       : null;
   }
   if (!isRecord(raw)) return null;
   const fileRef = raw['file_ref'];
   if (typeof fileRef !== 'string' || !FILE_REF_PATTERN.test(fileRef)) return null;
-  if (raw['owner_role'] !== undefined) {
-    if (raw['owner_role'] !== 'user' || raw['direction'] !== 'inbound') return null;
-    const messageRef = raw['message_ref'];
-    if (messageRef !== undefined && clientMsgId !== null && messageRef !== clientMsgId) return null;
+  const pending = OWNERSHIP_FIELDS.every((field) => raw[field] === undefined);
+  if (pending) {
+    if (!pendingAllowed) return null;
+  } else if (
+    clientMsgId === null
+    || raw['owner_role'] !== 'user'
+    || raw['direction'] !== 'inbound'
+    || raw['message_ref_kind'] !== 'client_msg_id'
+    || raw['message_ref'] !== clientMsgId
+  ) {
+    return null;
   }
   const fileName = nonEmptyString(raw['filename']);
   const state = typeof raw['state'] === 'string' && STATES.has(raw['state']) ? raw['state'] : null;
@@ -92,7 +106,8 @@ export function getMessageAttachments(message: ChatMessageViewModel): Transcript
     if (turnRef) project = (value) => toGeneratedFile(value, turnRef);
   } else if (message.role === 'user' && (message.type === 'chat::message' || message.type === 'chat::echo')) {
     const clientMsgId = message.clientMsgId ?? nonEmptyString(message.meta?.['client_msg_id']);
-    project = (value) => toUserFile(value, clientMsgId);
+    const pendingAllowed = message.type === 'chat::message';
+    project = (value) => toUserFile(value, clientMsgId, pendingAllowed);
   }
   if (!project) return [];
 

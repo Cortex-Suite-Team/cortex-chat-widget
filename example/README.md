@@ -51,7 +51,8 @@ Then open:
 - simulates typing start / stop events
 - emits one or more `chat::partial` messages
 - emits a final `chat::answer`
-- returns mock attachment ids from `uploadAttachment()`
+- uploads files with `uploadFile()` (public `sf_` references) and confirms them on the echo as user files bound to the message's `client_msg_id`
+- attaches one generated text file to answers that received files; it downloads through `downloadFile(file_ref)`, which returns a Blob (no URLs)
 
 Everything runs in the browser with GitHub-hosted module files. No real backend connection is required.
 

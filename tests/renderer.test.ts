@@ -14,6 +14,20 @@ function getHost(): HTMLElement {
   return document.body.firstElementChild as HTMLElement;
 }
 
+function confirmedUserFile(fileRef: string, filename: string, clientMsgId: string) {
+  return {
+    file_ref: fileRef,
+    filename,
+    content_type: 'application/octet-stream',
+    size: 10,
+    owner_role: 'user',
+    direction: 'inbound',
+    state: 'available',
+    message_ref: clientMsgId,
+    message_ref_kind: 'client_msg_id',
+  };
+}
+
 function getShadow(): ShadowRoot {
   const host = getHost();
   if (!host.shadowRoot) {
@@ -320,11 +334,10 @@ describe('widget renderer behavior', () => {
         type: 'chat::echo',
         role: 'user',
         content: '',
+        clientMsgId: 'cli_report',
         meta: {
-          attachments: [{
-            file_ref: 'sf_mock_file_1_report',
-            filename: 'report.xlsx',
-          }],
+          client_msg_id: 'cli_report',
+          attachments: [confirmedUserFile('sf_mock_file_1_report', 'report.xlsx', 'cli_report')],
         },
       }],
     }));
@@ -348,11 +361,10 @@ describe('widget renderer behavior', () => {
         type: 'chat::echo',
         role: 'user',
         content: 'Please review this file',
+        clientMsgId: 'cli_contract',
         meta: {
-          attachments: [{
-            file_ref: 'sf_mock_file_2_contract',
-            filename: 'contract.pdf',
-          }],
+          client_msg_id: 'cli_contract',
+          attachments: [confirmedUserFile('sf_mock_file_2_contract', 'contract.pdf', 'cli_contract')],
         },
       }],
     }));
@@ -471,6 +483,76 @@ describe('widget renderer behavior', () => {
     expect(pre).toBeTruthy();
     expect(pre.textContent).toContain('"debug": true');
     expect(pre.textContent).toContain('"value": 1');
+  });
+
+  it.each([
+    ['wrong message_ref', { message_ref: 'cli_other' }],
+    ['missing message_ref', { message_ref: undefined }],
+    ['missing message_ref_kind', { message_ref_kind: undefined }],
+    ['turn binding kind', { message_ref_kind: 'turn' }],
+    ['assistant owner', { owner_role: 'assistant' }],
+    ['outbound direction', { direction: 'outbound' }],
+    ['internal message_ref', { message_ref: 'fi_0123' }],
+  ] as const)('does not render a user file with %s', (_name, override) => {
+    mountWidget();
+    const shadow = getShadow();
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_user_bound',
+        type: 'chat::echo',
+        role: 'user',
+        content: 'Files',
+        clientMsgId: 'cli_bound',
+        meta: {
+          client_msg_id: 'cli_bound',
+          attachments: [
+            { ...confirmedUserFile('sf_in_bad', 'bad.csv', 'cli_bound'), ...override },
+            confirmedUserFile('sf_in_good', 'good.csv', 'cli_bound'),
+          ],
+        },
+      }],
+    }));
+    const labels = Array.from(shadow.querySelectorAll('.cortex-widget__message-attachment-label')).map((el) => el.textContent);
+    expect(labels).toEqual(['good.csv']);
+    expect(shadow.innerHTML).not.toContain('bad.csv');
+  });
+
+  it('does not render confirmed user files on a message without client_msg_id', () => {
+    mountWidget();
+    const shadow = getShadow();
+    applyChatState(baseChatState({
+      transcript: [{
+        id: 'msg_no_identity',
+        type: 'chat::echo',
+        role: 'user',
+        content: 'Files',
+        meta: { attachments: [confirmedUserFile('sf_in_1', 'one.csv', 'cli_any')] },
+      }],
+    }));
+    expect(shadow.querySelector('[data-testid="message-attachments"]')).toBeNull();
+  });
+
+  it('keeps pending chips only on the locally sent chat::message', () => {
+    mountWidget();
+    const shadow = getShadow();
+    const pending = { file_ref: 'sf_pending_1', filename: 'pending.csv', content_type: 'text/csv', size: 3 };
+    applyChatState(baseChatState({
+      transcript: [
+        {
+          id: 'client:cli_local', type: 'chat::message', role: 'user', content: 'Sending', clientMsgId: 'cli_local',
+          deliveryStatus: 'sending', meta: { client_msg_id: 'cli_local', attachments: [pending, 'sf_pending_2'] },
+        },
+        {
+          id: 'echo_unconfirmed', type: 'chat::echo', role: 'user', content: 'Echo', clientMsgId: 'cli_echo',
+          meta: { client_msg_id: 'cli_echo', attachments: [{ ...pending, file_ref: 'sf_echo_unbound', filename: 'unbound.csv' }] },
+        },
+      ],
+    }));
+    const messages = Array.from(shadow.querySelectorAll('[data-testid="transcript-message"]'));
+    const labels = (index: number) => Array.from(messages[index].querySelectorAll('.cortex-widget__message-attachment-label')).map((el) => el.textContent);
+    expect(labels(0)).toEqual(['pending.csv', 'Attached file']);
+    expect(labels(1)).toEqual([]);
+    expect(shadow.innerHTML).not.toContain('unbound.csv');
   });
 
   it('renders a restored transcript with the same user files and generated cards, once each', () => {

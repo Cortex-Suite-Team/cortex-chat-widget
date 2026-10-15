@@ -8,9 +8,10 @@ const DEMO_ACTOR = {
   avatar_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="14" fill="%234f46e5"/><text x="14" y="19" text-anchor="middle" fill="white" font-size="11" font-family="sans-serif">RV</text></svg>',
 };
 
-function sanitizeFileName(name) {
+// Suffix for a mock sf_ reference; sf_ refs allow only [A-Za-z0-9_-].
+function fileRefSuffix(name) {
   const trimmed = String(name ?? '').trim().toLowerCase();
-  const normalized = trimmed.replace(/[^a-z0-9._-]+/g, '-').replace(/-+/g, '-');
+  const normalized = trimmed.replace(/[^a-z0-9_-]+/g, '-').replace(/-+/g, '-');
   return normalized.replace(/^-|-$/g, '') || 'attachment';
 }
 
@@ -25,14 +26,36 @@ function createEnvelope(type, sessionId, seq, payload) {
   };
 }
 
+// Public session-file descriptor (cortex-sdk contracts/session_file_attachments_v1.json).
+function describeFile(fileRef, record, binding) {
+  return {
+    file_ref: fileRef,
+    filename: record.filename,
+    content_type: record.content_type,
+    size: record.size,
+    state: 'available',
+    ...binding,
+  };
+}
+
+function makeError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  error.retryable = false;
+  return error;
+}
+
 export function createMockCortexClient() {
   const listeners = new Set();
   const timers = new Set();
-  const uploadedAttachments = new Map();
+  // sf_ ref -> { blob, filename, content_type, size }
+  const uploadedFiles = new Map();
+  const generatedFiles = new Map();
   let connected = false;
   let seq = 0;
   let turnNumber = 0;
   let uploadNumber = 0;
+  let outputNumber = 0;
   const sessionId = `mock-session-${Date.now().toString(36)}`;
 
   function nextSeq() {
@@ -61,73 +84,57 @@ export function createMockCortexClient() {
     }
   }
 
-  function buildAnswerContent(content, attachments) {
+  function buildAnswerContent(content, fileCount) {
     const normalizedContent = typeof content === 'string' ? content.trim() : '';
-
     if (normalizedContent !== '') {
       return `Echo: ${normalizedContent}`;
     }
-
-    if (attachments?.length) {
-      return 'I received your file.';
+    if (fileCount > 0) {
+      return fileCount === 1 ? 'I received your file.' : `I received your ${fileCount} files.`;
     }
-
     return 'Echo:';
   }
 
-  function buildPartialChunks(content, attachments) {
-    const normalizedContent = typeof content === 'string' ? content.trim() : '';
-    const finalContent = normalizedContent !== ''
-      ? `Echo: ${normalizedContent}`
-      : (attachments?.length ? 'I received your file.' : 'Echo:');
-
+  function buildPartialChunks(finalContent) {
     if (finalContent.length <= 1) {
       return [finalContent];
     }
-
     const midpoint = Math.max(1, Math.ceil(finalContent.length / 2));
     return [finalContent.slice(0, midpoint), finalContent.slice(midpoint)];
   }
 
-  function toResolvedAttachment(id) {
-    const stored = uploadedAttachments.get(id);
-    if (!stored) {
-      return {
-        file_ref: id,
-        filename: id,
-        content_type: 'application/octet-stream',
-        size: null,
-        download_url: null,
-      };
-    }
-
-    return {
-      file_ref: id,
-      filename: stored.filename,
-      content_type: stored.content_type,
-      size: stored.size,
-      download_url: stored.download_url,
-    };
-  }
-
-  function resolveAttachments(attachments) {
+  function attachmentRefs(attachments) {
     if (!Array.isArray(attachments)) {
       return [];
     }
+    return attachments
+      .map((attachment) => (typeof attachment === 'string' ? attachment : attachment?.file_ref))
+      .filter((fileRef) => typeof fileRef === 'string' && uploadedFiles.has(fileRef));
+  }
 
-    return attachments.map((attachment) => {
-      if (typeof attachment === 'string') {
-        return toResolvedAttachment(attachment);
-      }
-
-      if (attachment && typeof attachment === 'object') {
-        if (typeof attachment.file_ref === 'string') {
-          return toResolvedAttachment(attachment.file_ref);
-        }
-      }
-
-      return null;
-    }).filter(Boolean);
+  // One generated text file per answer that received files, bound to the answer's turn.
+  function generateReceipt(fileRefs, turn) {
+    outputNumber += 1;
+    const lines = fileRefs.map((fileRef) => {
+      const record = uploadedFiles.get(fileRef);
+      return `${record.filename} (${record.size} bytes)`;
+    });
+    const text = `Received files:\n${lines.join('\n')}\n`;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const record = {
+      blob,
+      filename: `received-files-${outputNumber}.txt`,
+      content_type: 'text/plain',
+      size: blob.size,
+    };
+    const fileRef = `sf_mock_out_${outputNumber}`;
+    generatedFiles.set(fileRef, record);
+    return describeFile(fileRef, record, {
+      owner_role: 'assistant',
+      direction: 'outbound',
+      message_ref: String(turn),
+      message_ref_kind: 'turn',
+    });
   }
 
   return {
@@ -144,12 +151,8 @@ export function createMockCortexClient() {
     async disconnect() {
       connected = false;
       clearTimers();
-      for (const item of uploadedAttachments.values()) {
-        if (item.download_url) {
-          URL.revokeObjectURL(item.download_url);
-        }
-      }
-      uploadedAttachments.clear();
+      uploadedFiles.clear();
+      generatedFiles.clear();
       this.channelState = 'CLOSED';
     },
 
@@ -160,28 +163,28 @@ export function createMockCortexClient() {
       };
     },
 
-    async uploadAttachment(file) {
+    async uploadFile(file) {
+      if (!(file instanceof Blob)) {
+        throw makeError('file_type_rejected', 'The mock client uploads browser files only.');
+      }
       uploadNumber += 1;
-      const fileName = typeof file === 'string'
-        ? file
-        : (file && typeof file === 'object' && 'name' in file ? file.name : 'attachment');
-      const id = `sf_mock_${uploadNumber}_${sanitizeFileName(fileName)}`;
-      const objectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function' && file instanceof Blob
-        ? URL.createObjectURL(file)
-        : null;
-
-      uploadedAttachments.set(id, {
-        file,
-        filename: fileName,
-        content_type: file && typeof file === 'object' && 'type' in file && typeof file.type === 'string' && file.type
-          ? file.type
-          : 'application/octet-stream',
-        size: file && typeof file === 'object' && 'size' in file && typeof file.size === 'number'
-          ? file.size
-          : 0,
-        download_url: objectUrl,
+      const filename = typeof file.name === 'string' && file.name ? file.name : 'attachment';
+      const fileRef = `sf_mock_${uploadNumber}_${fileRefSuffix(filename)}`;
+      uploadedFiles.set(fileRef, {
+        blob: file,
+        filename,
+        content_type: file.type || 'application/octet-stream',
+        size: file.size,
       });
-      return id;
+      return fileRef;
+    },
+
+    async downloadFile(fileRef) {
+      const record = generatedFiles.get(fileRef);
+      if (!record) {
+        throw makeError('file_not_found', 'File not found.');
+      }
+      return record.blob;
     },
 
     async sendMessage({ content, attachments, meta }) {
@@ -190,24 +193,34 @@ export function createMockCortexClient() {
       }
 
       turnNumber += 1;
-      const turnId = `turn_${turnNumber}`;
-      const attachmentIds = Array.isArray(attachments) ? attachments : [];
-      const resolvedAttachments = resolveAttachments(attachmentIds);
+      const turn = turnNumber;
+      const fileRefs = attachmentRefs(attachments);
+      const clientMsgId = meta && typeof meta.client_msg_id === 'string' ? meta.client_msg_id : null;
 
-      // Normalize content — may be string or string[]
-      const contentStr = Array.isArray(content)
-        ? content.filter(Boolean).join(' ')
-        : (typeof content === 'string' ? content : '');
+      // Runtime chat text is list[str].
+      const contentBlocks = Array.isArray(content)
+        ? content.filter((block) => typeof block === 'string')
+        : (typeof content === 'string' ? [content] : []);
+      const contentStr = contentBlocks.filter(Boolean).join(' ');
 
-      const finalContent = buildAnswerContent(contentStr, resolvedAttachments);
-      const partialChunks = buildPartialChunks(contentStr, resolvedAttachments);
+      const finalContent = buildAnswerContent(contentStr, fileRefs.length);
+      const partialChunks = buildPartialChunks(finalContent);
 
+      // The user's files are confirmed on the echo, bound to its client_msg_id.
+      const echoFiles = clientMsgId
+        ? fileRefs.map((fileRef) => describeFile(fileRef, uploadedFiles.get(fileRef), {
+            owner_role: 'user',
+            direction: 'inbound',
+            message_ref: clientMsgId,
+            message_ref_kind: 'client_msg_id',
+          }))
+        : [];
       emit(createEnvelope('chat::echo', sessionId, nextSeq(), {
         role: 'user',
-        content,
+        content: contentBlocks,
         meta: {
           ...(meta && typeof meta === 'object' ? meta : {}),
-          ...(resolvedAttachments.length ? { attachments: resolvedAttachments } : {}),
+          ...(echoFiles.length ? { attachments: echoFiles } : {}),
         },
       }));
 
@@ -220,11 +233,11 @@ export function createMockCortexClient() {
         schedule(800, () => {
           emit(createEnvelope('chat::question', sessionId, nextSeq(), {
             role: 'assistant',
-            turn_id: turnId,
+            turn,
             content: ['What would you like to do with this?'],
             meta: {
               actor: DEMO_ACTOR,
-              question_ref: `q_${turnId}`,
+              question_ref: `q_turn_${turn}`,
               input_type: 'form',
               allow_reply: true,
               questions: [
@@ -250,33 +263,27 @@ export function createMockCortexClient() {
         return;
       }
 
-      schedule(520, () => {
-        emit(createEnvelope('chat::partial', sessionId, nextSeq(), {
-          role: 'assistant',
-          turn_id: turnId,
-          content: partialChunks[0],
-          meta: { actor: DEMO_ACTOR },
-        }));
-      });
-
-      schedule(900, () => {
-        emit(createEnvelope('chat::partial', sessionId, nextSeq(), {
-          role: 'assistant',
-          turn_id: turnId,
-          content: partialChunks[1],
-          meta: { actor: DEMO_ACTOR },
-        }));
+      // Runtime partials: list[str] chunks carrying the answer's integer turn, no meta.
+      partialChunks.forEach((chunk, index) => {
+        schedule(520 + (index * 380), () => {
+          emit(createEnvelope('chat::partial', sessionId, nextSeq(), {
+            role: 'assistant',
+            turn,
+            content: [chunk],
+          }));
+        });
       });
 
       schedule(1280, () => {
+        const outputs = fileRefs.length ? [generateReceipt(fileRefs, turn)] : [];
         emit(createEnvelope('chat::answer', sessionId, nextSeq(), {
           role: 'assistant',
-          turn_id: turnId,
+          turn,
           answer_kind: 'final',
-          content: finalContent,
+          content: [finalContent],
           meta: {
             actor: DEMO_ACTOR,
-            ...(resolvedAttachments.length ? { attachments: resolvedAttachments } : {}),
+            ...(outputs.length ? { attachments: outputs } : {}),
           },
         }));
       });
