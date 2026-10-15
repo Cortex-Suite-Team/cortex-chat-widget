@@ -243,6 +243,8 @@ export const typographyStyles = `
 .cortex-widget__question-option,
 .cortex-widget__file-chip,
 .cortex-widget__file-remove,
+.cortex-widget__file-retry,
+.cortex-widget__file-card-download,
 .cortex-widget__attach,
 .cortex-widget__send,
 .cortex-widget__launcher {
@@ -297,6 +299,8 @@ export const typographyStyles = `
 .cortex-widget__attach:disabled,
 .cortex-widget__send:disabled,
 .cortex-widget__file-remove:disabled,
+.cortex-widget__file-retry:disabled,
+.cortex-widget__file-card-download:disabled,
 .cortex-widget__launcher:disabled,
 .cortex-widget__question-option:disabled {
   cursor: not-allowed;
@@ -329,6 +333,67 @@ export const typographyStyles = `
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cortex-widget__file-chip[data-status="failed"] {
+  border-color: #d14343;
+}
+
+.cortex-widget__file-chip-status,
+.cortex-widget__file-card-status {
+  display: block;
+  font-size: 11px;
+  color: var(--cortex-muted-text);
+}
+
+.cortex-widget__file-chip-status:empty,
+.cortex-widget__file-card-status:empty {
+  display: none;
+}
+
+.cortex-widget__file-chip[data-status="failed"] .cortex-widget__file-chip-status,
+.cortex-widget__file-card[data-download-status="failed"] .cortex-widget__file-card-status {
+  color: #d14343;
+}
+
+.cortex-widget__file-chip-progress {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: 4px;
+}
+
+.cortex-widget__file-chip-progress[hidden] {
+  display: none;
+}
+
+.cortex-widget__file-card-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cortex-widget__file-card-details {
+  font-size: 11px;
+  opacity: 0.82;
+}
+
+.cortex-widget__file-retry,
+.cortex-widget__file-card-download {
+  flex-shrink: 0;
+  border: 1px solid var(--cortex-border-color);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cortex-widget__file-retry[hidden] {
+  display: none;
 }
 
 .cortex-widget__file-chip-meta {

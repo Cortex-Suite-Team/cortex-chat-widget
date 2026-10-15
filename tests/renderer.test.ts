@@ -165,7 +165,7 @@ describe('widget renderer behavior', () => {
     expect(typing.dataset.visible).toBe('false');
   });
 
-  it('supports one-file selection, replacement, removal, upload, and retryable send failure state', async () => {
+  it('keeps single-file selection, removal, upload, and send-failure retry without re-upload', async () => {
     const client = new CustomClient();
     client.uploadFileImpl = async () => 'sf_second_file';
 
@@ -177,20 +177,17 @@ describe('widget renderer behavior', () => {
     const textarea = shadow.querySelector('[data-testid="composer-textarea"]') as HTMLTextAreaElement;
     const form = shadow.querySelector('[data-testid="composer"]') as HTMLFormElement;
     const fileInput = shadow.querySelector('[data-testid="file-input"]') as HTMLInputElement;
-    const fileChip = shadow.querySelector('[data-testid="selected-file-chip"]') as HTMLElement;
-    const removeButton = shadow.querySelector('[data-testid="remove-file"]') as HTMLButtonElement;
+    const chips = () => Array.from(shadow.querySelectorAll('[data-testid="selected-file-chip"]')) as HTMLElement[];
 
     const firstFile = new File(['a'], 'first.txt', { type: 'text/plain' });
     setFileInput(fileInput, firstFile);
-    expect(fileChip.textContent).toContain('first.txt');
+    expect(chips().map((chip) => chip.textContent)).toEqual([expect.stringContaining('first.txt')]);
+
+    (chips()[0].querySelector('[data-testid="remove-file"]') as HTMLButtonElement).click();
+    expect(chips()).toHaveLength(0);
+    expect((shadow.querySelector('[data-testid="selected-files"]') as HTMLElement).dataset.visible).toBe('false');
 
     const secondFile = new File(['b'], 'second.txt', { type: 'text/plain' });
-    setFileInput(fileInput, secondFile);
-    expect(fileChip.textContent).toContain('second.txt');
-
-    removeButton.click();
-    expect(fileChip.dataset.visible).toBe('false');
-
     setFileInput(fileInput, secondFile);
     changeInput(textarea, 'Attach this');
     controller.nextSendError = new Error('Send failed');
@@ -204,13 +201,14 @@ describe('widget renderer behavior', () => {
       attachments: [{ file_ref: 'sf_second_file', filename: 'second.txt', content_type: 'text/plain', size: 1 }],
     });
     expect(textarea.value).toBe('Attach this');
-    expect(fileChip.textContent).toContain('second.txt');
+    expect(chips()[0].textContent).toContain('second.txt');
 
     submitComposer(form);
     await flushAsyncWork();
 
     expect(client.uploadedFiles).toHaveLength(1);
     expect(controller.sendCalls).toHaveLength(2);
+    expect(controller.sendCalls[1].attachments).toEqual(controller.sendCalls[0].attachments);
   });
 
   it('prevents send when upload fails', async () => {
@@ -366,42 +364,47 @@ describe('widget renderer behavior', () => {
     expect(attachments.textContent).toContain('contract.pdf');
   });
 
-  it('renders assistant file attachments as download links when attachment url is available', () => {
+  it('renders an owned generated file as a download card and never as a URL link', () => {
     mountWidget();
     const shadow = getShadow();
 
     applyChatState(baseChatState({
       transcript: [{
-        id: 'msg_assistant_file',
+        id: 'turn:3',
         type: 'chat::answer',
         role: 'assistant',
         content: 'Generated file is ready.',
         meta: {
-          // Assistant-generated file: an explicitly owned outbound descriptor bound to this message.
+          turnRef: '3',
           attachments: [{
             file_ref: 'sf_assistant_1',
             owner_role: 'assistant',
             direction: 'outbound',
-            message_ref: 'msg_assistant_file',
+            state: 'available',
+            message_ref: '3',
+            message_ref_kind: 'turn',
             filename: 'summary.pdf',
             content_type: 'application/pdf',
             size: 2048,
             download_mint_url: '/sessions/sess_1/files/sf_assistant_1/download-token',
+            download_url: 'https://evil.example/f',
+            href: 'javascript:alert(1)',
           }],
         },
       }],
     }));
 
-    const link = shadow.querySelector('[data-testid="message-attachment-link"]') as HTMLAnchorElement;
-
-    expect(link).toBeTruthy();
-    expect(link.getAttribute('href')).toBe('/sessions/sess_1/files/sf_assistant_1/download-token');
-    expect(link.getAttribute('data-download-mint-url')).toBe('/sessions/sess_1/files/sf_assistant_1/download-token');
-    expect(link.download).toBe('summary.pdf');
-    expect(link.textContent).toContain('summary.pdf');
-    expect(link.textContent).toContain('application/pdf');
-    // The internal blob id must never appear in the DOM.
-    expect(shadow.innerHTML).not.toContain('file_123');
+    const card = shadow.querySelector('[data-testid="generated-file-card"]') as HTMLElement;
+    const button = card.querySelector('[data-testid="generated-file-download"]') as HTMLButtonElement;
+    expect(card.getAttribute('aria-label')).toBe('Generated file summary.pdf');
+    expect(card.textContent).toContain('application/pdf');
+    expect(card.textContent).toContain('2.0 KB');
+    expect(button.dataset.downloadFileRef).toBe('sf_assistant_1');
+    expect(button.getAttribute('aria-label')).toBe('Download summary.pdf');
+    expect(shadow.querySelector('a')).toBeNull();
+    expect(shadow.innerHTML).not.toContain('download-token');
+    expect(shadow.innerHTML).not.toContain('evil.example');
+    expect(shadow.innerHTML).not.toContain('javascript:');
   });
 
   it('renders assistant final answers through the html markdown branch', () => {
@@ -470,32 +473,63 @@ describe('widget renderer behavior', () => {
     expect(pre.textContent).toContain('"value": 1');
   });
 
-  it('falls back to a visible chip for an owned assistant attachment without download url', () => {
+  it('renders a restored transcript with the same user files and generated cards, once each', () => {
+    mountWidget();
+    const shadow = getShadow();
+    const output = (fileRef: string, filename: string) => ({
+      file_ref: fileRef, filename, content_type: 'text/csv', size: 38, owner_role: 'assistant',
+      direction: 'outbound', state: 'available', message_ref: '7', message_ref_kind: 'turn',
+    });
+    const restored = baseChatState({
+      transcript: [
+        {
+          id: 'client:cli_1', type: 'chat::message', role: 'user', content: ['Compare'], clientMsgId: 'cli_1',
+          deliveryStatus: 'processed',
+          meta: { attachments: ['sf_in_1', 'sf_in_2', 'sf_in_3'].map((fileRef, index) => ({
+            file_ref: fileRef, filename: `in${index}.csv`, content_type: 'text/csv', size: 1, owner_role: 'user',
+            direction: 'inbound', state: 'available', message_ref: 'cli_1', message_ref_kind: 'client_msg_id',
+          })) },
+        },
+        {
+          id: 'turn:7', type: 'chat::answer', role: 'assistant', content: ['Done'], status: 'final',
+          meta: { turnRef: '7', attachments: [output('sf_out_1', 'delta.csv'), output('sf_out_2', 'summary.md'), output('sf_out_1', 'delta.csv')] },
+        },
+      ],
+    });
+    applyChatState(restored);
+    applyChatState({ ...restored, transcriptRevision: restored.transcriptRevision + 1 });
+
+    expect(shadow.querySelectorAll('[data-testid="message-attachment"]')).toHaveLength(3);
+    const cards = Array.from(shadow.querySelectorAll('[data-testid="generated-file-card"]')) as HTMLElement[];
+    expect(cards.map((card) => card.dataset.fileRef)).toEqual(['sf_out_1', 'sf_out_2']);
+    // The mock client has no downloadFile: cards render but cannot start a download.
+    expect((cards[0].querySelector('[data-testid="generated-file-download"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('does not render an assistant file bound to a different turn or without turn identity', () => {
     mountWidget();
     const shadow = getShadow();
 
+    const descriptor = {
+      file_ref: 'sf_assistant_2',
+      owner_role: 'assistant',
+      direction: 'outbound',
+      state: 'available',
+      message_ref: '4',
+      message_ref_kind: 'turn',
+      filename: 'artifact.txt',
+      content_type: 'text/plain',
+      size: 3,
+    };
     applyChatState(baseChatState({
-      transcript: [{
-        id: 'msg_assistant_file_id_only',
-        type: 'chat::answer',
-        role: 'assistant',
-        content: 'Attached result.',
-        meta: {
-          // Owned outbound descriptor, but no download mint url yet → renders a plain chip.
-          attachments: [{
-            file_ref: 'sf_assistant_2',
-            owner_role: 'assistant',
-            direction: 'outbound',
-            message_ref: 'msg_assistant_file_id_only',
-            filename: 'artifact.txt',
-          }],
-        },
-      }],
+      transcript: [
+        { id: 'turn:5', type: 'chat::answer', role: 'assistant', content: 'Other turn.', meta: { turnRef: '5', attachments: [descriptor] } },
+        { id: 'operator_close', type: 'chat::answer', role: 'assistant', content: 'No turn.', meta: { attachments: [descriptor] } },
+      ],
     }));
 
-    expect(shadow.querySelector('[data-testid="message-attachment-link"]')).toBeNull();
-    const attachments = shadow.querySelector('[data-testid="message-attachments"]') as HTMLElement;
-    expect(attachments.textContent).toContain('artifact.txt');
+    expect(shadow.querySelector('[data-testid="message-attachments"]')).toBeNull();
+    expect(shadow.innerHTML).not.toContain('artifact.txt');
   });
 
   it('hides an unowned (inherited) attachment on an assistant message', () => {
@@ -1231,20 +1265,22 @@ describe('widget renderer behavior', () => {
 
     applyChatState(baseChatState({
       transcript: [{
-        id: 'msg_actor_attach',
+        id: 'turn:9',
         type: 'chat::answer',
         role: 'assistant',
         content: 'Here is the file.',
         status: 'final',
         actor: { kind: 'digital_worker', name: 'Robot Vasya' },
         meta: {
+          turnRef: '9',
           attachments: [{
             file_ref: 'sf_reg',
             owner_role: 'assistant',
             direction: 'outbound',
-            message_ref: 'msg_actor_attach',
+            state: 'available',
+            message_ref: '9',
+            message_ref_kind: 'turn',
             filename: 'report.pdf',
-            download_mint_url: '/sessions/sess_1/files/sf_reg/download-token',
             content_type: 'application/pdf',
             size: 1024,
           }],
@@ -1253,11 +1289,10 @@ describe('widget renderer behavior', () => {
     }));
 
     const actorName = shadow.querySelector('[data-testid="actor-name"]') as HTMLElement;
-    const link = shadow.querySelector('[data-testid="message-attachment-link"]') as HTMLAnchorElement;
+    const card = shadow.querySelector('[data-testid="generated-file-card"]') as HTMLElement;
 
     expect(actorName.textContent).toBe('Robot Vasya');
-    expect(link).toBeTruthy();
-    expect(link.getAttribute('href')).toBe('/sessions/sess_1/files/sf_reg/download-token');
+    expect(card.textContent).toContain('report.pdf');
   });
 
   it('unlocks on terminal session state', async () => {
@@ -1534,12 +1569,13 @@ describe('composer icon controls', () => {
     resetMocks();
   });
 
-  it('composer renders circular attach button with aria-label Attach file', () => {
+  it('composer renders circular attach button with aria-label Attach files and a multi-file input', () => {
     mountWidget();
     const shadow = getShadow();
     const btn = shadow.querySelector('[data-testid="attach-button"]') as HTMLButtonElement;
     expect(btn).toBeTruthy();
-    expect(btn.getAttribute('aria-label')).toBe('Attach file');
+    expect(btn.getAttribute('aria-label')).toBe('Attach files');
+    expect((shadow.querySelector('[data-testid="file-input"]') as HTMLInputElement).multiple).toBe(true);
     expect(btn.textContent?.trim()).toBe('');
     expect(btn.querySelector('svg')).toBeTruthy();
   });

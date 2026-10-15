@@ -23,27 +23,47 @@ export interface WidgetAttachmentRef {
   size?: number;
 }
 
+/** Maximum files in one composed message (SDK MAX_ATTACHMENTS_PER_MESSAGE). */
+export const MAX_COMPOSER_ATTACHMENTS = 8;
+
+export type SelectedFileStatus = 'selected' | 'uploading' | 'uploaded' | 'failed';
+
 export interface SelectedFileState {
+  /** Stable local identity of this selection; never sent to the server. */
+  id: string;
   name: string;
   size: number;
   type: string;
+  status: SelectedFileStatus;
+  /** Upload failure of this file; retryable failures can be retried without touching the others. */
+  error: CortexChatWidgetError | null;
+  retryable: boolean;
 }
 
+export type FileDownloadStatus = 'downloading' | 'failed';
+
+export interface FileDownloadState {
+  status: FileDownloadStatus;
+  error: CortexChatWidgetError | null;
+  retryable: boolean;
+}
+
+/**
+ * A public session file rendered on a transcript message. Built only from the
+ * canonical `message.meta.attachments` descriptor; it carries no URL. The only
+ * download target is `fileRef`, passed to `client.downloadFile(fileRef)`.
+ */
 export interface TranscriptAttachmentViewModel {
-  id: string | null;
+  /** Session file reference (sf_...) — the public, render-safe id. */
+  fileRef: string;
   label: string;
-  url: string | null;
   fileName: string | null;
   contentType: string | null;
   size: number | null;
-  /** Session file descriptor reference (sf_...) — the public, render-safe id. */
-  fileRef: string | null;
-  /** Stable mint endpoint used for mint-on-click download. */
-  downloadMintUrl: string | null;
-  /** Descriptor ownership fields used for the rendering ownership check (R3/R6). */
-  ownerRole: string | null;
-  direction: string | null;
-  messageRef: string | null;
+  /** Descriptor state; only `available` files can be downloaded. */
+  state: 'available' | 'expired' | 'deleted' | 'quarantined' | null;
+  /** True for an assistant-generated file of this answer (rendered as a download card). */
+  generated: boolean;
 }
 
 export interface CortexChatWidgetState {
@@ -54,7 +74,10 @@ export interface CortexChatWidgetState {
   isAwaitingAnswer: boolean;
   isTyping: boolean;
   isHistoricalView: boolean;
-  selectedFile: SelectedFileState | null;
+  /** Files selected in the composer, in selection order. */
+  selectedFiles: SelectedFileState[];
+  /** In-flight or failed generated-file downloads, by file_ref. */
+  fileDownloads: Record<string, FileDownloadState>;
   chat: ChatState;
   error: CortexChatWidgetError | null;
 }
@@ -126,6 +149,8 @@ export interface WidgetClientLike extends CortexClientLike {
     file: File | Blob | ArrayBuffer | Uint8Array | string,
     options?: { sessionId?: string },
   ): Promise<string>;
+  /** SDK session-file download: resolves the bytes of a public sf_ file. */
+  downloadFile?(fileRef: string): Promise<Blob>;
   readonly accessToken?: string | null;
   readonly cpApiUrl?: string | null;
 }
@@ -157,12 +182,20 @@ export interface InternalWidgetState {
   isTyping: boolean;
   isUploading: boolean;
   attachmentsAvailable: boolean;
-  selectedFile: SelectedFileState | null;
-  selectedFileValue: File | null;
-  cachedUploadedAttachmentRef: WidgetAttachmentRef | null;
-  cachedUploadedFile: File | null;
+  /** Composer files in selection order; a successful upload keeps its sf_ ref for retries. */
+  composerFiles: ComposerFile[];
+  fileDownloads: Map<string, FileDownloadState>;
   draftText: string;
   error: CortexChatWidgetError | null;
+}
+
+export interface ComposerFile {
+  id: string;
+  file: File;
+  status: SelectedFileStatus;
+  uploadedRef: WidgetAttachmentRef | null;
+  error: CortexChatWidgetError | null;
+  retryable: boolean;
 }
 
 export interface WidgetDom {
@@ -196,10 +229,8 @@ export interface WidgetDom {
   attachButton: HTMLButtonElement;
   fileInput: HTMLInputElement;
   fileHint: HTMLElement;
-  fileChip: HTMLElement;
-  fileChipName: HTMLElement;
-  fileChipMeta: HTMLElement;
-  fileChipRemove: HTMLButtonElement;
+  /** Selected-file chip list; chips are rendered per file. */
+  fileChips: HTMLElement;
 }
 
 export interface HistoryDom {

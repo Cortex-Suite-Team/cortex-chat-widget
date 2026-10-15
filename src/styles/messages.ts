@@ -36,7 +36,8 @@ export const messageStyles = `
   color: #92400e;
 }
 
-.cortex-widget__message-attachment {
+.cortex-widget__message-attachment,
+.cortex-widget__file-card {
   background: color-mix(in srgb, var(--cortex-background-color) 82%, #dfe8f8 18%);
   border: 1px solid var(--cortex-bubble-in-border);
 }

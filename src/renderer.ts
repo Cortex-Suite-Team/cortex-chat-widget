@@ -1,16 +1,19 @@
 import { getIconSvg } from './icons.js';
 import { renderChatMessageContent } from '@cortex-suite/sdk-ui';
+import { getMessageAttachments } from './attachments.js';
 import {
   buildStatusText,
   shouldHideTranscriptMessage,
 } from './message-flags.js';
 import { TranscriptVirtualizer, type VirtualTranscriptItem } from './transcript-virtualizer.js';
-import type {
-  ChatMessageViewModel,
-  CortexChatWidgetState,
-  NormalizedWidgetOptions,
-  TranscriptAttachmentViewModel,
-  WidgetDom,
+import {
+  MAX_COMPOSER_ATTACHMENTS,
+  type ChatMessageViewModel,
+  type CortexChatWidgetState,
+  type NormalizedWidgetOptions,
+  type SelectedFileState,
+  type TranscriptAttachmentViewModel,
+  type WidgetDom,
 } from './types.js';
 
 const _warnedMissingActorIds = new Set<string>();
@@ -360,142 +363,129 @@ function getDeliveryStatusLabel(status: string): string {
   return 'Failed';
 }
 
-function toAttachmentViewModel(attachment: unknown): TranscriptAttachmentViewModel | null {
-  if (typeof attachment === 'string') {
-    const ref = attachment.trim();
-    if (!ref) {
-      return null;
-    }
-    if (!ref.startsWith('sf_')) {
-      return null;
-    }
-    return {
-      id: ref,
-      label: 'Attached file',
-      url: null,
-      fileName: null,
-      contentType: null,
-      size: null,
-      fileRef: ref,
-      downloadMintUrl: null,
-      ownerRole: null,
-      direction: null,
-      messageRef: null,
-    };
-  }
-
-  if (!isRecord(attachment)) {
-    return null;
-  }
-
-  // file_ref (sf_) is the only public id. Never surface file_id/artifact_id/attachment_id.
-  const fileRef = toNonEmptyString(attachment.file_ref);
-  const fileName = toNonEmptyString(attachment.filename) ?? toNonEmptyString(attachment.file_name) ?? toNonEmptyString(attachment.name);
-  const downloadMintUrl = toNonEmptyString(attachment.download_mint_url);
-  const url = downloadMintUrl ?? toNonEmptyString(attachment.download_url) ?? toNonEmptyString(attachment.url) ?? toNonEmptyString(attachment.href);
-  const contentType = toNonEmptyString(attachment.content_type) ?? toNonEmptyString(attachment.mime_type) ?? toNonEmptyString(attachment.type);
-  const size = typeof attachment.size === 'number'
-    ? attachment.size
-    : (typeof attachment.size_bytes === 'number' ? attachment.size_bytes : null);
-  const ownerRole = toNonEmptyString(attachment.owner_role);
-  const direction = toNonEmptyString(attachment.direction);
-  const messageRef = toNonEmptyString(attachment.message_ref);
-  // Never fall back to any id/url for the visible label — filename only, else a safe placeholder.
-  const label = fileName ?? 'Attached file';
-
-  if (!fileName && !fileRef && !url) {
-    return null;
-  }
-
-  return {
-    id: fileRef,
-    label,
-    url,
-    fileName,
-    contentType,
-    size,
-    fileRef,
-    downloadMintUrl,
-    ownerRole,
-    direction,
-    messageRef,
-  };
+function describeFile(attachment: { contentType: string | null; size: number | null }): string {
+  const parts: string[] = [];
+  if (attachment.contentType) parts.push(attachment.contentType);
+  if (attachment.size !== null) parts.push(formatFileSize(attachment.size));
+  return parts.join(' · ');
 }
 
-function attachmentOwnerMatchesRole(messageRole: string, ownerRole: string | null): boolean {
-  if (!ownerRole) return false;
-  if (messageRole === 'assistant') return ownerRole === 'assistant';
-  if (messageRole === 'operator') return ownerRole === 'operator';
-  if (messageRole === 'user') return ownerRole === 'user';
-  return false;
+function createAttachedFileChip(attachment: TranscriptAttachmentViewModel): HTMLElement {
+  const item = document.createElement('li');
+  item.className = 'cortex-widget__message-attachment';
+  item.setAttribute('data-testid', 'message-attachment');
+  const label = document.createElement('span');
+  label.className = 'cortex-widget__message-attachment-label';
+  label.textContent = attachment.label;
+  item.appendChild(label);
+  const detailsText = describeFile(attachment);
+  if (detailsText) {
+    const details = document.createElement('span');
+    details.className = 'cortex-widget__message-attachment-details';
+    details.textContent = detailsText;
+    item.appendChild(details);
+  }
+  return item;
 }
 
-function attachmentBindingMatchesMessage(
+const UNAVAILABLE_STATE_LABELS: Record<string, string> = {
+  expired: 'Expired',
+  deleted: 'Deleted',
+  quarantined: 'Unavailable',
+};
+
+// One labeled card per generated file. The download button carries only the
+// public file_ref and its message id; the widget resolves the descriptor again
+// from the transcript before calling client.downloadFile(file_ref).
+function createGeneratedFileCard(
   message: ChatMessageViewModel,
   attachment: TranscriptAttachmentViewModel,
-): boolean {
-  if (!attachment.messageRef) return false;
-  return attachment.messageRef === message.clientMsgId || attachment.messageRef === message.id;
+  state: CortexChatWidgetState,
+  context: TranscriptRenderContext,
+): HTMLElement {
+  const fileName = attachment.label;
+  const card = document.createElement('li');
+  card.className = 'cortex-widget__file-card';
+  card.setAttribute('data-testid', 'generated-file-card');
+  card.setAttribute('role', 'group');
+  card.setAttribute('aria-label', `Generated file ${fileName}`);
+  card.dataset.fileRef = attachment.fileRef;
+  card.dataset.state = attachment.state ?? 'available';
+
+  const main = document.createElement('div');
+  main.className = 'cortex-widget__file-card-main';
+  const name = document.createElement('span');
+  name.className = 'cortex-widget__file-card-name';
+  name.setAttribute('data-testid', 'generated-file-name');
+  name.textContent = fileName;
+  main.appendChild(name);
+  const detailsText = describeFile(attachment);
+  if (detailsText) {
+    const details = document.createElement('span');
+    details.className = 'cortex-widget__file-card-details';
+    details.textContent = detailsText;
+    main.appendChild(details);
+  }
+
+  const download = state.fileDownloads[attachment.fileRef];
+  const unavailableLabel = attachment.state && attachment.state !== 'available'
+    ? UNAVAILABLE_STATE_LABELS[attachment.state] ?? 'Unavailable'
+    : null;
+  let statusText = '';
+  let buttonText = 'Download';
+  let disabled = false;
+  if (unavailableLabel) {
+    statusText = unavailableLabel;
+    buttonText = unavailableLabel;
+    disabled = true;
+  } else if (state.isHistoricalView) {
+    statusText = 'Open this conversation live to download';
+    disabled = true;
+  } else if (!context.downloadsAvailable) {
+    statusText = 'Download unavailable';
+    disabled = true;
+  } else if (download?.status === 'downloading') {
+    statusText = 'Downloading…';
+    buttonText = 'Downloading…';
+    disabled = true;
+  } else if (download?.status === 'failed') {
+    statusText = `Download failed: ${download.error?.message ?? 'unknown error'}`;
+    buttonText = download.retryable ? 'Retry download' : 'Unavailable';
+    disabled = !download.retryable;
+  }
+  card.dataset.downloadStatus = download?.status ?? (disabled ? 'disabled' : 'idle');
+
+  const status = document.createElement('span');
+  status.className = 'cortex-widget__file-card-status';
+  status.setAttribute('data-testid', 'generated-file-status');
+  status.setAttribute('aria-live', 'polite');
+  status.textContent = statusText;
+  main.appendChild(status);
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'cortex-widget__file-card-download';
+  button.setAttribute('data-testid', 'generated-file-download');
+  button.dataset.downloadFileRef = attachment.fileRef;
+  button.dataset.messageId = message.id;
+  button.textContent = buttonText;
+  button.setAttribute('aria-label', `${buttonText} ${fileName}`);
+  button.disabled = disabled;
+  if (download?.status === 'downloading') button.setAttribute('aria-busy', 'true');
+
+  card.append(main, button);
+  return card;
 }
 
-// R3/R6: a file renders on a message only when the message's actor owns it.
-// User (inbound) is lenient for legacy refs that lack ownership metadata; assistant/operator
-// (outbound) is strict — owner role match, outbound direction, explicit message binding, and a
-// download link must all be present.
-function attachmentBelongsToMessage(
-  message: ChatMessageViewModel,
-  attachment: TranscriptAttachmentViewModel,
-): boolean {
-  if (message.role === 'user') {
-    if (!attachment.ownerRole) return true; // transitional/legacy tolerance
-    return attachment.ownerRole === 'user';
-  }
-  // Non-user (assistant/operator): strict ownership. The download link is optional — its presence
-  // only decides link-vs-chip; ownership + outbound direction + explicit binding decide visibility.
-  return attachmentOwnerMatchesRole(message.role, attachment.ownerRole)
-    && attachment.direction === 'outbound'
-    && attachmentBindingMatchesMessage(message, attachment);
-}
-
-function hasExplicitOwnedFileDescriptor(message: ChatMessageViewModel): boolean {
-  const attachments = message.meta?.attachments;
-  if (!Array.isArray(attachments)) {
-    return false;
-  }
-  return attachments.some((raw) => {
-    const vm = toAttachmentViewModel(raw);
-    return vm !== null && attachmentBelongsToMessage(message, vm);
-  });
-}
-
-function getMessageAttachments(message: ChatMessageViewModel): TranscriptAttachmentViewModel[] {
-  // A worker question must never render user-uploaded attachments. The file belongs to the
-  // user message, not to the question.
-  if (message.type === 'chat::question') {
-    return [];
-  }
-
-  const attachments = message.meta?.attachments;
-  if (!Array.isArray(attachments)) {
-    return [];
-  }
-
-  // Transitional guard. Do not render inherited user attachments on non-user messages.
-  // Worker/operator-generated files require explicit SessionFileDescriptor ownership (R6).
-  if (message.role !== 'user' && !hasExplicitOwnedFileDescriptor(message)) {
-    return [];
-  }
-
-  return attachments
-    .map((attachment) => toAttachmentViewModel(attachment))
-    .filter((attachment): attachment is TranscriptAttachmentViewModel =>
-      attachment !== null && attachmentBelongsToMessage(message, attachment));
+interface TranscriptRenderContext {
+  downloadsAvailable: boolean;
 }
 
 function createTranscriptMessage(
   message: ChatMessageViewModel,
   state: CortexChatWidgetState,
   options: NormalizedWidgetOptions,
+  context: TranscriptRenderContext,
 ): HTMLElement | null {
     const rendered = renderChatMessageContent(message);
     const attachments = getMessageAttachments(message);
@@ -589,7 +579,7 @@ function createTranscriptMessage(
         text.className = 'cortex-widget__bubble-text cortex-widget__markdown';
         text.innerHTML = rendered.html;
         bubble.appendChild(text);
-      } else if (attachments.length > 0) {
+      } else if (attachments.length > 0 && message.role === 'user') {
         const fallback = document.createElement('div');
         fallback.className = 'cortex-widget__bubble-text';
         fallback.textContent = 'Attachment sent';
@@ -602,7 +592,7 @@ function createTranscriptMessage(
         text.className = 'cortex-widget__bubble-text';
         text.textContent = rendered.text;
         bubble.appendChild(text);
-      } else if (attachments.length > 0) {
+      } else if (attachments.length > 0 && message.role === 'user') {
         const fallback = document.createElement('div');
         fallback.className = 'cortex-widget__bubble-text';
         fallback.textContent = 'Attachment sent';
@@ -619,58 +609,12 @@ function createTranscriptMessage(
       const attachmentList = document.createElement('ul');
       attachmentList.className = 'cortex-widget__message-attachments';
       attachmentList.setAttribute('data-testid', 'message-attachments');
+      const generated = attachments.some((attachment) => attachment.generated);
+      attachmentList.setAttribute('aria-label', generated ? 'Generated files' : 'Attached files');
       for (const attachment of attachments) {
-        const item = document.createElement('li');
-        item.className = 'cortex-widget__message-attachment';
-        // A descriptor with a mint URL is downloadable regardless of actor (user files included).
-        // The href points at the download/mint endpoint; the actual fetch is mint-on-click,
-        // handled by the widget controller via the data-download-mint-url hook.
-        const downloadTarget = attachment.downloadMintUrl ?? attachment.url;
-        const hasDownloadLink = Boolean(downloadTarget);
-
-        if (hasDownloadLink && downloadTarget) {
-          const link = document.createElement('a');
-          link.className = 'cortex-widget__message-attachment-link';
-          link.href = downloadTarget;
-          link.rel = 'noopener noreferrer';
-          if (attachment.downloadMintUrl) {
-            link.setAttribute('data-download-mint-url', attachment.downloadMintUrl);
-          }
-          if (attachment.fileRef) {
-            link.setAttribute('data-file-ref', attachment.fileRef);
-          }
-          if (attachment.fileName) {
-            link.download = attachment.fileName;
-            link.setAttribute('data-filename', attachment.fileName);
-          }
-          link.setAttribute('data-testid', 'message-attachment-link');
-
-          const label = document.createElement('span');
-          label.className = 'cortex-widget__message-attachment-label';
-          label.textContent = attachment.label;
-
-          const detailsParts: string[] = [];
-          if (attachment.contentType) {
-            detailsParts.push(attachment.contentType);
-          }
-          if (attachment.size !== null) {
-            detailsParts.push(formatFileSize(attachment.size));
-          }
-
-          link.appendChild(label);
-
-          if (detailsParts.length > 0) {
-            const details = document.createElement('span');
-            details.className = 'cortex-widget__message-attachment-details';
-            details.textContent = detailsParts.join(' · ');
-            link.appendChild(details);
-          }
-
-          item.appendChild(link);
-        } else {
-          item.textContent = attachment.label;
-        }
-        attachmentList.appendChild(item);
+        attachmentList.appendChild(attachment.generated
+          ? createGeneratedFileCard(message, attachment, state, context)
+          : createAttachedFileChip(attachment));
       }
       bubble.appendChild(attachmentList);
     }
@@ -869,17 +813,29 @@ function getMessageVersion(message: ChatMessageViewModel, state: CortexChatWidge
     meta,
     getQuestionRef(state.chat.activeQuestion) ?? '',
     state.isAwaitingAnswer ? '1' : '0',
+    fileDownloadsVersion(message, state),
   ].join('\u0000');
+}
+
+function fileDownloadsVersion(message: ChatMessageViewModel, state: CortexChatWidgetState): string {
+  return getMessageAttachments(message)
+    .filter((attachment) => attachment.generated)
+    .map((attachment) => {
+      const download = state.fileDownloads[attachment.fileRef];
+      return download ? `${attachment.fileRef}:${download.status}:${download.error?.code ?? ''}` : '';
+    })
+    .join(',');
 }
 
 function renderTranscript(
   transcriptEl: HTMLElement,
   state: CortexChatWidgetState,
   options: NormalizedWidgetOptions,
+  context: TranscriptRenderContext,
 ): void {
   const transcript = state.chat.transcript;
-  const scopeKey = `${state.isHistoricalView ? 'history' : 'live'}:${state.chat.connection.sessionId ?? ''}`;
-  const renderRow = (message: ChatMessageViewModel) => createTranscriptMessage(message, state, options);
+  const scopeKey = `${state.isHistoricalView ? 'history' : 'live'}:${context.downloadsAvailable ? 'dl' : 'nodl'}:${state.chat.connection.sessionId ?? ''}`;
+  const renderRow = (message: ChatMessageViewModel) => createTranscriptMessage(message, state, options, context);
   const existing = transcriptProjections.get(transcriptEl);
   const mutation = state.chat.transcriptMutation;
 
@@ -977,6 +933,7 @@ export function renderWidget(
   options: NormalizedWidgetOptions,
   attachmentsAvailable: boolean,
   isUploading: boolean,
+  downloadsAvailable = false,
 ): void {
   applyResolvedTheme(dom.host, dom.root, options.theme, {
     dark: 'cortex-widget--dark',
@@ -1071,7 +1028,7 @@ export function renderWidget(
     || questionLocksInput
     || state.isHistoricalView;
 
-  const hasSendableContent = dom.textarea.value.trim().length > 0 || state.selectedFile !== null;
+  const hasSendableContent = dom.textarea.value.trim().length > 0 || state.selectedFiles.length > 0;
 
   dom.textarea.disabled = inputLocked;
   dom.textarea.placeholder = state.isHistoricalView ? 'History view is read-only' : options.placeholder;
@@ -1082,22 +1039,98 @@ export function renderWidget(
   dom.sendButton.setAttribute('title', 'Send message');
   dom.sendButton.dataset.empty = hasSendableContent ? 'false' : 'true';
 
-  dom.attachButton.disabled = !attachmentsAvailable || state.chat.input.locked || state.isAwaitingAnswer || isUploading;
+  dom.attachButton.disabled = !attachmentsAvailable
+    || state.chat.input.locked
+    || state.isAwaitingAnswer
+    || isUploading
+    || state.isHistoricalView
+    || state.selectedFiles.length >= MAX_COMPOSER_ATTACHMENTS;
   dom.fileInput.disabled = dom.attachButton.disabled;
   dom.fileHint.textContent = attachmentsAvailable ? '' : 'Attachments unavailable';
   dom.fileHint.title = attachmentsAvailable ? '' : 'Attachments unavailable';
 
-  if (state.selectedFile) {
-    dom.fileChip.dataset.visible = 'true';
-    dom.fileChipName.textContent = state.selectedFile.name;
-    dom.fileChipMeta.textContent = `${formatFileSize(state.selectedFile.size)}${state.selectedFile.type ? ` · ${state.selectedFile.type}` : ''}`;
-    dom.fileChipRemove.disabled = state.isAwaitingAnswer || isUploading;
-  } else {
-    dom.fileChip.dataset.visible = 'false';
-    dom.fileChipName.textContent = '';
-    dom.fileChipMeta.textContent = '';
-    dom.fileChipRemove.disabled = true;
-  }
+  renderComposerFiles(dom.fileChips, state.selectedFiles, state.isAwaitingAnswer || isUploading);
 
-  renderTranscript(dom.transcript, state, options);
+  renderTranscript(dom.transcript, state, options, { downloadsAvailable });
+}
+
+function composerFileStatusText(file: SelectedFileState): string {
+  if (file.status === 'uploading') return 'Uploading…';
+  if (file.status === 'uploaded') return 'Uploaded';
+  if (file.status === 'failed') return `Upload failed: ${file.error?.message ?? 'unknown error'}`;
+  return '';
+}
+
+// Chips are keyed by the stable selection id so re-renders keep their DOM
+// nodes (and keyboard focus) in place.
+function renderComposerFiles(list: HTMLElement, files: SelectedFileState[], busy: boolean): void {
+  list.dataset.visible = files.length > 0 ? 'true' : 'false';
+  const existing = new Map<string, HTMLElement>();
+  for (const child of Array.from(list.children) as HTMLElement[]) {
+    if (child.dataset.fileId) existing.set(child.dataset.fileId, child);
+  }
+  files.forEach((file, index) => {
+    let chip = existing.get(file.id);
+    existing.delete(file.id);
+    if (!chip) chip = createComposerFileChip(file);
+    updateComposerFileChip(chip, file, busy);
+    if (list.children[index] !== chip) list.insertBefore(chip, list.children[index] ?? null);
+  });
+  for (const stale of existing.values()) stale.remove();
+}
+
+function createComposerFileChip(file: SelectedFileState): HTMLElement {
+  const chip = document.createElement('li');
+  chip.className = 'cortex-widget__file-chip';
+  chip.dataset.fileId = file.id;
+  chip.setAttribute('data-testid', 'selected-file-chip');
+  const main = document.createElement('div');
+  main.className = 'cortex-widget__file-chip-main';
+  const name = document.createElement('span');
+  name.className = 'cortex-widget__file-chip-name';
+  name.textContent = file.name;
+  const meta = document.createElement('span');
+  meta.className = 'cortex-widget__file-chip-meta';
+  meta.textContent = `${formatFileSize(file.size)}${file.type ? ` · ${file.type}` : ''}`;
+  const status = document.createElement('span');
+  status.className = 'cortex-widget__file-chip-status';
+  status.setAttribute('data-testid', 'selected-file-status');
+  status.setAttribute('aria-live', 'polite');
+  const progress = document.createElement('progress');
+  progress.className = 'cortex-widget__file-chip-progress';
+  progress.setAttribute('data-testid', 'selected-file-progress');
+  progress.setAttribute('aria-label', `Uploading ${file.name}`);
+  progress.hidden = true;
+  main.append(name, meta, status, progress);
+
+  const retry = document.createElement('button');
+  retry.type = 'button';
+  retry.className = 'cortex-widget__file-retry';
+  retry.textContent = 'Retry';
+  retry.setAttribute('data-testid', 'retry-file-upload');
+  retry.setAttribute('aria-label', `Retry upload of ${file.name}`);
+  retry.dataset.retryFileId = file.id;
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'cortex-widget__file-remove';
+  remove.textContent = 'Remove';
+  remove.setAttribute('data-testid', 'remove-file');
+  remove.setAttribute('aria-label', `Remove ${file.name}`);
+  remove.dataset.removeFileId = file.id;
+
+  chip.append(main, retry, remove);
+  return chip;
+}
+
+function updateComposerFileChip(chip: HTMLElement, file: SelectedFileState, busy: boolean): void {
+  chip.dataset.status = file.status;
+  const status = chip.querySelector('.cortex-widget__file-chip-status') as HTMLElement;
+  const statusText = composerFileStatusText(file);
+  if (status.textContent !== statusText) status.textContent = statusText;
+  (chip.querySelector('.cortex-widget__file-chip-progress') as HTMLProgressElement).hidden = file.status !== 'uploading';
+  const retry = chip.querySelector('.cortex-widget__file-retry') as HTMLButtonElement;
+  retry.hidden = !(file.status === 'failed' && file.retryable);
+  retry.disabled = busy;
+  (chip.querySelector('.cortex-widget__file-remove') as HTMLButtonElement).disabled = busy;
 }

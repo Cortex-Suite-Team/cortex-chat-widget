@@ -5,4 +5,6 @@ export type {
   CortexChatWidgetHandle,
   CortexChatWidgetOptions,
   CortexChatWidgetState,
+  FileDownloadState,
+  SelectedFileState,
 } from './types.js';

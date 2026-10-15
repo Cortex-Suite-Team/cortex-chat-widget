@@ -371,8 +371,21 @@ export const layoutStyles = `
   display: none;
 }
 
-.cortex-widget__file-chip {
+.cortex-widget__file-chips {
   display: none;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cortex-widget__file-chips[data-visible="true"] {
+  display: flex;
+}
+
+.cortex-widget__file-chip {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -380,11 +393,25 @@ export const layoutStyles = `
   border-radius: 14px;
 }
 
-.cortex-widget__file-chip[data-visible="true"] {
-  display: flex;
+.cortex-widget__file-chip-main {
+  flex: 1;
+  min-width: 0;
 }
 
-.cortex-widget__file-chip-main {
+.cortex-widget__file-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.cortex-widget__file-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 

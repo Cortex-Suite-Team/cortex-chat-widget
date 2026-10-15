@@ -82,11 +82,13 @@ mountCortexChat({
 });
 ```
 
-## File Attachment Note
+## Files
 
-The widget supports one file attachment when the active client exposes the canonical `uploadFile()` API.
+The widget attaches up to 8 files to one message when the active client exposes the canonical `uploadFile()` API. Each selected file gets its own chip with upload status, retry and removal. Files are uploaded one by one in selection order; a successful upload keeps its `sf_...` reference, so retrying a failed upload or a failed send never uploads that file again. The message is sent only when every selected file is uploaded, with the references in selection order.
 
 Uploads return an opaque session file reference (`sf_...`). The widget does not accept or expose legacy/internal File Layer identifiers. If the client does not support uploads, the widget disables attachment UI up front instead of failing later.
+
+Files generated for an assistant answer are read only from the public descriptors in `message.meta.attachments` supplied by `@cortex-suite/sdk-ui` (owner `assistant`, direction `outbound`, bound to the answer's turn). Each one is rendered as its own labeled card and downloaded through `client.downloadFile(file_ref)`; the resulting Blob is saved under a sanitized filename. The widget never derives a download URL from message metadata. Expired, deleted or quarantined files cannot be downloaded, and downloads are disabled in the read-only history view.
 
 ## Interactive Questions
 

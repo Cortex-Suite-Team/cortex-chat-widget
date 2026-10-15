@@ -110,25 +110,20 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   textarea.placeholder = options.placeholder;
   textarea.setAttribute('data-testid', 'composer-textarea');
 
-  const fileChip = createElement('div', 'cortex-widget__file-chip');
-  fileChip.setAttribute('data-testid', 'selected-file-chip');
-  const fileChipMain = createElement('div', 'cortex-widget__file-chip-main');
-  const fileChipName = createElement('span', 'cortex-widget__file-chip-name');
-  const fileChipMeta = createElement('span', 'cortex-widget__file-chip-meta');
-  const fileChipRemove = createElement('button', 'cortex-widget__file-remove', 'Remove') as HTMLButtonElement;
-  fileChipRemove.type = 'button';
-  fileChipRemove.setAttribute('data-testid', 'remove-file');
-  fileChipMain.append(fileChipName, fileChipMeta);
-  fileChip.append(fileChipMain, fileChipRemove);
+  const fileChips = createElement('ul', 'cortex-widget__file-chips');
+  fileChips.setAttribute('aria-label', 'Selected files');
+  fileChips.setAttribute('data-testid', 'selected-files');
+  fileChips.dataset.visible = 'false';
 
   const actions = createElement('div', 'cortex-widget__actions');
   const fileInput = createElement('input', 'cortex-widget__file-input') as HTMLInputElement;
   fileInput.type = 'file';
+  fileInput.multiple = true;
   fileInput.setAttribute('data-testid', 'file-input');
   const attachButton = createElement('button', 'cortex-widget__attach') as HTMLButtonElement;
   attachButton.type = 'button';
-  attachButton.setAttribute('aria-label', 'Attach file');
-  attachButton.setAttribute('title', 'Attach file');
+  attachButton.setAttribute('aria-label', 'Attach files');
+  attachButton.setAttribute('title', 'Attach files');
   attachButton.setAttribute('data-testid', 'attach-button');
   attachButton.innerHTML = getIconSvg('paperclip');
   const fileHint = createElement('span', 'cortex-widget__file-hint');
@@ -144,7 +139,7 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   actions.append(fileHint);
   composerRow.append(attachWrap, textarea, sendButton);
 
-  composer.append(fileChip, composerRow, actions);
+  composer.append(fileChips, composerRow, actions);
   headerText.append(title, subtitle, statusWrap);
   headerMain.append(avatar, headerText);
   header.append(headerMain);
@@ -191,9 +186,6 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
     attachButton,
     fileInput,
     fileHint,
-    fileChip,
-    fileChipName,
-    fileChipMeta,
-    fileChipRemove,
+    fileChips,
   };
 }

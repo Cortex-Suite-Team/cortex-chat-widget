@@ -1,4 +1,5 @@
 import { createChatController, type ChatController, type ChatState } from '@cortex-suite/sdk-ui';
+import { findGeneratedFile, FILE_REF_PATTERN, safeDownloadFilename } from './attachments.js';
 import { createDebugLogger } from './debug.js';
 import { createWidgetError, toWidgetError } from './errors.js';
 import { createHistoryClient } from './history-client.js';
@@ -9,17 +10,20 @@ import {
   isTerminalSessionState,
 } from './message-flags.js';
 import { applyResolvedTheme, destroyTranscriptRenderer, renderWidget } from './renderer.js';
-import type {
-  ChatMessageViewModel,
-  ChatViewMode,
-  CortexChatWidgetHandle,
-  CortexChatWidgetOptions,
-  CortexChatWidgetState,
-  InternalWidgetState,
-  NormalizedWidgetOptions,
-  WidgetAttachmentRef,
-  WidgetClientLike,
-  WidgetDom,
+import {
+  MAX_COMPOSER_ATTACHMENTS,
+  type ChatMessageViewModel,
+  type ChatViewMode,
+  type ComposerFile,
+  type CortexChatWidgetError,
+  type CortexChatWidgetHandle,
+  type CortexChatWidgetOptions,
+  type CortexChatWidgetState,
+  type InternalWidgetState,
+  type NormalizedWidgetOptions,
+  type WidgetAttachmentRef,
+  type WidgetClientLike,
+  type WidgetDom,
 } from './types.js';
 
 const EMPTY_CHAT_STATE: ChatState = {
@@ -48,6 +52,34 @@ const EMPTY_CHAT_STATE: ChatState = {
 };
 
 const MAX_RUNTIME_CHAT_TITLE_LENGTH = 120;
+// Object URLs of saved downloads stay alive briefly so the browser can start the save.
+const DOWNLOAD_URL_REVOKE_DELAY_MS = 1000;
+// SDK error codes after which repeating the same upload or download cannot succeed.
+const NON_RETRYABLE_FILE_ERRORS = new Set([
+  'attachments_unavailable',
+  'downloads_unavailable',
+  'file_access_denied',
+  'file_api_unavailable',
+  'file_expired',
+  'file_not_found',
+  'file_too_large',
+  'file_type_rejected',
+  'invalid_attachment',
+  'too_many_attachments',
+  'upload_failed',
+]);
+
+function isRetryableFileError(error: unknown, widgetError: CortexChatWidgetError): boolean {
+  if (NON_RETRYABLE_FILE_ERRORS.has(widgetError.code)) return false;
+  if (error && typeof error === 'object' && typeof (error as { retryable?: unknown }).retryable === 'boolean') {
+    return (error as { retryable: boolean }).retryable;
+  }
+  return true;
+}
+
+function isSameSelectedFile(a: File, b: File): boolean {
+  return a === b || (a.name === b.name && a.size === b.size && a.type === b.type && a.lastModified === b.lastModified);
+}
 
 function cloneChatState(state: ChatState): ChatState {
   return {
@@ -150,6 +182,8 @@ export class ChatWidget {
   private liveConnectPromise: Promise<void> | null = null;
   private mounted = false;
   private readonly domCleanup = new Set<() => void>();
+  private composerFileSeq = 0;
+  private readonly pendingDownloadUrls = new Map<string, number>();
   private unsubscribeController: (() => void) | null = null;
   private unsubscribeRawMessages: (() => void) | null = null;
   private readonly ui: InternalWidgetState = {
@@ -160,10 +194,8 @@ export class ChatWidget {
     isTyping: false,
     isUploading: false,
     attachmentsAvailable: false,
-    selectedFile: null,
-    selectedFileValue: null,
-    cachedUploadedAttachmentRef: null,
-    cachedUploadedFile: null,
+    composerFiles: [],
+    fileDownloads: new Map(),
     draftText: '',
     error: null,
   };
@@ -191,6 +223,7 @@ export class ChatWidget {
       !this.ui.attachmentsAvailable
       || this.ui.isUploading
       || this.ui.isAwaitingAnswer
+      || this.ui.composerFiles.length >= MAX_COMPOSER_ATTACHMENTS
       || this.getDisplayedChatState().input.locked
     ) {
       return;
@@ -199,18 +232,31 @@ export class ChatWidget {
   };
 
   private readonly onFileChange = () => {
-    const file = this.dom.fileInput.files?.[0] ?? null;
-    if (!this.ui.attachmentsAvailable || !file) {
-      this.dom.fileInput.value = '';
+    const files = Array.from(this.dom.fileInput.files ?? []);
+    // Clear the input so the same file can be picked again after removing it.
+    this.dom.fileInput.value = '';
+    if (!this.ui.attachmentsAvailable || files.length === 0) {
       return;
     }
-    this.setSelectedFile(file);
+    this.addComposerFiles(files);
     this.notifyAndRender();
   };
 
-  private readonly onRemoveFile = () => {
-    this.clearSelectedFile();
-    this.notifyAndRender();
+  private readonly onFileChipsClick = (event: MouseEvent) => {
+    const target = event.target as Element;
+    const removeButton = target.closest('[data-remove-file-id]') as HTMLButtonElement | null;
+    if (removeButton) {
+      const fileId = removeButton.dataset.removeFileId;
+      if (!removeButton.disabled && fileId) {
+        this.removeComposerFile(fileId);
+      }
+      return;
+    }
+    const retryButton = target.closest('[data-retry-file-id]') as HTMLButtonElement | null;
+    const retryId = retryButton?.dataset.retryFileId;
+    if (retryButton && !retryButton.disabled && retryId) {
+      void this.retryComposerUpload(retryId);
+    }
   };
 
   private readonly onAuthSubmitClick = () => {
@@ -316,6 +362,11 @@ export class ChatWidget {
     this.ui.isAwaitingAnswer = false;
     this.ui.isTyping = false;
     this.ui.isUploading = false;
+    for (const [url, timer] of this.pendingDownloadUrls) {
+      window.clearTimeout(timer);
+      URL.revokeObjectURL(url);
+    }
+    this.pendingDownloadUrls.clear();
     this.historyController?.destroy();
     this.historyController = null;
     this.teardownLiveListeners();
@@ -353,7 +404,6 @@ export class ChatWidget {
     this.ui.isAwaitingAnswer = false;
     this.ui.isTyping = false;
     this.clearDraftComposer();
-    this.clearSelectedFile();
     this.notifyAndRender();
   }
 
@@ -408,6 +458,7 @@ export class ChatWidget {
     });
     this.liveChatState = this.controller.getState();
     this.ui.attachmentsAvailable = typeof this.client.uploadFile === 'function';
+    this.ui.fileDownloads = new Map();
     this.bindControllerListeners();
   }
 
@@ -467,7 +518,7 @@ export class ChatWidget {
     this.dom.composer.addEventListener('submit', this.onComposerSubmit);
     this.dom.attachButton.addEventListener('click', this.onAttachClick);
     this.dom.fileInput.addEventListener('change', this.onFileChange);
-    this.dom.fileChipRemove.addEventListener('click', this.onRemoveFile);
+    this.dom.fileChips.addEventListener('click', this.onFileChipsClick);
     this.dom.authSubmitButton.addEventListener('click', this.onAuthSubmitClick);
     this.dom.authPasswordInput.addEventListener('keydown', this.onAuthPasswordKeyDown);
     this.dom.launcher.addEventListener('click', this.onLauncherClick);
@@ -479,7 +530,7 @@ export class ChatWidget {
     this.domCleanup.add(() => this.dom.composer.removeEventListener('submit', this.onComposerSubmit));
     this.domCleanup.add(() => this.dom.attachButton.removeEventListener('click', this.onAttachClick));
     this.domCleanup.add(() => this.dom.fileInput.removeEventListener('change', this.onFileChange));
-    this.domCleanup.add(() => this.dom.fileChipRemove.removeEventListener('click', this.onRemoveFile));
+    this.domCleanup.add(() => this.dom.fileChips.removeEventListener('click', this.onFileChipsClick));
     this.domCleanup.add(() => this.dom.authSubmitButton.removeEventListener('click', this.onAuthSubmitClick));
     this.domCleanup.add(() => this.dom.authPasswordInput.removeEventListener('keydown', this.onAuthPasswordKeyDown));
     this.domCleanup.add(() => this.dom.launcher.removeEventListener('click', this.onLauncherClick));
@@ -512,6 +563,7 @@ export class ChatWidget {
     });
     this.liveChatState = this.controller.getState();
     this.ui.attachmentsAvailable = typeof this.client.uploadFile === 'function';
+    this.ui.fileDownloads = new Map();
     this.liveConnected = false;
     this.liveConnectPromise = null;
     this.bindControllerListeners();
@@ -564,7 +616,19 @@ export class ChatWidget {
       isAwaitingAnswer: this.chatView.kind === 'historical' ? false : this.ui.isAwaitingAnswer,
       isTyping: this.chatView.kind === 'historical' ? false : this.ui.isTyping,
       isHistoricalView: this.chatView.kind === 'historical',
-      selectedFile: this.ui.selectedFile ? { ...this.ui.selectedFile } : null,
+      selectedFiles: this.ui.composerFiles.map((entry) => ({
+        id: entry.id,
+        name: entry.file.name,
+        size: entry.file.size,
+        type: entry.file.type,
+        status: entry.status,
+        error: entry.error ? { ...entry.error } : null,
+        retryable: entry.retryable,
+      })),
+      fileDownloads: Object.fromEntries(Array.from(this.ui.fileDownloads, ([fileRef, download]) => [
+        fileRef,
+        { ...download, error: download.error ? { ...download.error } : null },
+      ])),
       chat: displayedChatState,
       error: this.ui.error ? { ...this.ui.error } : null,
     };
@@ -622,42 +686,91 @@ export class ChatWidget {
     }
     this.syncTextareaValue();
     const state = this.getPublicState();
-    renderWidget(this.dom, state, this.options, this.ui.attachmentsAvailable, this.ui.isUploading);
+    renderWidget(
+      this.dom,
+      state,
+      this.options,
+      this.ui.attachmentsAvailable,
+      this.ui.isUploading,
+      typeof this.client.downloadFile === 'function',
+    );
     this.resizeComposerTextarea();
     this.historyController?.setLiveSessionId(this.getLiveSessionId());
     this.options.onStateChange?.(state);
   }
 
-  private setSelectedFile(file: File | null): void {
-    this.ui.selectedFileValue = file;
-    this.ui.selectedFile = file
-      ? {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-        }
-      : null;
-
-    if (!file || this.ui.cachedUploadedFile !== file) {
-      this.ui.cachedUploadedAttachmentRef = null;
-      this.ui.cachedUploadedFile = null;
+  private addComposerFiles(files: File[]): void {
+    const selected = [...this.ui.composerFiles];
+    let overflow = 0;
+    for (const file of files) {
+      if (selected.some((entry) => isSameSelectedFile(entry.file, file))) {
+        continue;
+      }
+      if (selected.length >= MAX_COMPOSER_ATTACHMENTS) {
+        overflow += 1;
+        continue;
+      }
+      this.composerFileSeq += 1;
+      selected.push({
+        id: `file_${this.composerFileSeq}`,
+        file,
+        status: 'selected',
+        uploadedRef: null,
+        error: null,
+        retryable: false,
+      });
+    }
+    this.ui.composerFiles = selected;
+    if (overflow > 0) {
+      this.ui.error = {
+        code: 'too_many_attachments',
+        message: `You can attach up to ${MAX_COMPOSER_ATTACHMENTS} files to one message.`,
+      };
     }
   }
 
-  private clearSelectedFile(): void {
-    this.setSelectedFile(null);
+  private removeComposerFile(fileId: string): void {
+    if (this.ui.isUploading || this.ui.isAwaitingAnswer) {
+      return;
+    }
+    const index = this.ui.composerFiles.findIndex((entry) => entry.id === fileId);
+    if (index < 0) {
+      return;
+    }
+    this.ui.composerFiles = this.ui.composerFiles.filter((entry) => entry.id !== fileId);
+    const error = this.ui.error;
+    const failedRemain = this.ui.composerFiles.some((entry) => entry.status === 'failed');
+    if (error && (error.code === 'too_many_attachments' || (!failedRemain && this.isComposerUploadError(error)))) {
+      this.ui.error = null;
+    }
+    this.notifyAndRender();
+    // Keep keyboard focus in the chip list: next chip, else the previous one, else the attach button.
+    const removeButtons = Array.from(this.dom.fileChips.querySelectorAll<HTMLButtonElement>('[data-remove-file-id]'));
+    (removeButtons[index] ?? removeButtons[index - 1] ?? this.dom.attachButton).focus();
+  }
+
+  private isComposerUploadError(error: CortexChatWidgetError): boolean {
+    return error.code === 'upload_failed' || error.code === 'attachments_unavailable' || error.code.startsWith('file_');
+  }
+
+  private updateComposerFile(fileId: string, patch: Partial<ComposerFile>): void {
+    this.ui.composerFiles = this.ui.composerFiles.map((entry) => (
+      entry.id === fileId ? { ...entry, ...patch } : entry
+    ));
+  }
+
+  private clearComposerFiles(): void {
+    this.ui.composerFiles = [];
     this.dom.fileInput.value = '';
   }
 
   private clearDraftComposer(): void {
     this.ui.draftText = '';
-    this.clearSelectedFile();
-    this.ui.cachedUploadedAttachmentRef = null;
-    this.ui.cachedUploadedFile = null;
+    this.clearComposerFiles();
   }
 
   private buildUploadedAttachment(fileRef: string, file: File): WidgetAttachmentRef {
-    if (!/^sf_[A-Za-z0-9][A-Za-z0-9_-]*$/.test(fileRef)) {
+    if (!FILE_REF_PATTERN.test(fileRef)) {
       throw createWidgetError('upload_failed', 'Upload did not return a canonical sf_ file_ref.');
     }
     const meta: Partial<WidgetAttachmentRef> = {};
@@ -667,19 +780,13 @@ export class ChatWidget {
     return { file_ref: fileRef, ...meta };
   }
 
-  private async uploadSelectedFile(): Promise<WidgetAttachmentRef | null> {
-    const file = this.ui.selectedFileValue;
-    if (!file) {
-      return null;
+  // Upload one composer file once; a file that already has its sf_ ref is never uploaded again.
+  private async uploadComposerFile(entry: ComposerFile): Promise<boolean> {
+    if (entry.uploadedRef) {
+      return true;
     }
-    if (this.ui.cachedUploadedAttachmentRef && this.ui.cachedUploadedFile === file) {
-      return this.ui.cachedUploadedAttachmentRef;
-    }
-
-    this.ui.isUploading = true;
-    this.ui.error = null;
+    this.updateComposerFile(entry.id, { status: 'uploading', error: null, retryable: false });
     this.notifyAndRender();
-
     try {
       if (typeof this.client.uploadFile !== 'function') {
         throw createWidgetError(
@@ -687,19 +794,105 @@ export class ChatWidget {
           'Attachments are unavailable for the current client.',
         );
       }
-      const fileRef = await this.client.uploadFile(file);
-      const attachmentRef = this.buildUploadedAttachment(fileRef, file);
-
-      this.ui.cachedUploadedAttachmentRef = attachmentRef;
-      this.ui.cachedUploadedFile = file;
-      this.ui.isUploading = false;
-      this.notifyAndRender();
-      return attachmentRef;
+      const fileRef = await this.client.uploadFile(entry.file);
+      const uploadedRef = this.buildUploadedAttachment(fileRef, entry.file);
+      this.updateComposerFile(entry.id, { status: 'uploaded', uploadedRef, error: null, retryable: false });
+      return true;
     } catch (error) {
-      this.resolveUploadError(error);
-      this.notifyAndRender();
+      const widgetError = toWidgetError(error, 'upload_failed', 'Attachment upload failed');
+      this.updateComposerFile(entry.id, {
+        status: 'failed',
+        error: widgetError,
+        retryable: isRetryableFileError(error, widgetError),
+      });
+      this.debug.log('[cortex-chat-widget] upload failed', {
+        code: widgetError.code,
+        message: widgetError.message,
+        details: (error && typeof error === 'object' && 'details' in error)
+          ? (error as { details?: unknown }).details
+          : undefined,
+      });
+      this.options.onError?.(error);
+      return false;
+    }
+  }
+
+  private setComposerUploadFailure(failed: ComposerFile[]): void {
+    this.ui.error = failed.length === 1 && failed[0].error
+      ? { ...failed[0].error }
+      : {
+          code: 'upload_failed',
+          message: `${failed.length} files could not be uploaded. Retry or remove them to send.`,
+        };
+  }
+
+  /**
+   * Upload every composer file that has no sf_ ref yet, in selection order.
+   * Returns the ordered refs only when every selected file is uploaded and the
+   * selection did not change meanwhile; otherwise nothing is sent.
+   */
+  private async uploadComposerFiles(): Promise<WidgetAttachmentRef[] | null> {
+    const entries = [...this.ui.composerFiles];
+    const blocked = entries.filter((entry) => entry.status === 'failed' && !entry.retryable);
+    if (blocked.length > 0) {
+      this.setComposerUploadFailure(blocked);
       return null;
     }
+
+    this.ui.isUploading = true;
+    this.ui.error = null;
+    this.notifyAndRender();
+    for (const entry of entries) {
+      await this.uploadComposerFile(entry);
+      if (this.ui.isDestroyed) {
+        return null;
+      }
+    }
+    this.ui.isUploading = false;
+
+    const current = this.ui.composerFiles;
+    const failed = current.filter((entry) => entry.status === 'failed');
+    if (failed.length > 0) {
+      this.setComposerUploadFailure(failed);
+      return null;
+    }
+    const unchanged = current.length === entries.length
+      && current.every((entry, index) => entry.id === entries[index].id && entry.uploadedRef !== null);
+    if (!unchanged) {
+      return null;
+    }
+    const refs = current.map((entry) => entry.uploadedRef as WidgetAttachmentRef);
+    if (new Set(refs.map((ref) => ref.file_ref)).size !== refs.length) {
+      this.ui.error = { code: 'invalid_attachment', message: 'Two selected files resolved to the same upload. Remove one to send.' };
+      return null;
+    }
+    return refs;
+  }
+
+  private async retryComposerUpload(fileId: string): Promise<void> {
+    const entry = this.ui.composerFiles.find((candidate) => candidate.id === fileId);
+    if (
+      !entry
+      || entry.status !== 'failed'
+      || !entry.retryable
+      || this.ui.isUploading
+      || this.ui.isAwaitingAnswer
+      || this.ui.isDestroyed
+    ) {
+      return;
+    }
+    this.ui.isUploading = true;
+    this.ui.error = null;
+    await this.uploadComposerFile(entry);
+    if (this.ui.isDestroyed) {
+      return;
+    }
+    this.ui.isUploading = false;
+    const failed = this.ui.composerFiles.filter((candidate) => candidate.status === 'failed');
+    if (failed.length > 0) {
+      this.setComposerUploadFailure(failed);
+    }
+    this.notifyAndRender();
   }
 
   private async handleSend(): Promise<void> {
@@ -709,7 +902,7 @@ export class ChatWidget {
 
     const content = this.ui.draftText.trim();
     const hasContent = content.length > 0;
-    const hasFile = this.ui.selectedFileValue !== null;
+    const hasFile = this.ui.composerFiles.length > 0;
     const displayedChatState = this.getDisplayedChatState();
     const activeQuestion = this.liveChatState.activeQuestion;
 
@@ -721,12 +914,15 @@ export class ChatWidget {
     }
 
     this.ui.error = null;
-    let attachmentRef: WidgetAttachmentRef | null = null;
+    let attachments: WidgetAttachmentRef[] | undefined;
     if (hasFile) {
-      attachmentRef = await this.uploadSelectedFile();
-      if (this.ui.selectedFileValue && attachmentRef === null) {
+      const uploaded = await this.uploadComposerFiles();
+      if (uploaded === null) {
+        this.ui.isUploading = false;
+        this.notifyAndRender();
         return;
       }
+      attachments = uploaded;
     }
 
     const questionRef = getQuestionRef(activeQuestion);
@@ -737,7 +933,7 @@ export class ChatWidget {
     try {
       const sendRequest = {
         content: [content],
-        attachments: attachmentRef ? [attachmentRef] : undefined,
+        attachments,
         meta: questionMeta,
       };
       this.debug.log('[cortex-chat-widget] handleSend -> controller.sendMessage start', {
@@ -878,12 +1074,13 @@ export class ChatWidget {
   }
 
   private async handleTranscriptClick(event: MouseEvent): Promise<void> {
-    const downloadLink = (event.target as Element).closest('[data-download-mint-url]') as HTMLAnchorElement | null;
-    if (downloadLink) {
+    const downloadButton = (event.target as Element).closest('[data-download-file-ref]') as HTMLButtonElement | null;
+    if (downloadButton) {
       event.preventDefault();
-      const fileRef = downloadLink.dataset.fileRef;
-      if (fileRef) {
-        await this.downloadSessionFile(fileRef, downloadLink.dataset.filename);
+      const fileRef = downloadButton.dataset.downloadFileRef;
+      const messageId = downloadButton.dataset.messageId;
+      if (!downloadButton.disabled && fileRef && messageId) {
+        await this.downloadGeneratedFile(messageId, fileRef);
       }
       return;
     }
@@ -910,33 +1107,84 @@ export class ChatWidget {
     }
   }
 
-  // Mint-on-click: fetch a fresh single-use download URL, then trigger a plain browser download.
-  private async downloadSessionFile(fileRef: string, filename?: string): Promise<void> {
-    const clientAny = this.client as unknown as Record<string, unknown>;
-    const mint = clientAny['mintSessionFileDownloadUrl'];
-    if (typeof mint !== 'function') {
-      return; // Older SDK without descriptor download support.
+  /**
+   * Download one generated file of a live answer. The descriptor is resolved
+   * again from the transcript (never from DOM or message URLs); only an
+   * available assistant file of that answer reaches client.downloadFile().
+   */
+  private async downloadGeneratedFile(messageId: string, fileRef: string): Promise<void> {
+    if (this.ui.isDestroyed || this.chatView.kind === 'historical') {
+      return;
     }
-    try {
-      const url = await (mint as (ref: string) => Promise<string>).call(this.client, fileRef);
-      this.triggerBrowserDownload(url, filename);
-    } catch (error) {
-      this.resolveRuntimeError(error);
+    const message = this.liveChatState.transcript.find((candidate) => candidate.id === messageId);
+    const attachment = message ? findGeneratedFile(message, fileRef) : null;
+    if (!attachment || attachment.state !== 'available') {
+      return;
+    }
+    if (this.ui.fileDownloads.get(fileRef)?.status === 'downloading') {
+      return;
+    }
+    const client = this.client;
+    if (typeof client.downloadFile !== 'function') {
+      this.setFileDownload(fileRef, {
+        status: 'failed',
+        error: { code: 'downloads_unavailable', message: 'Downloads are unavailable for the current client.' },
+        retryable: false,
+      });
       this.notifyAndRender();
+      return;
     }
+
+    this.setFileDownload(fileRef, { status: 'downloading', error: null, retryable: false });
+    this.notifyAndRender();
+    try {
+      const blob = await client.downloadFile(fileRef);
+      if (this.ui.isDestroyed || this.client !== client) {
+        return;
+      }
+      if (!(blob instanceof Blob)) {
+        throw createWidgetError('file_download_failed', 'Download did not return file contents.');
+      }
+      this.saveBlob(blob, safeDownloadFilename(attachment.fileName));
+      this.setFileDownload(fileRef, null);
+    } catch (error) {
+      if (this.ui.isDestroyed || this.client !== client) {
+        return;
+      }
+      const widgetError = toWidgetError(error, 'file_download_failed', 'File download failed');
+      this.setFileDownload(fileRef, {
+        status: 'failed',
+        error: widgetError,
+        retryable: isRetryableFileError(error, widgetError),
+      });
+      this.options.onError?.(error);
+    }
+    this.notifyAndRender();
   }
 
-  private triggerBrowserDownload(url: string, filename?: string): void {
-    if (typeof document === 'undefined') return;
+  private setFileDownload(fileRef: string, download: { status: 'downloading' | 'failed'; error: CortexChatWidgetError | null; retryable: boolean } | null): void {
+    const next = new Map(this.ui.fileDownloads);
+    if (download) next.set(fileRef, download);
+    else next.delete(fileRef);
+    this.ui.fileDownloads = next;
+  }
+
+  // Save a downloaded Blob through a short-lived object URL; no server URL is ever used.
+  private saveBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.rel = 'noopener noreferrer';
-    if (filename) {
-      anchor.download = filename;
-    }
+    anchor.download = filename;
+    anchor.rel = 'noopener';
+    anchor.style.display = 'none';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
+    const timer = window.setTimeout(() => {
+      this.pendingDownloadUrls.delete(url);
+      URL.revokeObjectURL(url);
+    }, DOWNLOAD_URL_REVOKE_DELAY_MS);
+    this.pendingDownloadUrls.set(url, timer);
   }
 
   private setOpen(nextOpen: boolean): void {
@@ -960,21 +1208,6 @@ export class ChatWidget {
     this.ui.error = toWidgetError(error, code, message);
     this.options.onError?.(error);
     this.notifyAndRender();
-  }
-
-  private resolveUploadError(error: unknown): void {
-    this.ui.isAwaitingAnswer = false;
-    this.ui.isUploading = false;
-    const widgetError = toWidgetError(error, 'upload_failed', 'Attachment upload failed');
-    this.ui.error = widgetError;
-    this.debug.log('[cortex-chat-widget] upload failed', {
-      code: widgetError.code,
-      message: widgetError.message,
-      details: (error && typeof error === 'object' && 'details' in error)
-        ? (error as { details?: unknown }).details
-        : undefined,
-    });
-    this.options.onError?.(error);
   }
 
   private resolveRuntimeError(error: unknown): void {
