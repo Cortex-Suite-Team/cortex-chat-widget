@@ -77,6 +77,10 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   typing.setAttribute('data-testid', 'typing-indicator');
   const escalation = createElement('div', 'cortex-widget__escalation');
   escalation.setAttribute('data-testid', 'escalation-card');
+  const humanAssistance = createElement('section', 'cortex-widget__human-assistance');
+  humanAssistance.setAttribute('aria-label', 'Human assistance requests');
+  humanAssistance.setAttribute('data-testid', 'human-assistance');
+  humanAssistance.hidden = true;
 
   const authGate = createElement('div', 'cortex-widget__auth-gate');
   authGate.setAttribute('data-testid', 'auth-gate');
@@ -143,7 +147,7 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   headerText.append(title, subtitle, statusWrap);
   headerMain.append(avatar, headerText);
   header.append(headerMain);
-  body.append(errorBanner, transcript, workerStatus, typing, escalation, authGate, composer);
+  body.append(errorBanner, transcript, workerStatus, typing, escalation, humanAssistance, authGate, composer);
   chatSlot.append(header, body);
   panel.append(shellRail, historySlot, chatSlot);
 
@@ -175,6 +179,7 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
     workerStatus,
     typing,
     escalation,
+    humanAssistance,
     authGate,
     authMessage,
     authLoginInput,

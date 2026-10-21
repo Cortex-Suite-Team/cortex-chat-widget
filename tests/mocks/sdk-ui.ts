@@ -1,5 +1,67 @@
 type Listener = (state: ChatState) => void;
 
+// S21 controller surface, used by widget DOM tests with an authenticated mock client.
+export function createHumanAssistanceController(options: {
+  client: {
+    humanAssistanceRequests: Array<{ request_id: string; question: string; options: Array<{ id: string; label: string }>; allow_text: boolean; deadline_at: string }>;
+    onHumanAssistance(handler: (event: { type: string; payload: any }) => void): () => void;
+    replyHumanAssistance(payload: unknown): Promise<void>;
+  };
+}) {
+  type Request = typeof options.client.humanAssistanceRequests[number];
+  type Card = { request: Request; optionId: string | null; text: string; status: string; clientReplyId: string | null; error?: string; reason?: string };
+  const cards = new Map<string, Card>();
+  const submissions = new Map<string, any>();
+  const listeners = new Set<(cards: Card[]) => void>();
+  const emit = () => listeners.forEach((listener) => listener([...cards.values()].map((card) => ({ ...card }))));
+  const add = (request: Request) => {
+    if (!cards.has(request.request_id)) { cards.set(request.request_id, { request, optionId: null, text: '', status: 'pending', clientReplyId: null }); emit(); }
+  };
+  const unsubscribe = options.client.onHumanAssistance((event) => {
+    if (event.type === 'human_assistance::request') { add(event.payload); return; }
+    const card = cards.get(event.payload.request_id);
+    if (!card) return;
+    if (['resolved', 'expired', 'revoked'].includes(event.payload.status)) card.status = event.payload.status;
+    else if (event.payload.client_reply_id === card.clientReplyId) {
+      if (event.payload.status === 'reply_accepted') card.status = 'accepted';
+      if (event.payload.status === 'reply_rejected') { card.status = 'rejected'; card.reason = event.payload.reason; }
+    }
+    emit();
+  });
+  options.client.humanAssistanceRequests.forEach(add);
+  const pending = (id: string) => {
+    const card = cards.get(id);
+    if (!card || card.status !== 'pending' || Date.now() >= Date.parse(card.request.deadline_at)) throw Error('inactive request');
+    return card;
+  };
+  const send = async (card: Card, payload: any) => {
+    card.status = 'sent'; card.error = undefined; emit();
+    try { await options.client.replyHumanAssistance(payload); }
+    catch (error) { card.error = (error as Error).message; emit(); throw error; }
+  };
+  const begin = (id: string, action: 'answer' | 'refuse') => {
+    const card = pending(id);
+    if (action === 'answer' && !card.optionId && !card.text.trim()) throw Error('empty answer');
+    const payload = { requestId: id, clientReplyId: `reply_${submissions.size + 1}`, action,
+      ...(action === 'answer' && card.optionId ? { optionId: card.optionId } : {}),
+      ...(action === 'answer' && card.text.trim() ? { text: card.text.trim() } : {}) };
+    card.clientReplyId = payload.clientReplyId;
+    submissions.set(id, payload);
+    return send(card, payload);
+  };
+  return {
+    getCards: () => [...cards.values()],
+    subscribe: (listener: (cards: Card[]) => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    selectOption: (id: string, optionId: string | null) => { const card = pending(id); if (optionId && !card.request.options.some((option) => option.id === optionId)) throw Error('invalid option'); card.optionId = optionId; emit(); },
+    setText: (id: string, value: string) => { const card = pending(id); if (!card.request.allow_text || value.length > 4096) throw Error('invalid text'); card.text = value; emit(); },
+    submit: (id: string) => begin(id, 'answer'),
+    refuse: (id: string) => begin(id, 'refuse'),
+    retry: (id: string) => { const card = cards.get(id); const payload = submissions.get(id); if (!card || !payload || card.status !== 'sent' || !card.error) throw Error('retry unavailable'); return send(card, payload); },
+    reset: () => { cards.clear(); emit(); },
+    destroy: () => { unsubscribe(); cards.clear(); listeners.clear(); },
+  };
+}
+
 export type ChatMessageDeliveryStatus = 'sending' | 'sent' | 'delivered' | 'processed' | 'failed';
 
 export interface CortexTransportMessage {

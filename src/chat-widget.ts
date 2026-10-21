@@ -1,10 +1,12 @@
 import { createChatController, type ChatController, type ChatState } from '@cortex-suite/sdk-ui';
+import * as sdkUi from '@cortex-suite/sdk-ui';
 import { findGeneratedFile, FILE_REF_PATTERN, safeDownloadFilename } from './attachments.js';
 import { createDebugLogger } from './debug.js';
 import { createWidgetError, toWidgetError } from './errors.js';
 import { createHistoryClient } from './history-client.js';
 import { HistoryController } from './history-controller.js';
 import { createHistoryDom } from './history-dom.js';
+import { HumanAssistanceView, type HumanAssistanceClient, type HumanAssistanceController } from './human-assistance.js';
 import {
   getMessageFlags,
   isTerminalSessionState,
@@ -186,6 +188,9 @@ export class ChatWidget {
   private readonly pendingDownloadUrls = new Map<string, number>();
   private unsubscribeController: (() => void) | null = null;
   private unsubscribeRawMessages: (() => void) | null = null;
+  private humanAssistanceController: HumanAssistanceController | null = null;
+  private humanAssistanceView: HumanAssistanceView | null = null;
+  private unsubscribeHumanAssistance: (() => void) | null = null;
   private readonly ui: InternalWidgetState = {
     isOpen: false,
     isReady: false,
@@ -369,6 +374,7 @@ export class ChatWidget {
     this.pendingDownloadUrls.clear();
     this.historyController?.destroy();
     this.historyController = null;
+    this.teardownHumanAssistance();
     this.teardownLiveListeners();
     for (const dispose of Array.from(this.domCleanup)) {
       dispose();
@@ -459,7 +465,37 @@ export class ChatWidget {
     this.liveChatState = this.controller.getState();
     this.ui.attachmentsAvailable = typeof this.client.uploadFile === 'function';
     this.ui.fileDownloads = new Map();
+    this.initializeHumanAssistance();
     this.bindControllerListeners();
+  }
+
+  private initializeHumanAssistance(): void {
+    const client = this.client as WidgetClientLike & Partial<HumanAssistanceClient>;
+    const factory = (sdkUi as unknown as {
+      createHumanAssistanceController?: (options: { client: HumanAssistanceClient }) => HumanAssistanceController;
+    }).createHumanAssistanceController;
+    // Both accepted S20 native client and S21 SDK UI must be present. Old packages fail closed.
+    if (typeof factory !== 'function'
+      || !Array.isArray(client.humanAssistanceRequests)
+      || typeof client.onHumanAssistance !== 'function'
+      || typeof client.replyHumanAssistance !== 'function') {
+      return;
+    }
+    const controller = factory({ client: client as HumanAssistanceClient });
+    const view = new HumanAssistanceView(this.dom.humanAssistance, controller);
+    this.humanAssistanceController = controller;
+    this.humanAssistanceView = view;
+    this.unsubscribeHumanAssistance = controller.subscribe((cards) => view.render(cards));
+    view.render(controller.getCards());
+  }
+
+  private teardownHumanAssistance(): void {
+    this.unsubscribeHumanAssistance?.();
+    this.unsubscribeHumanAssistance = null;
+    this.humanAssistanceController?.destroy();
+    this.humanAssistanceController = null;
+    this.humanAssistanceView?.destroy();
+    this.humanAssistanceView = null;
   }
 
   private bindControllerListeners(): void {
@@ -550,6 +586,7 @@ export class ChatWidget {
   }
 
   private async resetLiveSession(): Promise<void> {
+    this.teardownHumanAssistance();
     this.teardownLiveListeners();
     try {
       await this.controller.disconnect();
@@ -564,6 +601,7 @@ export class ChatWidget {
     this.liveChatState = this.controller.getState();
     this.ui.attachmentsAvailable = typeof this.client.uploadFile === 'function';
     this.ui.fileDownloads = new Map();
+    this.initializeHumanAssistance();
     this.liveConnected = false;
     this.liveConnectPromise = null;
     this.bindControllerListeners();

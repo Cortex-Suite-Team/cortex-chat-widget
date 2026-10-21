@@ -28,6 +28,20 @@ This package is not the Control Plane operator cockpit.
 npm install @cortex-suite/chat-widget
 ```
 
+### Human Assistance capability gate (S22)
+
+The separate Human Assistance cards require the native SDK responder API from
+`Cortex-Suite-Team/cortex-sdk` at `6b523a2c705225d9ffa22f845a1dbfc7198de4d6`
+and `createHumanAssistanceController` from `Cortex-Suite-Team/cortex-sdk-ui` at
+`ce1e84c889f95df46075b1b60fef43628ccd3c68`. The currently pinned npm
+versions (`@cortex-suite/sdk@1.1.21` and `@cortex-suite/sdk-ui@0.1.0`) share
+their version numbers with older builds and do not prove those APIs are present.
+Build both accepted commits into local tarballs and install them together before
+building the widget. If either API is absent, the widget shows no HA cards and
+does not create a local responder. Ordinary chat remains available. Publishing
+those dependency builds and validating the real deployed widget are separate
+release gates.
+
 ## Embedded Example
 
 ```ts

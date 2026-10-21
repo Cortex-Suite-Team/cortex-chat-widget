@@ -218,6 +218,7 @@ export interface WidgetDom {
   workerStatus: HTMLElement;
   typing: HTMLElement;
   escalation: HTMLElement;
+  humanAssistance: HTMLElement;
   authGate: HTMLElement;
   authMessage: HTMLElement;
   authLoginInput: HTMLInputElement;
