@@ -10,7 +10,7 @@ export interface HumanAssistanceCard {
   };
   optionId: string | null;
   text: string;
-  status: 'pending' | 'sent' | 'accepted' | 'rejected' | 'resolved' | 'expired' | 'revoked' | 'delivery_failed';
+  status: 'pending' | 'sent' | 'accepted' | 'rejected' | 'resolved' | 'expired' | 'revoked' | 'delivery_failed' | 'cancelled';
   clientReplyId: string | null;
   reason?: string;
   error?: string;
@@ -50,6 +50,7 @@ function statusText(card: HumanAssistanceCard): string {
     expired: 'Expired',
     revoked: 'Revoked',
     delivery_failed: 'Could not deliver request',
+    cancelled: 'Request cancelled',
   };
   return labels[card.status];
 }
@@ -186,7 +187,8 @@ export class HumanAssistanceView {
     const status = node.querySelector<HTMLElement>('.cortex-widget__ha-status')!;
     status.textContent = statusText(card);
     const error = node.querySelector<HTMLElement>('.cortex-widget__ha-error')!;
-    error.textContent = card.error ?? (card.reason ? `Reason: ${card.reason}` : '');
+    error.textContent = card.reason === 'not_admitted' ? 'Reply not accepted'
+      : card.error ?? (card.reason ? `Reason: ${card.reason}` : '');
     error.hidden = !error.textContent;
     node.querySelector<HTMLButtonElement>('[data-ha-action="submit"]')!.disabled = !pending || (!card.optionId && !card.text.trim());
     node.querySelector<HTMLButtonElement>('[data-ha-action="refuse"]')!.disabled = !pending;

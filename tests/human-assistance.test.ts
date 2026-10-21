@@ -90,6 +90,8 @@ describe('Human Assistance visual host', () => {
     client.notify('human_assistance::status', { request_id: 'revoked', status: 'revoked' });
     client.notify('human_assistance::request', request('failed', [], true));
     client.notify('human_assistance::status', { request_id: 'failed', status: 'delivery_failed' });
+    client.notify('human_assistance::request', request('cancelled', [], true));
+    client.notify('human_assistance::status', { request_id: 'cancelled', status: 'cancelled' });
     expect(action(card(root, 'choice'), 'submit').disabled).toBe(true);
     expect(card(root, 'choice').querySelector('textarea')).toBeNull();
     expect(action(card(root, 'expired'), 'submit').disabled).toBe(true);
@@ -97,6 +99,11 @@ describe('Human Assistance visual host', () => {
     expect(card(root, 'failed').textContent).toContain('Could not deliver request');
     expect(card(root, 'failed').textContent).not.toContain('Resolved');
     expect(action(card(root, 'failed'), 'submit').disabled).toBe(true);
+    expect(card(root, 'cancelled').textContent).toContain('Request cancelled');
+    expect(card(root, 'cancelled').textContent).not.toContain('Revoked');
+    expect(action(card(root, 'cancelled'), 'refuse').disabled).toBe(true);
+    client.notify('human_assistance::request', request('cancelled', [], true));
+    expect(root.querySelectorAll('[data-ha-request-id="cancelled"]')).toHaveLength(1);
     client.notify('human_assistance::status', { request_id: 'failed', status: 'delivery_failed' });
     client.notify('human_assistance::request', request('failed', [], true));
     expect(root.querySelectorAll('[data-ha-request-id="failed"]')).toHaveLength(1);
@@ -112,6 +119,12 @@ describe('Human Assistance visual host', () => {
     expect(client.replies[1]).toEqual(client.replies[0]);
     client.notify('human_assistance::status', { request_id: 'choice', status: 'reply_rejected', client_reply_id: 'reply_1', reason: 'unauthorized' });
     expect(card(root, 'choice').textContent).toContain('Reason: unauthorized');
+    client.notify('human_assistance::request', request('neutral', [], true));
+    action(card(root, 'neutral'), 'refuse').click();
+    await flushAsyncWork();
+    client.notify('human_assistance::status', { request_id: 'neutral', status: 'reply_rejected', client_reply_id: 'reply_2', reason: 'not_admitted' });
+    expect(card(root, 'neutral').textContent).toContain('Reply not accepted');
+    expect(card(root, 'neutral').textContent).not.toContain('Reason: not_admitted');
     expect(action(card(root, 'choice'), 'retry').hidden).toBe(true);
     client.notify('human_assistance::request', request('choice', [{ id: 'two', label: 'Two' }], true));
     expect(root.querySelectorAll('[data-ha-request-id="choice"]')).toHaveLength(1);
