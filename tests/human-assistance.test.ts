@@ -135,4 +135,27 @@ describe('Human Assistance visual host', () => {
       jest.useRealTimers();
     }
   });
+
+  it('replaces the HA subscription and clears old cards on New Chat', async () => {
+    const target = document.createElement('div');
+    const historyTarget = document.createElement('div');
+    document.body.append(target, historyTarget);
+    const client = new HAClient();
+    const { widget } = mountWidget({ client, mode: 'embedded', target, historyTarget, controlPlaneUrl: 'https://cp.test' });
+    const root = (target.firstElementChild as HTMLElement).shadowRoot!;
+    client.notify('human_assistance::request', request('old', [], true));
+    expect(client.haListeners.size).toBe(1);
+    expect(card(root, 'old')).toBeTruthy();
+    // The accepted native SDK clears its inbox on explicit disconnect.
+    client.humanAssistanceRequests = [];
+    const historyHost = root.querySelector<HTMLElement>('[data-testid="widget-history-slot"] > *')!;
+    historyHost.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="history-new-chat"]')!.click();
+    await flushAsyncWork();
+    expect(client.haListeners.size).toBe(1);
+    expect(root.querySelectorAll('[data-ha-request-id]')).toHaveLength(0);
+    client.notify('human_assistance::request', request('new', [], true));
+    expect(root.querySelectorAll('[data-ha-request-id]')).toHaveLength(1);
+    expect(card(root, 'new')).toBeTruthy();
+    widget.destroy();
+  });
 });
