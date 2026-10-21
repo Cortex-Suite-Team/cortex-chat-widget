@@ -88,10 +88,18 @@ describe('Human Assistance visual host', () => {
     client.notify('human_assistance::status', { request_id: 'expired', status: 'expired' });
     client.notify('human_assistance::request', request('revoked', [{ id: 'one', label: 'One' }], false));
     client.notify('human_assistance::status', { request_id: 'revoked', status: 'revoked' });
+    client.notify('human_assistance::request', request('failed', [], true));
+    client.notify('human_assistance::status', { request_id: 'failed', status: 'delivery_failed' });
     expect(action(card(root, 'choice'), 'submit').disabled).toBe(true);
     expect(card(root, 'choice').querySelector('textarea')).toBeNull();
     expect(action(card(root, 'expired'), 'submit').disabled).toBe(true);
     expect(action(card(root, 'revoked'), 'refuse').disabled).toBe(true);
+    expect(card(root, 'failed').textContent).toContain('Could not deliver request');
+    expect(card(root, 'failed').textContent).not.toContain('Resolved');
+    expect(action(card(root, 'failed'), 'submit').disabled).toBe(true);
+    client.notify('human_assistance::status', { request_id: 'failed', status: 'delivery_failed' });
+    client.notify('human_assistance::request', request('failed', [], true));
+    expect(root.querySelectorAll('[data-ha-request-id="failed"]')).toHaveLength(1);
     const select = card(root, 'choice').querySelector<HTMLSelectElement>('select')!;
     select.value = 'one'; select.dispatchEvent(new Event('change', { bubbles: true }));
     client.failNextReply = true;

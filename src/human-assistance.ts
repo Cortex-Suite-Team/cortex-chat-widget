@@ -10,7 +10,7 @@ export interface HumanAssistanceCard {
   };
   optionId: string | null;
   text: string;
-  status: 'pending' | 'sent' | 'accepted' | 'rejected' | 'resolved' | 'expired' | 'revoked';
+  status: 'pending' | 'sent' | 'accepted' | 'rejected' | 'resolved' | 'expired' | 'revoked' | 'delivery_failed';
   clientReplyId: string | null;
   reason?: string;
   error?: string;
@@ -49,6 +49,7 @@ function statusText(card: HumanAssistanceCard): string {
     resolved: 'Resolved',
     expired: 'Expired',
     revoked: 'Revoked',
+    delivery_failed: 'Could not deliver request',
   };
   return labels[card.status];
 }

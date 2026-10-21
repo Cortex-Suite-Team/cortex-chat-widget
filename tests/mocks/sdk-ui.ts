@@ -21,7 +21,7 @@ export function createHumanAssistanceController(options: {
     if (event.type === 'human_assistance::request') { add(event.payload); return; }
     const card = cards.get(event.payload.request_id);
     if (!card) return;
-    if (['resolved', 'expired', 'revoked'].includes(event.payload.status)) card.status = event.payload.status;
+    if (['resolved', 'expired', 'revoked', 'delivery_failed'].includes(event.payload.status)) card.status = event.payload.status;
     else if (event.payload.client_reply_id === card.clientReplyId) {
       if (event.payload.status === 'reply_accepted') card.status = 'accepted';
       if (event.payload.status === 'reply_rejected') { card.status = 'rejected'; card.reason = event.payload.reason; }
