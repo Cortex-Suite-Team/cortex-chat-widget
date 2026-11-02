@@ -15,6 +15,8 @@ import { applyResolvedTheme, destroyTranscriptRenderer, renderWidget } from './r
 import {
   MAX_COMPOSER_ATTACHMENTS,
   type ChatMessageViewModel,
+  type HistoryAuditInfo,
+  type HistoryTranscript,
   type ChatViewMode,
   type ComposerFile,
   type CortexChatWidgetError,
@@ -176,6 +178,7 @@ export class ChatWidget {
   private controller!: ChatController;
   private liveChatState: ChatState = EMPTY_CHAT_STATE;
   private historicalTranscript: ChatMessageViewModel[] = [];
+  private historicalAudit: HistoryAuditInfo | null = null;
   private historicalTranscriptRevision = 0;
   private chatView: ChatViewMode = { kind: 'live' };
   private historyController: HistoryController | null = null;
@@ -331,7 +334,7 @@ export class ChatWidget {
         callbacks: {
           getLiveSessionId: () => this.getLiveSessionId(),
           onOpenCurrent: () => this.showLive(),
-          onOpenHistorical: (sessionId, messages) => this.showHistoricalTranscript(sessionId, messages),
+          onOpenHistorical: (sessionId, transcript) => this.showHistoricalTranscript(sessionId, transcript),
           onStartNewChat: () => this.startNewChat(),
           onError: (error, code, message) => this.handleHistoryError(error, code, message),
         },
@@ -395,17 +398,19 @@ export class ChatWidget {
     }
     this.chatView = { kind: 'live' };
     this.historicalTranscript = [];
+    this.historicalAudit = null;
     this.historicalTranscriptRevision += 1;
     this.ui.error = null;
     this.notifyAndRender();
   }
 
-  showHistoricalTranscript(sessionId: string, messages: ChatMessageViewModel[]): void {
+  showHistoricalTranscript(sessionId: string, transcript: HistoryTranscript): void {
     if (this.ui.isDestroyed) {
       return;
     }
     this.chatView = { kind: 'historical', sessionId };
-    this.historicalTranscript = [...messages];
+    this.historicalTranscript = [...transcript.messages];
+    this.historicalAudit = transcript.audit;
     this.historicalTranscriptRevision += 1;
     this.ui.isAwaitingAnswer = false;
     this.ui.isTyping = false;
@@ -654,6 +659,7 @@ export class ChatWidget {
       isAwaitingAnswer: this.chatView.kind === 'historical' ? false : this.ui.isAwaitingAnswer,
       isTyping: this.chatView.kind === 'historical' ? false : this.ui.isTyping,
       isHistoricalView: this.chatView.kind === 'historical',
+      historyAudit: this.chatView.kind === 'historical' ? this.historicalAudit : null,
       selectedFiles: this.ui.composerFiles.map((entry) => ({
         id: entry.id,
         name: entry.file.name,

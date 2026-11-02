@@ -131,10 +131,10 @@ describe('history stability', () => {
       .mockResolvedValueOnce(mockJsonResponse({
         ok: true,
         data: {
-          session_id: 'sess_hist',
           messages: [
-            { id: 'm1', type: 'chat::answer', role: 'assistant', content: 'Historical message', status: 'final', ts: '2026-05-10T10:00:00Z', meta: {} },
+            { id: 1, message_type: 'chat::answer', direction: 'out', role: 'assistant', content: ['Historical message'], timestamp: '2026-05-10T10:00:00Z', source: 'session-manager' },
           ],
+          next_cursor: null, incomplete: true, incomplete_reason: 'audit_best_effort', truncated: false,
         },
       }));
 
@@ -434,7 +434,7 @@ describe('Current Chat row', () => {
     installTargets();
     getFetchMock()
       .mockResolvedValueOnce(mockJson({ ok: true, data: { conversations: [{ session_id: 'sess_hist', title: 'Old Chat', renamed: false, pinned: false, last_message_at: '2026-05-10T10:00:00Z', created_at: '2026-05-10T09:00:00Z' }] } }))
-      .mockResolvedValueOnce(mockJson({ ok: true, data: { session_id: 'sess_hist', messages: [{ id: 'm1', type: 'chat::answer', role: 'assistant', content: 'Old answer', status: 'final', ts: '2026-05-10T10:00:00Z', meta: {} }] } }));
+      .mockResolvedValueOnce(mockJson({ ok: true, data: { messages: [{ id: 1, message_type: 'chat::answer', direction: 'out', role: 'assistant', content: ['Old answer'], timestamp: '2026-05-10T10:00:00Z', source: 'session-manager' }], next_cursor: null, incomplete: true, incomplete_reason: 'audit_best_effort', truncated: false } }));
 
     mountCortexChat({ apiKey: 'test-key', mode: 'embedded', target: '#chat', historyTarget: '#history', controlPlaneUrl: 'https://cp.example.test' });
     __getLastController()!.setState(createMockChatState());

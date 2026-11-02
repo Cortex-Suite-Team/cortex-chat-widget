@@ -211,8 +211,8 @@ describe('DOM stability — render gating', () => {
       .mockResolvedValueOnce(mockJsonResponse({
         ok: true,
         data: {
-          session_id: 'sess_old',
-          messages: [{ id: 'm1', type: 'chat::answer', role: 'assistant', content: 'Historical answer', status: 'final', ts: '2026-05-10T10:00:00Z', meta: {} }],
+          messages: [{ id: 1, message_type: 'chat::answer', direction: 'out', role: 'assistant', content: ['Historical answer'], timestamp: '2026-05-10T10:00:00Z', source: 'session-manager' }],
+          next_cursor: null, incomplete: true, incomplete_reason: 'audit_best_effort', truncated: false,
         },
       }));
 
@@ -271,7 +271,7 @@ describe('live session selection', () => {
       }))
       .mockResolvedValueOnce(mockJsonResponse({
         ok: true,
-        data: { session_id: 'sess_client_only', messages: [] },
+        data: { messages: [], next_cursor: null, incomplete: true, incomplete_reason: 'audit_best_effort', truncated: false },
       }));
 
     mountCortexChat({
@@ -444,7 +444,7 @@ describe('live session selection', () => {
       }))
       .mockResolvedValueOnce(mockJsonResponse({
         ok: true,
-        data: { session_id: 'sess_old', messages: [{ id: 'm1', type: 'chat::answer', role: 'assistant', content: 'Old answer', status: 'final', ts: '2026-05-10T10:00:00Z', meta: {} }] },
+        data: { messages: [{ id: 1, message_type: 'chat::answer', direction: 'out', role: 'assistant', content: ['Old answer'], timestamp: '2026-05-10T10:00:00Z', source: 'session-manager' }], next_cursor: null, incomplete: true, incomplete_reason: 'audit_best_effort', truncated: false },
       }));
 
     mountCortexChat({

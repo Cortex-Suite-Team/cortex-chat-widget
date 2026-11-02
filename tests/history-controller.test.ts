@@ -1,7 +1,14 @@
 import { jest } from '@jest/globals';
 import { createHistoryDom } from '../src/history-dom.js';
 import { HistoryController, HistoryPinStore, type HistoryControllerCallbacks } from '../src/history-controller.js';
-import type { ChatMessageViewModel, HistoryClient, HistoryConversationSummary, NormalizedWidgetOptions } from '../src/types.js';
+import type { ChatMessageViewModel, HistoryClient, HistoryConversationSummary, HistoryTranscript, NormalizedWidgetOptions } from '../src/types.js';
+
+function transcript(messages: ChatMessageViewModel[]): HistoryTranscript {
+  return {
+    messages: messages.map((message) => ({ ...message, direction: 'out', source: 'session-manager' })),
+    audit: { incomplete: true, incompleteReason: 'audit_best_effort', truncated: false, sources: ['session-manager'] },
+  };
+}
 
 function createOptions(): NormalizedWidgetOptions {
   return {
@@ -53,7 +60,7 @@ function createPinStore(storage: Storage | null = createMemoryStorage()): Histor
 function createClient(overrides: Partial<HistoryClient> = {}): jest.Mocked<HistoryClient> {
   return {
     listConversations: jest.fn(async () => []),
-    getMessages: jest.fn(async () => []),
+    getMessages: jest.fn(async () => transcript([])),
     renameConversation: jest.fn(async () => {}),
     pinConversation: jest.fn(async () => {}),
     unpinConversation: jest.fn(async () => {}),
@@ -124,7 +131,7 @@ describe('HistoryController', () => {
     const messages = [createMessage('Old answer')];
     const client = createClient({
       listConversations: jest.fn(async () => [createSummary('sess_old', 'Old Chat')]),
-      getMessages: jest.fn(async () => messages),
+      getMessages: jest.fn(async () => transcript(messages)),
     });
     const controller = new HistoryController({ dom, options: createOptions(), callbacks });
 
@@ -138,7 +145,7 @@ describe('HistoryController', () => {
     await flushAsyncWork();
 
     expect(client.getMessages).toHaveBeenCalledWith('sess_old');
-    expect(callbacks.onOpenHistorical).toHaveBeenCalledWith('sess_old', messages);
+    expect(callbacks.onOpenHistorical).toHaveBeenCalledWith('sess_old', transcript(messages));
   });
 
   it('clicking header New Chat calls onStartNewChat', async () => {
@@ -408,8 +415,8 @@ describe('HistoryController', () => {
   it('ignores stale historical message responses', async () => {
     const dom = createHistoryDom();
     const callbacks = createCallbacks();
-    const first = deferred<ChatMessageViewModel[]>();
-    const second = deferred<ChatMessageViewModel[]>();
+    const first = deferred<HistoryTranscript>();
+    const second = deferred<HistoryTranscript>();
     let messageCall = 0;
     const client = createClient({
       listConversations: jest.fn(async () => [
@@ -433,12 +440,12 @@ describe('HistoryController', () => {
     updatedRows[1].click();
 
     const secondMessages = [createMessage('Second answer')];
-    second.resolve(secondMessages);
+    second.resolve(transcript(secondMessages));
     await flushAsyncWork();
     expect(callbacks.onOpenHistorical).toHaveBeenCalledTimes(1);
-    expect(callbacks.onOpenHistorical).toHaveBeenCalledWith('sess_second', secondMessages);
+    expect(callbacks.onOpenHistorical).toHaveBeenCalledWith('sess_second', transcript(secondMessages));
 
-    first.resolve([createMessage('First answer')]);
+    first.resolve(transcript([createMessage('First answer')]));
     await flushAsyncWork();
     expect(callbacks.onOpenHistorical).toHaveBeenCalledTimes(1);
   });
@@ -448,7 +455,7 @@ describe('HistoryController', () => {
     const callbacks = createCallbacks();
     const oldClient = createClient({
       listConversations: jest.fn(async () => [createSummary('sess_old', 'Old Chat')]),
-      getMessages: jest.fn(async () => [createMessage('Old answer')]),
+      getMessages: jest.fn(async () => transcript([createMessage('Old answer')])),
     });
     const newClient = createClient({
       listConversations: jest.fn(async () => [createSummary('sess_new', 'New Chat')]),

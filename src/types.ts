@@ -74,6 +74,7 @@ export interface CortexChatWidgetState {
   isAwaitingAnswer: boolean;
   isTyping: boolean;
   isHistoricalView: boolean;
+  historyAudit: HistoryAuditInfo | null;
   /** Files selected in the composer, in selection order. */
   selectedFiles: SelectedFileState[];
   /** In-flight or failed generated-file downloads, by file_ref. */
@@ -91,9 +92,26 @@ export interface HistoryConversationSummary {
   created_at: string | null;
 }
 
+export interface HistoryAuditInfo {
+  incomplete: boolean;
+  incompleteReason: string | null;
+  truncated: boolean;
+  sources: string[];
+}
+
+export interface HistoryMessageViewModel extends ChatMessageViewModel {
+  direction: 'in' | 'out';
+  source: string;
+}
+
+export interface HistoryTranscript {
+  messages: HistoryMessageViewModel[];
+  audit: HistoryAuditInfo;
+}
+
 export interface HistoryClient {
   listConversations(): Promise<HistoryConversationSummary[]>;
-  getMessages(sessionId: string): Promise<ChatMessageViewModel[]>;
+  getMessages(sessionId: string): Promise<HistoryTranscript>;
   renameConversation(sessionId: string, title: string): Promise<void>;
   pinConversation(sessionId: string): Promise<void>;
   unpinConversation(sessionId: string): Promise<void>;
@@ -214,6 +232,7 @@ export interface WidgetDom {
   avatar: HTMLElement;
   statusDot: HTMLElement;
   errorBanner: HTMLElement;
+  historyNotice: HTMLElement;
   transcript: HTMLElement;
   workerStatus: HTMLElement;
   typing: HTMLElement;

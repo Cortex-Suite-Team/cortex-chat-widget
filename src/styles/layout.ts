@@ -224,6 +224,15 @@ export const layoutStyles = `
   display: block;
 }
 
+.cortex-widget__history-notice:not([hidden]) {
+  margin: 10px 14px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.12);
+  color: inherit;
+  font-size: 12px;
+}
+
 .cortex-widget__transcript {
   flex: 1 1 auto;
   min-height: 0;

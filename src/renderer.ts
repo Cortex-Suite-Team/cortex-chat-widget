@@ -1051,6 +1051,11 @@ export function renderWidget(
 
   renderComposerFiles(dom.fileChips, state.selectedFiles, state.isAwaitingAnswer || isUploading);
 
+  const audit = state.historyAudit;
+  dom.historyNotice.hidden = !state.isHistoricalView || audit === null;
+  dom.historyNotice.textContent = audit === null ? '' : audit.incomplete
+    ? `Audit history may be incomplete (${audit.incompleteReason ?? 'best effort'}). Source: ${audit.sources.join(', ') || 'audit'}.`
+    : `Audit history. Source: ${audit.sources.join(', ') || 'audit'}.`;
   renderTranscript(dom.transcript, state, options, { downloadsAvailable });
 }
 

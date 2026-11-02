@@ -69,6 +69,8 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   const errorBanner = createElement('div', 'cortex-widget__error');
   errorBanner.setAttribute('role', 'alert');
   errorBanner.setAttribute('data-testid', 'error-banner');
+  const historyNotice = createElement('div', 'cortex-widget__history-notice');
+  historyNotice.setAttribute('data-testid', 'history-audit-notice');
   const transcript = createElement('div', 'cortex-widget__transcript');
   transcript.setAttribute('data-testid', 'transcript');
   const workerStatus = createElement('div', 'cortex-widget__worker-status');
@@ -147,7 +149,7 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
   headerText.append(title, subtitle, statusWrap);
   headerMain.append(avatar, headerText);
   header.append(headerMain);
-  body.append(errorBanner, transcript, workerStatus, typing, escalation, humanAssistance, authGate, composer);
+  body.append(errorBanner, historyNotice, transcript, workerStatus, typing, escalation, humanAssistance, authGate, composer);
   chatSlot.append(header, body);
   panel.append(shellRail, historySlot, chatSlot);
 
@@ -175,6 +177,7 @@ export function createWidgetDom(options: NormalizedWidgetOptions): WidgetDom {
     avatar,
     statusDot,
     errorBanner,
+    historyNotice,
     transcript,
     workerStatus,
     typing,

@@ -155,10 +155,10 @@ describe('widget history', () => {
       .mockResolvedValueOnce(mockJsonResponse({
         ok: true,
         data: {
-          session_id: 'sess_hist',
           messages: [
-            { id: 'm1', type: 'chat::answer', role: 'assistant', content: 'Earlier answer', status: 'final', ts: '2026-05-11T10:00:00Z', meta: {} },
+            { id: 1, message_type: 'chat::answer', direction: 'out', role: 'assistant', content: ['Earlier answer'], timestamp: '2026-05-11T10:00:00Z', source: 'session-manager' },
           ],
+          next_cursor: null, incomplete: true, incomplete_reason: 'audit_best_effort', truncated: false,
         },
       }));
 
@@ -420,7 +420,7 @@ describe('widget history', () => {
     expect(historyHost.style.getPropertyValue('--cortex-background-color')).toBe('#111827');
   });
 
-  it('history chat::question with actor renders worker name and title', async () => {
+  it('history chat::question renders without inventing an actor', async () => {
     installTargets();
     getFetchMock()
       .mockResolvedValueOnce(mockJsonResponse({
@@ -434,19 +434,18 @@ describe('widget history', () => {
       .mockResolvedValueOnce(mockJsonResponse({
         ok: true,
         data: {
-          session_id: 'sess_w',
           messages: [
             {
-              id: 'audit:10',
-              type: 'chat::question',
-              role: 'worker',
+              id: 10,
+              message_type: 'chat::question',
+              direction: 'out',
+              role: 'assistant',
               content: ['Which plan do you need?'],
-              status: 'final',
-              ts: '2026-05-20T10:00:00Z',
-              actor: { kind: 'digital_worker', id: 'proj_1', name: 'Interactive Worker', title: 'Digital worker', avatar_url: '/static/avatar.png' },
-              meta: {},
+              timestamp: '2026-05-20T10:00:00Z',
+              source: 'session-manager',
             },
           ],
+          next_cursor: null, incomplete: true, incomplete_reason: 'audit_best_effort', truncated: false,
         },
       }));
 
@@ -467,12 +466,12 @@ describe('widget history', () => {
 
     const chatShadow = getChatShadow();
     const actorName = chatShadow.querySelector('[data-testid="actor-name"]') as HTMLElement | null;
-    expect(actorName).not.toBeNull();
-    expect(actorName!.textContent).toBe('Interactive Worker');
-    expect(chatShadow.querySelector('[data-testid="actor-missing"]')).toBeNull();
+    expect(actorName).toBeNull();
+    expect(chatShadow.querySelector('[data-testid="transcript"]')?.textContent).toContain('Which plan do you need?');
+    expect(chatShadow.querySelector('[data-testid="history-audit-notice"]')?.textContent).toContain('audit_best_effort');
   });
 
-  it('history chat::answer with actor renders worker actor on answer message', async () => {
+  it('history chat::answer renders without inventing an actor', async () => {
     installTargets();
     getFetchMock()
       .mockResolvedValueOnce(mockJsonResponse({
@@ -486,19 +485,18 @@ describe('widget history', () => {
       .mockResolvedValueOnce(mockJsonResponse({
         ok: true,
         data: {
-          session_id: 'sess_ans',
           messages: [
             {
-              id: 'audit:20',
-              type: 'chat::answer',
+              id: 20,
+              message_type: 'chat::answer',
+              direction: 'out',
               role: 'assistant',
-              content: 'Here is the answer.',
-              status: 'final',
-              ts: '2026-05-20T10:01:00Z',
-              actor: { kind: 'digital_worker', name: 'Interactive Worker', title: 'Digital worker' },
-              meta: {},
+              content: ['Here is the answer.'],
+              timestamp: '2026-05-20T10:01:00Z',
+              source: 'session-manager',
             },
           ],
+          next_cursor: null, incomplete: true, incomplete_reason: 'audit_best_effort', truncated: false,
         },
       }));
 
@@ -519,8 +517,8 @@ describe('widget history', () => {
 
     const chatShadow = getChatShadow();
     const actorName = chatShadow.querySelector('[data-testid="actor-name"]') as HTMLElement | null;
-    expect(actorName).not.toBeNull();
-    expect(actorName!.textContent).toBe('Interactive Worker');
+    expect(actorName).toBeNull();
+    expect(chatShadow.querySelector('[data-testid="transcript"]')?.textContent).toContain('Here is the answer.');
   });
 
   it('history message without actor shows debug missing-actor marker, not a fallback name', async () => {
@@ -538,19 +536,18 @@ describe('widget history', () => {
       .mockResolvedValueOnce(mockJsonResponse({
         ok: true,
         data: {
-          session_id: 'sess_noactor',
           messages: [
             {
-              id: 'audit:30',
-              type: 'chat::answer',
+              id: 30,
+              message_type: 'chat::answer',
+              direction: 'out',
               role: 'assistant',
-              content: 'An old answer.',
-              status: 'final',
-              ts: '2026-05-01T10:00:00Z',
-              actor: null,
-              meta: {},
+              content: ['An old answer.'],
+              timestamp: '2026-05-01T10:00:00Z',
+              source: 'session-manager',
             },
           ],
+          next_cursor: null, incomplete: true, incomplete_reason: 'audit_best_effort', truncated: false,
         },
       }));
 

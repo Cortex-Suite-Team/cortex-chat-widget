@@ -1,7 +1,7 @@
 import type { DebugLogger } from './debug.js';
 import { renderHistoryList } from './history-renderer.js';
 import type {
-  ChatMessageViewModel,
+  HistoryTranscript,
   HistoryClient,
   HistoryConversationSummary,
   HistoryDom,
@@ -12,7 +12,7 @@ import type {
 export interface HistoryControllerCallbacks {
   getLiveSessionId(): string | null;
   onOpenCurrent(): void;
-  onOpenHistorical(sessionId: string, messages: ChatMessageViewModel[]): void;
+  onOpenHistorical(sessionId: string, transcript: HistoryTranscript): void;
   onStartNewChat(): Promise<void>;
   onError(error: unknown, code: string, message: string): void;
 }
@@ -434,11 +434,11 @@ export class HistoryController {
     this.render();
 
     try {
-      const messages = await client.getMessages(sessionId);
+      const transcript = await client.getMessages(sessionId);
       if (this.destroyed || generation !== this.messagesGeneration || client !== this.client) {
         return;
       }
-      this.callbacks.onOpenHistorical(sessionId, messages);
+      this.callbacks.onOpenHistorical(sessionId, transcript);
       this.render();
     } catch (error) {
       if (this.destroyed || generation !== this.messagesGeneration || client !== this.client) {
