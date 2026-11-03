@@ -1,8 +1,8 @@
-import type { CortexChatWidgetState, NormalizedWidgetOptions, WidgetDom } from './types.js';
+import { type CortexChatWidgetState, type NormalizedWidgetOptions, type WidgetDom } from './types.js';
 export declare function applyResolvedTheme(host: HTMLElement, root: HTMLElement, theme: NormalizedWidgetOptions['theme'] | undefined, variantClasses: {
     light: string;
     dark: string;
 }): boolean;
 export declare function destroyTranscriptRenderer(transcriptEl: HTMLElement): void;
-export declare function renderWidget(dom: WidgetDom, state: CortexChatWidgetState, options: NormalizedWidgetOptions, attachmentsAvailable: boolean, isUploading: boolean): void;
+export declare function renderWidget(dom: WidgetDom, state: CortexChatWidgetState, options: NormalizedWidgetOptions, attachmentsAvailable: boolean, isUploading: boolean, downloadsAvailable?: boolean): void;
 //# sourceMappingURL=renderer.d.ts.map

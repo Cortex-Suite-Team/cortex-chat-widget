@@ -130,15 +130,25 @@ export class HumanAssistanceView {
         choice.textContent = option.label;
         select.append(choice);
       }
+      if (card.request.allow_text) {
+        const other = document.createElement('option');
+        other.value = '';
+        other.dataset.haOther = 'true';
+        other.textContent = 'Other…';
+        select.append(other);
+      }
       select.addEventListener('change', () => {
-        try { this.controller.selectOption(id, select.value || null); } catch { /* Controller owns validation/error state. */ }
+        const other = select.options[select.selectedIndex]?.dataset.haOther === 'true';
+        cardNode.dataset.haOtherSelected = other ? 'true' : '';
+        try { this.controller.selectOption(id, other ? null : select.value || null); } catch { /* Controller owns validation/error state. */ }
+        if (other) cardNode.querySelector<HTMLTextAreaElement>('[data-ha-control="text"]')?.focus();
       });
       label.append(select);
       cardNode.append(label);
     }
     if (card.request.allow_text) {
       const label = element('label', 'cortex-widget__ha-label');
-      label.textContent = 'Your response';
+      label.textContent = card.request.options.length ? 'Other answer' : 'Your response';
       const input = element('textarea', 'cortex-widget__ha-text');
       input.dataset.haControl = 'text';
       input.maxLength = 4096;
@@ -176,7 +186,11 @@ export class HumanAssistanceView {
     const select = node.querySelector<HTMLSelectElement>('[data-ha-control="option"]');
     if (select) {
       const value = card.optionId ?? '';
-      if (select.value !== value) select.value = value;
+      if (card.optionId) node.dataset.haOtherSelected = '';
+      if (node.dataset.haOtherSelected === 'true' && card.optionId === null) {
+        const other = [...select.options].find((option) => option.dataset.haOther === 'true');
+        if (other) other.selected = true;
+      } else if (select.value !== value) select.value = value;
       select.disabled = !pending;
     }
     const input = node.querySelector<HTMLTextAreaElement>('[data-ha-control="text"]');

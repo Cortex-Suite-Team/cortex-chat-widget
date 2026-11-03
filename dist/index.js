@@ -2220,6 +2220,57 @@ var historyStyles = `
 }
 `;
 
+// src/styles/human-assistance.ts
+var humanAssistanceStyles = `
+.cortex-widget__human-assistance {
+  flex: 0 1 auto;
+  max-height: 45%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 14px;
+  border-top: 1px solid var(--cortex-border-color);
+}
+.cortex-widget__human-assistance[hidden] { display: none; }
+.cortex-widget__ha-card {
+  padding: 10px;
+  margin: 0 0 8px;
+  border: 1px solid var(--cortex-border-color);
+  border-radius: 10px;
+  background: var(--cortex-background-color);
+  color: var(--cortex-text-color);
+}
+.cortex-widget__ha-heading { margin: 0 0 4px; font-size: 13px; }
+.cortex-widget__ha-prompt { margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cortex-widget__ha-label { display: block; margin: 8px 0; font-size: 12px; }
+.cortex-widget__ha-select, .cortex-widget__ha-text {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px;
+  border: 1px solid var(--cortex-border-color);
+  border-radius: 6px;
+  background: var(--cortex-surface-color);
+  color: var(--cortex-text-color);
+  font: inherit;
+}
+.cortex-widget__ha-text { min-height: 56px; resize: vertical; }
+.cortex-widget__ha-status { margin: 8px 0 0; font-size: 12px; }
+.cortex-widget__ha-error { margin: 4px 0 0; color: #b91c1c; font-size: 12px; }
+.cortex-widget__ha-error[hidden] { display: none; }
+.cortex-widget__ha-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.cortex-widget__ha-button {
+  padding: 6px 10px;
+  border: 1px solid var(--cortex-border-color);
+  border-radius: 6px;
+  background: var(--cortex-surface-color);
+  color: var(--cortex-text-color);
+  cursor: pointer;
+  font: inherit;
+}
+.cortex-widget__ha-button:disabled { opacity: .5; cursor: default; }
+.cortex-widget__ha-button[hidden] { display: none; }
+`;
+
 // src/styles/layout.ts
 var layoutStyles = `
 .cortex-widget *,
@@ -2447,6 +2498,15 @@ var layoutStyles = `
   display: block;
 }
 
+.cortex-widget__history-notice:not([hidden]) {
+  margin: 10px 14px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.12);
+  color: inherit;
+  font-size: 12px;
+}
+
 .cortex-widget__transcript {
   flex: 1 1 auto;
   min-height: 0;
@@ -2594,8 +2654,21 @@ var layoutStyles = `
   display: none;
 }
 
-.cortex-widget__file-chip {
+.cortex-widget__file-chips {
   display: none;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cortex-widget__file-chips[data-visible="true"] {
+  display: flex;
+}
+
+.cortex-widget__file-chip {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -2603,11 +2676,25 @@ var layoutStyles = `
   border-radius: 14px;
 }
 
-.cortex-widget__file-chip[data-visible="true"] {
-  display: flex;
+.cortex-widget__file-chip-main {
+  flex: 1;
+  min-width: 0;
 }
 
-.cortex-widget__file-chip-main {
+.cortex-widget__file-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.cortex-widget__file-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -2746,7 +2833,8 @@ var messageStyles = `
   color: #92400e;
 }
 
-.cortex-widget__message-attachment {
+.cortex-widget__message-attachment,
+.cortex-widget__file-card {
   background: color-mix(in srgb, var(--cortex-background-color) 82%, #dfe8f8 18%);
   border: 1px solid var(--cortex-bubble-in-border);
 }
@@ -3078,6 +3166,8 @@ var typographyStyles = `
 .cortex-widget__question-option,
 .cortex-widget__file-chip,
 .cortex-widget__file-remove,
+.cortex-widget__file-retry,
+.cortex-widget__file-card-download,
 .cortex-widget__attach,
 .cortex-widget__send,
 .cortex-widget__launcher {
@@ -3132,6 +3222,8 @@ var typographyStyles = `
 .cortex-widget__attach:disabled,
 .cortex-widget__send:disabled,
 .cortex-widget__file-remove:disabled,
+.cortex-widget__file-retry:disabled,
+.cortex-widget__file-card-download:disabled,
 .cortex-widget__launcher:disabled,
 .cortex-widget__question-option:disabled {
   cursor: not-allowed;
@@ -3164,6 +3256,67 @@ var typographyStyles = `
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cortex-widget__file-chip[data-status="failed"] {
+  border-color: #d14343;
+}
+
+.cortex-widget__file-chip-status,
+.cortex-widget__file-card-status {
+  display: block;
+  font-size: 11px;
+  color: var(--cortex-muted-text);
+}
+
+.cortex-widget__file-chip-status:empty,
+.cortex-widget__file-card-status:empty {
+  display: none;
+}
+
+.cortex-widget__file-chip[data-status="failed"] .cortex-widget__file-chip-status,
+.cortex-widget__file-card[data-download-status="failed"] .cortex-widget__file-card-status {
+  color: #d14343;
+}
+
+.cortex-widget__file-chip-progress {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: 4px;
+}
+
+.cortex-widget__file-chip-progress[hidden] {
+  display: none;
+}
+
+.cortex-widget__file-card-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cortex-widget__file-card-details {
+  font-size: 11px;
+  opacity: 0.82;
+}
+
+.cortex-widget__file-retry,
+.cortex-widget__file-card-download {
+  flex-shrink: 0;
+  border: 1px solid var(--cortex-border-color);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cortex-widget__file-retry[hidden] {
+  display: none;
 }
 
 .cortex-widget__file-chip-meta {
@@ -3293,19 +3446,20 @@ var widgetStyles = [
   typographyStyles,
   messageStyles,
   historyStyles,
+  humanAssistanceStyles,
   authStyles
 ].join("\n");
 
 // src/dom.ts
 function createElement(tagName, className, textContent) {
-  const element = document.createElement(tagName);
+  const element2 = document.createElement(tagName);
   if (className) {
-    element.className = className;
+    element2.className = className;
   }
   if (textContent !== void 0) {
-    element.textContent = textContent;
+    element2.textContent = textContent;
   }
-  return element;
+  return element2;
 }
 function createWidgetDom(options) {
   const host = createElement("div");
@@ -3353,6 +3507,8 @@ function createWidgetDom(options) {
   const errorBanner = createElement("div", "cortex-widget__error");
   errorBanner.setAttribute("role", "alert");
   errorBanner.setAttribute("data-testid", "error-banner");
+  const historyNotice = createElement("div", "cortex-widget__history-notice");
+  historyNotice.setAttribute("data-testid", "history-audit-notice");
   const transcript = createElement("div", "cortex-widget__transcript");
   transcript.setAttribute("data-testid", "transcript");
   const workerStatus = createElement("div", "cortex-widget__worker-status");
@@ -3361,6 +3517,10 @@ function createWidgetDom(options) {
   typing.setAttribute("data-testid", "typing-indicator");
   const escalation = createElement("div", "cortex-widget__escalation");
   escalation.setAttribute("data-testid", "escalation-card");
+  const humanAssistance = createElement("section", "cortex-widget__human-assistance");
+  humanAssistance.setAttribute("aria-label", "Human assistance requests");
+  humanAssistance.setAttribute("data-testid", "human-assistance");
+  humanAssistance.hidden = true;
   const authGate = createElement("div", "cortex-widget__auth-gate");
   authGate.setAttribute("data-testid", "auth-gate");
   authGate.setAttribute("role", "form");
@@ -3391,24 +3551,19 @@ function createWidgetDom(options) {
   const textarea = createElement("textarea", "cortex-widget__textarea");
   textarea.placeholder = options.placeholder;
   textarea.setAttribute("data-testid", "composer-textarea");
-  const fileChip = createElement("div", "cortex-widget__file-chip");
-  fileChip.setAttribute("data-testid", "selected-file-chip");
-  const fileChipMain = createElement("div", "cortex-widget__file-chip-main");
-  const fileChipName = createElement("span", "cortex-widget__file-chip-name");
-  const fileChipMeta = createElement("span", "cortex-widget__file-chip-meta");
-  const fileChipRemove = createElement("button", "cortex-widget__file-remove", "Remove");
-  fileChipRemove.type = "button";
-  fileChipRemove.setAttribute("data-testid", "remove-file");
-  fileChipMain.append(fileChipName, fileChipMeta);
-  fileChip.append(fileChipMain, fileChipRemove);
+  const fileChips = createElement("ul", "cortex-widget__file-chips");
+  fileChips.setAttribute("aria-label", "Selected files");
+  fileChips.setAttribute("data-testid", "selected-files");
+  fileChips.dataset.visible = "false";
   const actions = createElement("div", "cortex-widget__actions");
   const fileInput = createElement("input", "cortex-widget__file-input");
   fileInput.type = "file";
+  fileInput.multiple = true;
   fileInput.setAttribute("data-testid", "file-input");
   const attachButton = createElement("button", "cortex-widget__attach");
   attachButton.type = "button";
-  attachButton.setAttribute("aria-label", "Attach file");
-  attachButton.setAttribute("title", "Attach file");
+  attachButton.setAttribute("aria-label", "Attach files");
+  attachButton.setAttribute("title", "Attach files");
   attachButton.setAttribute("data-testid", "attach-button");
   attachButton.innerHTML = getIconSvg("paperclip");
   const fileHint = createElement("span", "cortex-widget__file-hint");
@@ -3422,11 +3577,11 @@ function createWidgetDom(options) {
   attachWrap.append(fileInput, attachButton);
   actions.append(fileHint);
   composerRow.append(attachWrap, textarea, sendButton);
-  composer.append(fileChip, composerRow, actions);
+  composer.append(fileChips, composerRow, actions);
   headerText.append(title, subtitle, statusWrap);
   headerMain.append(avatar, headerText);
   header.append(headerMain);
-  body.append(errorBanner, transcript, workerStatus, typing, escalation, authGate, composer);
+  body.append(errorBanner, historyNotice, transcript, workerStatus, typing, escalation, humanAssistance, authGate, composer);
   chatSlot.append(header, body);
   panel.append(shellRail, historySlot, chatSlot);
   if (options.mode === "floating") {
@@ -3451,10 +3606,12 @@ function createWidgetDom(options) {
     avatar,
     statusDot,
     errorBanner,
+    historyNotice,
     transcript,
     workerStatus,
     typing,
     escalation,
+    humanAssistance,
     authGate,
     authMessage,
     authLoginInput,
@@ -3466,57 +3623,7 @@ function createWidgetDom(options) {
     attachButton,
     fileInput,
     fileHint,
-    fileChip,
-    fileChipName,
-    fileChipMeta,
-    fileChipRemove
-  };
-}
-
-// node_modules/@cortex-suite/sdk-ui/dist/src/errors.js
-var ControllerError = class extends Error {
-  constructor(code2, message, details) {
-    super(message);
-    this.name = "ControllerError";
-    this.code = code2;
-    this.details = details;
-  }
-};
-function createChatError(code2, message, source, details) {
-  return { code: code2, message, source, details };
-}
-function createControllerError(code2, message, source, details) {
-  return new ControllerError(code2, message, {
-    ...source ? { source } : {},
-    ...details ?? {}
-  });
-}
-function errorFromUnknown(error2, fallbackCode = "controller_error", source) {
-  if (error2 instanceof ControllerError) {
-    return createChatError(error2.code, error2.message, source, error2.details);
-  }
-  if (error2 instanceof Error) {
-    return createChatError(fallbackCode, error2.message, source);
-  }
-  return createChatError(fallbackCode, "Unknown controller error", source, {
-    value: error2
-  });
-}
-
-// node_modules/@cortex-suite/sdk-ui/dist/src/debug.js
-function createDebugLogger(enabled) {
-  return {
-    enabled: enabled === true,
-    log(message, data) {
-      if (enabled !== true) {
-        return;
-      }
-      if (data === void 0) {
-        console.debug(message);
-        return;
-      }
-      console.debug(message, data);
-    }
+    fileChips
   };
 }
 
@@ -3547,9 +3654,13 @@ function asStringArray(value) {
   }
   return value.map((entry) => typeof entry === "string" ? entry.trim() : "").filter((entry) => entry !== "");
 }
+function turnRef(payload) {
+  const turn = payload["turn"];
+  return typeof turn === "number" && Number.isSafeInteger(turn) && turn >= 0 ? String(turn) : null;
+}
 function buildMessageId(message, fallbackPrefix) {
   const payload = asPayload(message);
-  const turnId = asNonEmptyString(payload["turn_id"]);
+  const turnId = asNonEmptyString(payload["turn_id"]) ?? turnRef(payload);
   if (turnId && (message.type === "chat::partial" || message.type === "chat::answer")) {
     return `turn:${turnId}`;
   }
@@ -3629,39 +3740,255 @@ function toEscalationActions(value) {
   return asStringArray(value).filter((action) => action === "continue" || action === "operator_input" || action === "reply_user");
 }
 
-// node_modules/@cortex-suite/sdk-ui/dist/src/normalize.js
-var INTERNAL_ATTACHMENT_KEYS = ["file_id", "blob_ref", "storage_key"];
-function stripInternalAttachmentFields(attachments) {
-  return attachments.map((att) => {
-    if (!isRecord(att))
-      return att;
-    const cleaned = { ...att };
-    for (const key of INTERNAL_ATTACHMENT_KEYS) {
-      delete cleaned[key];
+// node_modules/@cortex-suite/sdk-ui/dist/src/attachments.js
+var FILE_REF_PATTERN2 = /^sf_[A-Za-z0-9][A-Za-z0-9_-]*$/;
+var OWNER_ROLES = /* @__PURE__ */ new Set(["user", "assistant", "operator", "system"]);
+var DIRECTIONS = /* @__PURE__ */ new Set(["inbound", "outbound", "internal"]);
+var STATES = /* @__PURE__ */ new Set(["available", "expired", "deleted", "quarantined"]);
+var MESSAGE_REF_KINDS = /* @__PURE__ */ new Set(["client_msg_id", "turn"]);
+var MAX_ATTACHMENTS_PER_MESSAGE = 8;
+var INTERNAL_VALUE_PREFIXES = ["fi_", "sn_"];
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.length > 0;
+}
+function isPublicIdentity(value) {
+  return isNonEmptyString(value) && !INTERNAL_VALUE_PREFIXES.some((prefix) => value.startsWith(prefix));
+}
+function isSize(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+function parsePublicAttachment(value) {
+  if (!isRecord(value))
+    return null;
+  const { file_ref: fileRef, filename, content_type: contentType, size, owner_role: ownerRole, direction, state, message_ref: messageRef, message_ref_kind: messageRefKind } = value;
+  if (typeof fileRef !== "string" || !FILE_REF_PATTERN2.test(fileRef))
+    return null;
+  if (!isNonEmptyString(filename) || !isNonEmptyString(contentType) || !isSize(size))
+    return null;
+  if (typeof ownerRole !== "string" || !OWNER_ROLES.has(ownerRole))
+    return null;
+  if (typeof direction !== "string" || !DIRECTIONS.has(direction))
+    return null;
+  if (typeof state !== "string" || !STATES.has(state))
+    return null;
+  const attachment = {
+    file_ref: fileRef,
+    filename,
+    content_type: contentType,
+    size,
+    owner_role: ownerRole,
+    direction,
+    state
+  };
+  if (messageRef !== void 0 && messageRef !== null) {
+    if (!isPublicIdentity(messageRef))
+      return null;
+    attachment.message_ref = messageRef;
+  }
+  if (messageRefKind !== void 0 && messageRefKind !== null) {
+    if (typeof messageRefKind !== "string" || !MESSAGE_REF_KINDS.has(messageRefKind))
+      return null;
+    attachment.message_ref_kind = messageRefKind;
+  }
+  return attachment;
+}
+function parsePendingAttachment(value) {
+  if (typeof value === "string")
+    return FILE_REF_PATTERN2.test(value) ? { file_ref: value } : null;
+  if (!isRecord(value))
+    return null;
+  if (value["owner_role"] !== void 0)
+    return parsePublicAttachment(value);
+  const fileRef = value["file_ref"];
+  if (typeof fileRef !== "string" || !FILE_REF_PATTERN2.test(fileRef))
+    return null;
+  const attachment = { file_ref: fileRef };
+  if (isNonEmptyString(value["filename"]))
+    attachment.filename = value["filename"];
+  if (isNonEmptyString(value["content_type"]))
+    attachment.content_type = value["content_type"];
+  if (isSize(value["size"]))
+    attachment.size = value["size"];
+  return attachment;
+}
+function belongsTo(attachment, binding) {
+  return binding !== null && binding.messageRef !== null && attachment.owner_role === binding.ownerRole && attachment.direction === binding.direction && attachment.message_ref_kind === binding.messageRefKind && attachment.message_ref === binding.messageRef;
+}
+function project(raw, parse, accept) {
+  if (!Array.isArray(raw))
+    return [];
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  for (const item of raw) {
+    if (result.length >= MAX_ATTACHMENTS_PER_MESSAGE)
+      break;
+    const attachment = parse(item);
+    if (!attachment || seen.has(attachment.file_ref) || !accept(attachment))
+      continue;
+    seen.add(attachment.file_ref);
+    result.push(attachment);
+  }
+  return result;
+}
+function transportBinding(message) {
+  const payload = asPayload(message);
+  if (message.type === "chat::answer") {
+    return { ownerRole: "assistant", direction: "outbound", messageRefKind: "turn", messageRef: turnRef(payload) };
+  }
+  if (message.type === "chat::echo" && payload["role"] !== "user")
+    return null;
+  if (message.type === "chat::echo" || message.type === "chat::message") {
+    const meta = isRecord(payload["meta"]) ? payload["meta"] : {};
+    return {
+      ownerRole: "user",
+      direction: "inbound",
+      messageRefKind: "client_msg_id",
+      messageRef: asNonEmptyString(meta["client_msg_id"])
+    };
+  }
+  return null;
+}
+function projectTransportAttachments(message) {
+  const payload = asPayload(message);
+  const meta = isRecord(payload["meta"]) ? payload["meta"] : {};
+  const binding = transportBinding(message);
+  return project(meta["attachments"], parsePublicAttachment, (attachment) => belongsTo(attachment, binding));
+}
+function viewBinding(message) {
+  const meta = message.meta ?? {};
+  if (message.type === "chat::answer") {
+    return { ownerRole: "assistant", direction: "outbound", messageRefKind: "turn", messageRef: asNonEmptyString(meta["turnRef"]) };
+  }
+  if (message.type === "chat::echo" && message.role !== "user")
+    return null;
+  if (message.type === "chat::echo" || message.type === "chat::message") {
+    return {
+      ownerRole: "user",
+      direction: "inbound",
+      messageRefKind: "client_msg_id",
+      messageRef: message.clientMsgId ?? asNonEmptyString(meta["client_msg_id"])
+    };
+  }
+  return null;
+}
+function projectViewAttachments(message) {
+  const meta = message.meta;
+  if (!meta || !("attachments" in meta))
+    return message;
+  const binding = viewBinding(message);
+  const pendingAllowed = message.type === "chat::message" && message.role === "user";
+  const attachments = project(meta["attachments"], pendingAllowed ? parsePendingAttachment : parsePublicAttachment, (attachment) => pendingAllowed && attachment.owner_role === void 0 || belongsTo(attachment, binding));
+  const nextMeta = { ...meta };
+  if (attachments.length > 0)
+    nextMeta["attachments"] = attachments;
+  else
+    delete nextMeta["attachments"];
+  return { ...message, meta: nextMeta };
+}
+function pendingAttachments(attachments) {
+  return project(attachments, parsePendingAttachment, () => true);
+}
+function mergeAttachments(existing, incoming) {
+  const merged = Array.isArray(existing) ? [...existing] : [];
+  const positions = new Map(merged.map((attachment, index) => [attachment.file_ref, index]));
+  for (const attachment of Array.isArray(incoming) ? incoming : []) {
+    const index = positions.get(attachment.file_ref);
+    if (index === void 0) {
+      positions.set(attachment.file_ref, merged.length);
+      merged.push(attachment);
+    } else {
+      merged[index] = attachment;
     }
-    return cleaned;
+  }
+  return merged;
+}
+function mergeMessageMeta(existing, incoming) {
+  const merged = { ...existing ?? {}, ...incoming ?? {} };
+  const attachments = mergeAttachments(existing?.["attachments"], incoming?.["attachments"]);
+  if (attachments.length > 0)
+    merged["attachments"] = attachments;
+  else
+    delete merged["attachments"];
+  return merged;
+}
+
+// node_modules/@cortex-suite/sdk-ui/dist/src/errors.js
+var ControllerError = class extends Error {
+  constructor(code2, message, details) {
+    super(message);
+    this.name = "ControllerError";
+    this.code = code2;
+    this.details = details;
+  }
+};
+function createChatError(code2, message, source, details) {
+  return { code: code2, message, source, details };
+}
+function createControllerError(code2, message, source, details) {
+  return new ControllerError(code2, message, {
+    ...source ? { source } : {},
+    ...details ?? {}
   });
 }
-function buildAttachmentMeta(payload) {
-  return Array.isArray(payload["attachments"]) ? { attachments: stripInternalAttachmentFields(payload["attachments"]) } : {};
+function errorFromUnknown(error2, fallbackCode = "controller_error", source) {
+  if (error2 instanceof ControllerError) {
+    return createChatError(error2.code, error2.message, source, error2.details);
+  }
+  if (error2 instanceof Error) {
+    return createChatError(fallbackCode, error2.message, source);
+  }
+  return createChatError(fallbackCode, "Unknown controller error", source, {
+    value: error2
+  });
+}
+
+// node_modules/@cortex-suite/sdk-ui/dist/src/debug.js
+function createDebugLogger(enabled) {
+  return {
+    enabled: enabled === true,
+    log(message, data) {
+      if (enabled !== true) {
+        return;
+      }
+      if (data === void 0) {
+        console.debug(message);
+        return;
+      }
+      console.debug(message, data);
+    }
+  };
+}
+
+// node_modules/@cortex-suite/sdk-ui/dist/src/normalize.js
+var INTERNAL_FILE_KEYS = [
+  "file_id",
+  "snapshot_id",
+  "blob_ref",
+  "storage_key",
+  "delivery_ticket",
+  "upload_ticket",
+  "file_link_secret",
+  "download_mint_url"
+];
+function buildAttachmentMeta(message) {
+  const attachments = projectTransportAttachments(message);
+  return attachments.length > 0 ? { attachments } : {};
 }
 function getClientMsgId(meta) {
   return asNonEmptyString(meta["client_msg_id"]) ?? void 0;
 }
-function resolveVisibleContent(payload) {
-  if (payload["content"] !== void 0) {
-    return payload["content"];
+function canonicalChatContent(payload) {
+  const content = payload["content"];
+  if (!Array.isArray(content) || !content.every((part) => typeof part === "string") || "message" in payload) {
+    throw new TypeError("Text chat transport requires payload.content: string[] without payload.message.");
   }
-  const message = payload["message"];
-  if (isRecord(message) && message["text"] !== void 0) {
-    return message["text"];
-  }
-  return message ?? null;
+  return content;
 }
 function withoutInternalRefs(meta) {
   const cleaned = { ...meta };
   delete cleaned["resume_event_ref"];
-  for (const key of INTERNAL_ATTACHMENT_KEYS) {
+  delete cleaned["attachments"];
+  for (const key of INTERNAL_FILE_KEYS) {
     delete cleaned[key];
   }
   return cleaned;
@@ -3721,7 +4048,7 @@ function normalizeCortexMessage(message) {
         clientMsgId: getClientMsgId(mergedMeta),
         meta: {
           ...mergedMeta,
-          ...buildAttachmentMeta(payload)
+          ...buildAttachmentMeta(message)
         }
       };
     case "chat::echo":
@@ -3730,14 +4057,14 @@ function normalizeCortexMessage(message) {
         seq: message.seq ?? null,
         type: message.type,
         role: mapRole(payload["role"], "user"),
-        content: resolveVisibleContent(payload),
+        content: canonicalChatContent(payload),
         status: "final",
         ts: message.ts ?? null,
         actor: extractActor(message, payload),
         clientMsgId: getClientMsgId(mergedMeta),
         meta: {
           ...mergedMeta,
-          ...buildAttachmentMeta(payload),
+          ...buildAttachmentMeta(message),
           ...asNonEmptyString(payload["turn_id"]) ? { turnId: asNonEmptyString(payload["turn_id"]) } : {}
         }
       };
@@ -3753,8 +4080,9 @@ function normalizeCortexMessage(message) {
         actor: extractActor(message, payload),
         meta: {
           ...mergedMeta,
-          ...buildAttachmentMeta(payload),
-          ...asNonEmptyString(payload["turn_id"]) ? { turnId: asNonEmptyString(payload["turn_id"]) } : {}
+          ...buildAttachmentMeta(message),
+          ...asNonEmptyString(payload["turn_id"]) ? { turnId: asNonEmptyString(payload["turn_id"]) } : {},
+          ...turnRef(payload) ? { turnRef: turnRef(payload) } : {}
         }
       };
     case "chat::answer":
@@ -3769,8 +4097,9 @@ function normalizeCortexMessage(message) {
         actor: extractActor(message, payload),
         meta: {
           ...mergedMeta,
-          ...buildAttachmentMeta(payload),
+          ...buildAttachmentMeta(message),
           ...asNonEmptyString(payload["turn_id"]) ? { turnId: asNonEmptyString(payload["turn_id"]) } : {},
+          ...turnRef(payload) ? { turnRef: turnRef(payload) } : {},
           ...asNonEmptyString(payload["answer_kind"]) ? { answerKind: asNonEmptyString(payload["answer_kind"]) } : {}
         }
       };
@@ -3781,14 +4110,14 @@ function normalizeCortexMessage(message) {
         seq: message.seq ?? null,
         type: message.type,
         role: mapRole(payload["role"], "assistant"),
-        content: resolveVisibleContent(payload),
+        content: canonicalChatContent(payload),
         status: "final",
         ts: message.ts ?? null,
         actor: extractActor(message, payload),
         clientMsgId: getClientMsgId(mergedMeta),
         meta: {
           ...mergedMeta,
-          ...buildAttachmentMeta(payload),
+          ...buildAttachmentMeta(message),
           ...asNonEmptyString(payload["turn_id"]) ? { turnId: asNonEmptyString(payload["turn_id"]) } : {}
         }
       };
@@ -4019,6 +4348,28 @@ function shouldStoreInTranscript(message) {
   }
   return !message.type.startsWith("system::");
 }
+function streamedText(content) {
+  if (typeof content === "string")
+    return content;
+  if (Array.isArray(content) && content.every((block2) => typeof block2 === "string"))
+    return content.join("");
+  return null;
+}
+function accumulatePartialContent(existing, incoming) {
+  if (typeof existing === "string" && typeof incoming === "string")
+    return `${existing}${incoming}`;
+  const previous = streamedText(existing);
+  const next = streamedText(incoming);
+  if (previous === null || next === null)
+    return incoming;
+  return [`${previous}${next}`];
+}
+function firstPartialContent(content) {
+  return Array.isArray(content) ? accumulatePartialContent([], content) : content;
+}
+function isReplayedDelivery(existing, incoming) {
+  return typeof existing.seq === "number" && typeof incoming.seq === "number" && incoming.seq <= existing.seq;
+}
 function createTranscriptStore(options = {}) {
   function freezeOwnedValue(value, seen = /* @__PURE__ */ new WeakSet()) {
     if (value === null || typeof value !== "object" || seen.has(value))
@@ -4038,7 +4389,7 @@ function createTranscriptStore(options = {}) {
     return value;
   }
   function createOwnedMessage(message) {
-    return freezeOwnedValue(cloneMessage(message));
+    return freezeOwnedValue(projectViewAttachments(cloneMessage(message)));
   }
   const transcript = (options.initialTranscript ?? []).map(createOwnedMessage);
   const readonlyTranscript = new Proxy(transcript, {
@@ -4124,11 +4475,25 @@ function createTranscriptStore(options = {}) {
     const index = indexByClientMsgId.get(clientMsgId);
     return index !== void 0 && isReconcileableOutgoingUserMessage(transcript[index], clientMsgId) ? index : void 0;
   }
+  function findEchoConfirmedUserMessageIndex(clientMsgId) {
+    if (!clientMsgId)
+      return void 0;
+    const index = indexByClientMsgId.get(clientMsgId);
+    const message = index === void 0 ? void 0 : transcript[index];
+    return message && message.role === "user" && message.clientMsgId === clientMsgId && message.deliveryStatus === "processed" && (message.type === "chat::echo" || message.meta?.["echo_type"] === "chat::echo") ? index : void 0;
+  }
+  function mergeRepeatedUserEcho(existing, normalized) {
+    return {
+      ...existing,
+      seq: existing.seq ?? normalized.seq ?? null,
+      ts: existing.ts ?? normalized.ts ?? null,
+      meta: mergeMessageMeta(existing.meta, normalized.meta)
+    };
+  }
   function reconcileOptimisticUserMessage(existing, normalized) {
     const hasServerTs = normalized.ts !== null && normalized.ts !== void 0;
     const nextMeta = {
-      ...existing.meta ?? {},
-      ...normalized.meta ?? {},
+      ...mergeMessageMeta(existing.meta, normalized.meta),
       timestamp_source: hasServerTs ? "server" : existing.meta?.["timestamp_source"],
       echo_seq: normalized.seq ?? existing.meta?.["echo_seq"],
       echo_type: "chat::echo",
@@ -4205,7 +4570,7 @@ function createTranscriptStore(options = {}) {
         return {};
       }
       const payload = asPayload(message);
-      if (message.type === "chat::partial" && !asNonEmptyString(payload["turn_id"])) {
+      if (message.type === "chat::partial" && !asNonEmptyString(payload["turn_id"]) && turnRef(payload) === null) {
         return buildMalformedPartialMessage(message);
       }
       const normalized = normalizeCortexMessage(message);
@@ -4216,6 +4581,10 @@ function createTranscriptStore(options = {}) {
           const existing = transcript[optimisticIndex];
           return updateMessage(optimisticIndex, reconcileOptimisticUserMessage(existing, normalized));
         }
+        const processedIndex = findEchoConfirmedUserMessageIndex(normalized.clientMsgId);
+        if (processedIndex !== void 0) {
+          return updateMessage(processedIndex, mergeRepeatedUserEcho(transcript[processedIndex], normalized));
+        }
         return addMessage({
           ...normalized,
           role: "user",
@@ -4225,6 +4594,9 @@ function createTranscriptStore(options = {}) {
       }
       if (message.type === "chat::partial" && existingIndex !== void 0) {
         const existing = transcript[existingIndex];
+        if (existing.status === "final" || isReplayedDelivery(existing, normalized)) {
+          return {};
+        }
         const nextMessage = {
           ...existing,
           seq: normalized.seq,
@@ -4232,13 +4604,13 @@ function createTranscriptStore(options = {}) {
           role: normalized.role,
           status: "streaming",
           ts: normalized.ts,
-          content: typeof existing.content === "string" && typeof normalized.content === "string" ? `${existing.content}${normalized.content}` : normalized.content,
-          meta: {
-            ...existing.meta ?? {},
-            ...normalized.meta ?? {}
-          }
+          content: accumulatePartialContent(existing.content, normalized.content),
+          meta: mergeMessageMeta(existing.meta, normalized.meta)
         };
         return updateMessage(existingIndex, nextMessage);
+      }
+      if (message.type === "chat::partial") {
+        return addMessage({ ...normalized, content: firstPartialContent(normalized.content) });
       }
       if (message.type === "chat::answer" && existingIndex !== void 0) {
         const existing = transcript[existingIndex];
@@ -4250,15 +4622,13 @@ function createTranscriptStore(options = {}) {
           content: normalized.content,
           status: "final",
           ts: normalized.ts,
-          meta: {
-            ...existing.meta ?? {},
-            ...normalized.meta ?? {}
-          }
+          meta: mergeMessageMeta(existing.meta, normalized.meta)
         };
         return updateMessage(existingIndex, nextMessage);
       }
       if (existingIndex !== void 0) {
-        return updateMessage(existingIndex, normalized);
+        const attachments = mergeAttachments(transcript[existingIndex].meta?.["attachments"], normalized.meta?.["attachments"]);
+        return updateMessage(existingIndex, attachments.length > 0 ? { ...normalized, meta: { ...normalized.meta ?? {}, attachments } } : normalized);
       }
       return addMessage(normalized);
     },
@@ -4285,7 +4655,7 @@ var DATABASE_NAME = "cortex-sdk-ui";
 var DATABASE_VERSION = 1;
 var SESSIONS_STORE = "transcript-sessions";
 var MESSAGES_STORE = "transcript-messages";
-var SENSITIVE_KEY = /^(?:access_token|refresh_token|token|api_key|authorization|credentials?|password|secret|private.*file|file.*private|file_id|storage_id|file_layer_id)$/;
+var SENSITIVE_KEY = /^(?:access_token|refresh_token|token|api_key|authorization|credentials?|password|secret|private.*file|file.*private|file_id|snapshot_id|storage_id|storage_key|file_layer_id|blob_ref|delivery_ticket|upload_ticket|file_link_secret|download_mint_url)$/;
 function sanitizeValue(value) {
   if (Array.isArray(value))
     return value.map(sanitizeValue);
@@ -4300,7 +4670,7 @@ function sanitizeValue(value) {
   return result;
 }
 function sanitizeTranscriptMessage(message) {
-  const safe = sanitizeValue(cloneMessage(message));
+  const safe = sanitizeValue(projectViewAttachments(cloneMessage(message)));
   if (message.originalPayload && message.id.startsWith("client:")) {
     safe.meta = { ...safe.meta ?? {}, persisted_outgoing: true };
   }
@@ -5039,7 +5409,7 @@ function createChatController(options) {
         retryable: false,
         meta: {
           ...message.meta ?? {},
-          ...message.attachments ? { attachments: message.attachments } : {},
+          ...message.attachments ? { attachments: pendingAttachments(message.attachments) } : {},
           client_msg_id: clientMsgId,
           timestamp_source: "client"
         },
@@ -5161,6 +5531,239 @@ function createChatController(options) {
       destroyed = true;
       clearWorkerStateTtl();
       teardownClientSubscription();
+      listeners.clear();
+    }
+  };
+}
+
+// node_modules/@cortex-suite/sdk-ui/dist/src/human-assistance-controller.js
+var MAX_REQUESTS = 64;
+var TERMINAL = /* @__PURE__ */ new Set(["resolved", "expired", "revoked", "delivery_failed", "cancelled"]);
+function fields(request) {
+  const result = [];
+  if (request.options.length) {
+    result.push({
+      key: "option_id",
+      label: request.question,
+      type: "select",
+      required: !request.allow_text,
+      options: [
+        ...request.options.map((option) => ({ ...option })),
+        ...request.allow_text ? [{ id: "", label: "Other\u2026" }] : []
+      ]
+    });
+  }
+  if (request.allow_text) {
+    result.push({
+      key: "text",
+      label: request.question,
+      type: "text",
+      required: !request.options.length,
+      options: []
+    });
+  }
+  return result;
+}
+function copyCard(card) {
+  return {
+    ...card,
+    request: { ...card.request, options: card.request.options.map((option) => ({ ...option })) },
+    fields: card.fields.map((field) => ({ ...field, options: field.options.map((option) => ({ ...option })) }))
+  };
+}
+function createHumanAssistanceController(options) {
+  const entries2 = /* @__PURE__ */ new Map();
+  const tombstones = /* @__PURE__ */ new Set();
+  const listeners = /* @__PURE__ */ new Set();
+  const createId = options.createClientReplyId ?? (() => crypto.randomUUID());
+  let overflow = false;
+  let destroyed = false;
+  function cards() {
+    return [...entries2.values()].map((entry) => copyCard(entry.card));
+  }
+  function emit() {
+    const snapshot = cards();
+    for (const listener of listeners)
+      listener(snapshot.map(copyCard));
+  }
+  function rememberTerminal(requestId) {
+    if (tombstones.has(requestId))
+      return;
+    if (tombstones.size >= MAX_REQUESTS) {
+      overflow = true;
+      return;
+    }
+    tombstones.add(requestId);
+  }
+  function ingestRequest(request) {
+    if (overflow || tombstones.has(request.request_id) || entries2.has(request.request_id))
+      return;
+    if (entries2.size >= MAX_REQUESTS) {
+      const terminal = [...entries2].find(([, entry]) => TERMINAL.has(entry.card.status));
+      if (terminal) {
+        rememberTerminal(terminal[0]);
+        entries2.delete(terminal[0]);
+      }
+    }
+    if (overflow || entries2.size >= MAX_REQUESTS)
+      return;
+    const owned = { ...request, options: request.options.map((option) => ({ ...option })) };
+    entries2.set(request.request_id, {
+      card: { request: owned, fields: fields(owned), optionId: null, text: "", status: "pending", clientReplyId: null },
+      submission: null,
+      inFlight: false
+    });
+    emit();
+  }
+  function ingest(event) {
+    if (destroyed)
+      return;
+    if (event.type === "human_assistance::request") {
+      ingestRequest(event.payload);
+      return;
+    }
+    const status = event.payload;
+    const entry = entries2.get(status.request_id);
+    if (!entry) {
+      if (TERMINAL.has(status.status))
+        rememberTerminal(status.request_id);
+      return;
+    }
+    if (TERMINAL.has(entry.card.status))
+      return;
+    if (status.status === "resolved" || status.status === "expired" || status.status === "revoked" || status.status === "delivery_failed" || status.status === "cancelled") {
+      entry.card.status = status.status;
+      entry.card.error = void 0;
+      emit();
+      return;
+    }
+    if (!entry.submission || entry.submission.clientReplyId !== status.client_reply_id)
+      return;
+    if (entry.card.status === "accepted" || entry.card.status === "rejected")
+      return;
+    entry.card.status = status.status === "reply_accepted" ? "accepted" : "rejected";
+    entry.card.reason = status.reason;
+    entry.card.error = status.status === "reply_rejected" ? status.reason : void 0;
+    emit();
+  }
+  function pending(requestId) {
+    const entry = entries2.get(requestId);
+    if (!entry || entry.card.status !== "pending")
+      throw createControllerError("ha_request_inactive", "Human Assistance request is not pending.", "human_assistance");
+    if (Date.now() >= Date.parse(entry.card.request.deadline_at)) {
+      entry.card.error = "Human Assistance request has expired.";
+      emit();
+      throw createControllerError("ha_request_expired", "Human Assistance request has expired.", "human_assistance");
+    }
+    return entry;
+  }
+  async function send(entry) {
+    if (!entry.submission || entry.inFlight)
+      throw createControllerError("ha_send_unavailable", "Human Assistance reply cannot be sent.", "human_assistance");
+    entry.inFlight = true;
+    entry.card.error = void 0;
+    entry.card.status = "sent";
+    emit();
+    try {
+      await options.client.replyHumanAssistance({ ...entry.submission });
+    } catch (error2) {
+      if (entry.card.status === "sent")
+        entry.card.error = error2 instanceof Error ? error2.message : "HA reply failed";
+      emit();
+      throw error2;
+    } finally {
+      entry.inFlight = false;
+    }
+  }
+  function begin(requestId, action) {
+    const entry = pending(requestId);
+    const optionId = entry.card.optionId;
+    const text3 = entry.card.text.trim();
+    if (action === "answer" && !optionId && !text3) {
+      entry.card.error = "Choose an option or enter text.";
+      emit();
+      throw createControllerError("ha_answer_empty", "Choose an option or enter text.", "human_assistance");
+    }
+    const clientReplyId = createId();
+    entry.submission = {
+      requestId,
+      clientReplyId,
+      action,
+      ...action === "answer" && optionId ? { optionId } : {},
+      ...action === "answer" && text3 ? { text: text3 } : {}
+    };
+    entry.card.clientReplyId = clientReplyId;
+    return send(entry);
+  }
+  const unsubscribe = options.client.onHumanAssistance(ingest);
+  for (const request of options.client.humanAssistanceRequests)
+    ingestRequest(request);
+  return {
+    getCards: cards,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    sync() {
+      if (!destroyed)
+        for (const request of options.client.humanAssistanceRequests)
+          ingestRequest(request);
+    },
+    selectOption(requestId, optionId) {
+      const entry = pending(requestId);
+      const selected = optionId === "" && entry.card.request.allow_text ? null : optionId;
+      if (selected !== null && !entry.card.request.options.some((option) => option.id === selected)) {
+        entry.card.error = "Unknown Human Assistance option.";
+        emit();
+        throw createControllerError("ha_option_invalid", "Unknown Human Assistance option.", "human_assistance");
+      }
+      entry.card.optionId = selected;
+      entry.card.error = void 0;
+      emit();
+    },
+    setText(requestId, text3) {
+      const entry = pending(requestId);
+      if (!entry.card.request.allow_text || typeof text3 !== "string" || text3.length > 4096) {
+        entry.card.error = "Text is not allowed or is too long.";
+        emit();
+        throw createControllerError("ha_text_invalid", "Text is not allowed or is too long.", "human_assistance");
+      }
+      entry.card.text = text3;
+      entry.card.error = void 0;
+      emit();
+    },
+    submit(requestId) {
+      return begin(requestId, "answer");
+    },
+    refuse(requestId) {
+      return begin(requestId, "refuse");
+    },
+    retry(requestId) {
+      const entry = entries2.get(requestId);
+      if (!entry?.submission || entry.card.status !== "sent" || entry.inFlight)
+        throw createControllerError("ha_retry_unavailable", "Human Assistance reply cannot be retried.", "human_assistance");
+      if (Date.now() >= Date.parse(entry.card.request.deadline_at)) {
+        entry.card.error = "Human Assistance request has expired.";
+        emit();
+        throw createControllerError("ha_request_expired", "Human Assistance request has expired.", "human_assistance");
+      }
+      return send(entry);
+    },
+    reset() {
+      entries2.clear();
+      tombstones.clear();
+      overflow = false;
+      emit();
+    },
+    destroy() {
+      if (destroyed)
+        return;
+      destroyed = true;
+      unsubscribe();
+      entries2.clear();
+      tombstones.clear();
       listeners.clear();
     }
   };
@@ -5289,9 +5892,12 @@ Array.prototype.indexOf;
 var arrayLastIndexOf = unapply(Array.prototype.lastIndexOf);
 var arrayPop = unapply(Array.prototype.pop);
 var arrayPush = unapply(Array.prototype.push);
-Array.prototype.slice;
+var arraySlice = unapply(Array.prototype.slice);
 var arraySplice = unapply(Array.prototype.splice);
 var arrayIsArray = Array.isArray;
+var setCreate = unconstruct(Set);
+var setAdd = unapply(Set.prototype.add);
+var setHas = unapply(Set.prototype.has);
 var stringToLowerCase = unapply(String.prototype.toLowerCase);
 var stringToString = unapply(String.prototype.toString);
 var stringMatch = unapply(String.prototype.match);
@@ -5325,15 +5931,15 @@ function addToSet(set2, array) {
   if (!arrayIsArray(array)) return set2;
   let l = array.length;
   while (l--) {
-    let element = array[l];
-    if (typeof element === "string") {
-      const lcElement = transformCaseFunc(element);
-      if (lcElement !== element) {
+    let element2 = array[l];
+    if (typeof element2 === "string") {
+      const lcElement = transformCaseFunc(element2);
+      if (lcElement !== element2) {
         if (!isFrozen(array)) array[l] = lcElement;
-        element = lcElement;
+        element2 = lcElement;
       }
     }
-    set2[element] = true;
+    set2[element2] = true;
   }
   return set2;
 }
@@ -5397,6 +6003,14 @@ function lookupGetter(object, prop) {
     return null;
   }
   return fallbackValue;
+}
+function lookupAccessor(object, prop) {
+  while (object !== null) {
+    const desc = getOwnPropertyDescriptor(object, prop);
+    if (desc) return desc.get ? unapply(desc.get) : null;
+    object = getPrototypeOf(object);
+  }
+  return null;
 }
 function isRegex(value) {
   try {
@@ -6082,7 +6696,7 @@ var NODE_TYPE = {
   documentFragment: 11,
   notation: 12
 };
-var LITERAL_TEXT_ELEMENT_NAMES = [
+var LITERAL_TEXT_ELEMENTS = freeze(addToSet({}, [
   "style",
   "script",
   "xmp",
@@ -6091,15 +6705,7 @@ var LITERAL_TEXT_ELEMENT_NAMES = [
   "noframes",
   "plaintext",
   "noscript"
-];
-var LITERAL_TEXT_ELEMENTS = freeze(addToSet({}, LITERAL_TEXT_ELEMENT_NAMES));
-var LITERAL_TEXT_CLOSE = (function() {
-  const map2 = {};
-  arrayForEach(LITERAL_TEXT_ELEMENT_NAMES, (name) => {
-    map2[name] = seal(new RegExp("</" + name + "(?=[\\t\\n\\f\\r />])", "i"));
-  });
-  return freeze(map2);
-})();
+]));
 var getGlobal = function getGlobal2() {
   return typeof window === "undefined" ? null : window;
 };
@@ -6146,7 +6752,7 @@ var _resolveObjectOption = function _resolveObjectOption2(cfg, key, makeFallback
 function createDOMPurify() {
   let window2 = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : getGlobal();
   const DOMPurify = (root) => createDOMPurify(root);
-  DOMPurify.version = "3.4.16";
+  DOMPurify.version = "3.4.17";
   DOMPurify.removed = [];
   if (!window2 || !window2.document || window2.document.nodeType !== NODE_TYPE.document || !window2.Element) {
     DOMPurify.isSupported = false;
@@ -6177,6 +6783,10 @@ function createDOMPurify() {
   };
   const _readNodeName = function _readNodeName2(node) {
     return getNodeName ? getNodeName(node) : node.nodeName;
+  };
+  const getNamespaceURI = lookupAccessor(ElementPrototype, "namespaceURI");
+  const _readNamespaceURI = function _readNamespaceURI2(element2) {
+    return getNamespaceURI ? getNamespaceURI(element2) : element2.namespaceURI;
   };
   if (typeof HTMLTemplateElement === "function") {
     const template = document2.createElement("template");
@@ -6291,6 +6901,7 @@ function createDOMPurify() {
   const SANITIZE_NAMED_PROPS_PREFIX = "user-content-";
   let KEEP_CONTENT = true;
   let IN_PLACE = false;
+  let IN_PLACE_VISITED = null;
   let USE_PROFILES = {};
   let FORBID_CONTENTS = null;
   const DEFAULT_FORBID_CONTENTS = addToSet({}, [
@@ -6528,19 +7139,24 @@ function createDOMPurify() {
     if (parent.namespaceURI === MATHML_NAMESPACE && !MATHML_TEXT_INTEGRATION_POINTS[parentTagName]) return false;
     return !ALL_MATHML_TAGS[tagName] && (COMMON_SVG_AND_HTML_ELEMENTS[tagName] || !ALL_SVG_TAGS[tagName]);
   };
-  const _checkValidNamespace = function _checkValidNamespace2(element) {
-    let parent = getParentNode(element);
-    if (!parent || !parent.tagName) parent = {
-      namespaceURI: NAMESPACE,
-      tagName: "template"
-    };
-    const tagName = stringToLowerCase(element.tagName);
-    const parentTagName = stringToLowerCase(parent.tagName);
-    if (!ALLOWED_NAMESPACES[element.namespaceURI]) return false;
-    if (element.namespaceURI === SVG_NAMESPACE) return _checkSvgNamespace(tagName, parent, parentTagName);
-    if (element.namespaceURI === MATHML_NAMESPACE) return _checkMathMlNamespace(tagName, parent, parentTagName);
-    if (element.namespaceURI === HTML_NAMESPACE) return _checkHtmlNamespace(tagName, parent, parentTagName);
-    if (PARSER_MEDIA_TYPE === "application/xhtml+xml" && ALLOWED_NAMESPACES[element.namespaceURI]) return true;
+  const _checkValidNamespace = function _checkValidNamespace2(element2) {
+    const elementNamespace = _readNamespaceURI(element2);
+    const tagName = stringToLowerCase(_readNodeName(element2));
+    const parentNode = getParentNode(element2);
+    let parent;
+    let parentTagName;
+    if (parentNode && _readNodeType(parentNode) === NODE_TYPE.element) {
+      parent = { namespaceURI: _readNamespaceURI(parentNode) };
+      parentTagName = stringToLowerCase(_readNodeName(parentNode));
+    } else {
+      parent = { namespaceURI: NAMESPACE };
+      parentTagName = "template";
+    }
+    if (!ALLOWED_NAMESPACES[elementNamespace]) return false;
+    if (elementNamespace === SVG_NAMESPACE) return _checkSvgNamespace(tagName, parent, parentTagName);
+    if (elementNamespace === MATHML_NAMESPACE) return _checkMathMlNamespace(tagName, parent, parentTagName);
+    if (elementNamespace === HTML_NAMESPACE) return _checkHtmlNamespace(tagName, parent, parentTagName);
+    if (PARSER_MEDIA_TYPE === "application/xhtml+xml" && ALLOWED_NAMESPACES[elementNamespace]) return true;
     return false;
   };
   const _forceRemove = function _forceRemove2(node) {
@@ -6552,12 +7168,12 @@ function createDOMPurify() {
       if (!getParentNode(node)) throw typeErrorCreate("a node selected for removal could not be detached from its tree and cannot be safely returned; refusing to sanitize in place");
     }
   };
-  const _stripAttributeNode = function _stripAttributeNode2(element, attribute2, name) {
+  const _stripAttributeNode = function _stripAttributeNode2(element2, attribute2, name) {
     try {
-      removeAttributeNode(element, attribute2);
+      removeAttributeNode(element2, attribute2);
     } catch (_) {
       try {
-        element.removeAttribute(name);
+        element2.removeAttribute(name);
       } catch (_2) {
       }
     }
@@ -6565,73 +7181,146 @@ function createDOMPurify() {
   const _neutralizeRoot = function _neutralizeRoot2(root) {
     _neutralizeSubtree(root);
     const childNodes = getChildNodes(root);
-    if (childNodes) {
-      const snapshot = [];
-      arrayForEach(childNodes, (child) => {
-        arrayPush(snapshot, child);
-      });
-      arrayForEach(snapshot, (child) => {
-        try {
-          remove(child);
-        } catch (_) {
-        }
-      });
-    }
-    const attributes = getAttributes(root);
+    if (childNodes) arrayForEach(arraySlice(childNodes), (child) => {
+      try {
+        remove(child);
+      } catch (_) {
+      }
+    });
+    const attributes = _readNodeType(root) === NODE_TYPE.element ? getAttributes(root) : null;
     if (attributes) for (let i = attributes.length - 1; i >= 0; --i) {
       const attribute2 = attributes[i];
       const name = attribute2 && attribute2.name;
       if (typeof name === "string") _stripAttributeNode(root, attribute2, name);
     }
   };
-  const _removeAttribute = function _removeAttribute2(name, element, attr) {
+  const _removeAttribute = function _removeAttribute2(name, element2, attr) {
     if (!attr) try {
-      attr = element.getAttributeNode(name);
+      attr = element2.getAttributeNode(name);
     } catch (_) {
       attr = null;
     }
     arrayPush(DOMPurify.removed, {
       attribute: attr || null,
-      from: element
+      from: element2
     });
     try {
-      if (attr) removeAttributeNode(element, attr);
-      else element.removeAttribute(name);
+      if (attr) removeAttributeNode(element2, attr);
+      else element2.removeAttribute(name);
     } catch (_) {
       try {
-        element.removeAttribute(name);
+        element2.removeAttribute(name);
       } catch (_2) {
       }
     }
     if (name === "is") {
       if (RETURN_DOM || RETURN_DOM_FRAGMENT) try {
-        _forceRemove(element);
+        _forceRemove(element2);
       } catch (_) {
       }
       else try {
-        element.setAttribute(name, "");
+        element2.setAttribute(name, "");
       } catch (_) {
       }
     }
   };
-  const _stripDisallowedAttributes = function _stripDisallowedAttributes2(element) {
-    const attributes = getAttributes(element);
+  const _stripDisallowedAttributes = function _stripDisallowedAttributes2(element2) {
+    const attributes = getAttributes(element2);
     if (!attributes) return;
     for (let i = attributes.length - 1; i >= 0; --i) {
       const attribute2 = attributes[i];
       const name = attribute2 && attribute2.name;
       if (typeof name !== "string" || ALLOWED_ATTR[transformCaseFunc(name)]) continue;
-      _stripAttributeNode(element, attribute2, name);
+      _stripAttributeNode(element2, attribute2, name);
     }
   };
-  const _neutralizeSubtree = function _neutralizeSubtree2(root) {
+  const _walkTree = function _walkTree2(root, visit) {
+    let intoShadow = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : false;
     const stack = [root];
     while (stack.length > 0) {
       const node = stack.pop();
-      if (_readNodeType(node) === NODE_TYPE.element) _stripDisallowedAttributes(node);
+      if (visit(node) === false) continue;
+      if (intoShadow && _readNodeType(node) === NODE_TYPE.element) {
+        const shadowRoot = getShadowRoot(node);
+        if (_isDocumentFragment(shadowRoot)) stack.push(shadowRoot);
+      }
       const childNodes = getChildNodes(node);
       if (childNodes) for (let i = childNodes.length - 1; i >= 0; --i) stack.push(childNodes[i]);
     }
+  };
+  const _neutralizeSubtree = function _neutralizeSubtree2(root) {
+    _walkTree(root, (node) => {
+      if (_readNodeType(node) === NODE_TYPE.element) _stripDisallowedAttributes(node);
+    });
+  };
+  const _collectLiveNodes = function _collectLiveNodes2(root) {
+    const nodes = [];
+    _walkTree(root, (node) => {
+      nodes.push(node);
+    }, true);
+    return nodes;
+  };
+  const _neutralizeEscapedElements = function _neutralizeEscapedElements2(root, before) {
+    const reachable = setCreate();
+    arrayForEach(_collectLiveNodes(root), (node) => {
+      if (_readNodeType(node) === NODE_TYPE.element) setAdd(reachable, node);
+    });
+    arrayForEach(before, (node) => {
+      if (_readNodeType(node) === NODE_TYPE.element && !setHas(reachable, node)) _stripDisallowedAttributes(node);
+    });
+  };
+  const _neutralizeDiscarded = function _neutralizeDiscarded2(root, before) {
+    let rootRemoved = false;
+    arrayForEach(DOMPurify.removed, (entry) => {
+      if (entry.element) {
+        rootRemoved = rootRemoved || entry.element === root;
+        _neutralizeSubtree(entry.element);
+      }
+    });
+    _neutralizeEscapedElements(root, before);
+    return rootRemoved;
+  };
+  const MAX_UNVISITED_ROUNDS = 8;
+  const _sanitizeUnvisitedNodes = function _sanitizeUnvisitedNodes2(root, before) {
+    const visited = IN_PLACE_VISITED;
+    let original = null;
+    const getOriginal = () => {
+      if (!original) {
+        original = setCreate();
+        arrayForEach(before, (beforeNode) => {
+          setAdd(original, beforeNode);
+        });
+      }
+      return original;
+    };
+    for (let round = 0; ; round++) {
+      const live = _collectLiveNodes(root);
+      const containers = [root];
+      let pending = false;
+      arrayForEach(live, (node) => {
+        if (_readNodeType(node) === NODE_TYPE.documentFragment) arrayPush(containers, node);
+        else if (!pending && !setHas(visited, node)) pending = setHas(getOriginal(), node);
+      });
+      if (!pending) return;
+      if (round >= MAX_UNVISITED_ROUNDS) throw typeErrorCreate("the tree kept changing during in-place sanitization; refusing to return it");
+      arrayForEach(containers, (container, index) => {
+        _sanitizeUnvisitedIn(container, index > 0, root, getOriginal());
+      });
+    }
+  };
+  const _sanitizeUnvisitedIn = function _sanitizeUnvisitedIn2(container, inShadow, root, original) {
+    const iterator = _createNodeIterator(container);
+    let node;
+    while (node = iterator.nextNode()) {
+      if (!setHas(original, node) || setHas(IN_PLACE_VISITED, node)) continue;
+      if (inShadow) _executeHooks(hooks.uponSanitizeShadowNode, node, null);
+      _sanitizeElements(node, root);
+      _sanitizeAttributes(node, root);
+      if (_isDocumentFragment(node.content)) _sanitizeShadowDOM2(node.content);
+    }
+  };
+  const _markVisited = function _markVisited2(node) {
+    if (IN_PLACE_VISITED) setAdd(IN_PLACE_VISITED, node);
   };
   const _isPatchLinkageAttribute = function _isPatchLinkageAttribute2(lcName, lcTag) {
     if (!SAFE_FOR_XML) return false;
@@ -6640,29 +7329,26 @@ function createDOMPurify() {
   };
   const _neutralizePatchLinkage = function _neutralizePatchLinkage2(root) {
     if (!SAFE_FOR_XML) return;
-    const stack = [root];
-    while (stack.length > 0) {
-      const node = stack.pop();
+    _walkTree(root, (node) => {
       const nodeType = _readNodeType(node);
       if (nodeType === NODE_TYPE.processingInstruction || nodeType === NODE_TYPE.comment && regExpTest(COMMENT_MARKUP_PROBE, node.data)) {
         try {
           remove(node);
         } catch (_) {
         }
-        continue;
+        return false;
       }
       if (nodeType === NODE_TYPE.element) {
-        const element = node;
+        const element2 = node;
         const lcTag = transformCaseFunc(_readNodeName(node));
         try {
-          if (element.hasAttribute && element.hasAttribute("patchsrc")) element.removeAttribute("patchsrc");
-          if (element.hasAttribute && element.hasAttribute("for") && _isPatchLinkageAttribute("for", lcTag)) element.removeAttribute("for");
+          if (element2.hasAttribute && element2.hasAttribute("patchsrc")) element2.removeAttribute("patchsrc");
+          if (element2.hasAttribute && element2.hasAttribute("for") && _isPatchLinkageAttribute("for", lcTag)) element2.removeAttribute("for");
         } catch (_) {
         }
       }
-      const childNodes = getChildNodes(node);
-      if (childNodes) for (let i = childNodes.length - 1; i >= 0; --i) stack.push(childNodes[i]);
-    }
+      return true;
+    });
   };
   const _initDocument = function _initDocument2(dirty) {
     let doc = null;
@@ -6702,6 +7388,13 @@ function createDOMPurify() {
   };
   const _scrubTemplateExpressions2 = function _scrubTemplateExpressions(node) {
     var _node$querySelectorAl;
+    _scrubOwnCharacterData(node);
+    const templates = (_node$querySelectorAl = node.querySelectorAll) === null || _node$querySelectorAl === void 0 ? void 0 : _node$querySelectorAl.call(node, "template");
+    if (templates) arrayForEach(templates, (tmpl) => {
+      if (_isDocumentFragment(tmpl.content)) _scrubTemplateExpressions2(tmpl.content);
+    });
+  };
+  const _scrubOwnCharacterData = function _scrubOwnCharacterData2(node) {
     node.normalize();
     const doc = getOwnerDocument ? getOwnerDocument(node) : node.ownerDocument;
     const walker = createNodeIterator.call(doc || node, node, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_COMMENT | NodeFilter.SHOW_CDATA_SECTION | NodeFilter.SHOW_PROCESSING_INSTRUCTION, null);
@@ -6710,16 +7403,12 @@ function createDOMPurify() {
       currentNode.data = _stripTemplateExpressions(currentNode.data);
       currentNode = walker.nextNode();
     }
-    const templates = (_node$querySelectorAl = node.querySelectorAll) === null || _node$querySelectorAl === void 0 ? void 0 : _node$querySelectorAl.call(node, "template");
-    if (templates) arrayForEach(templates, (tmpl) => {
-      if (_isDocumentFragment(tmpl.content)) _scrubTemplateExpressions2(tmpl.content);
-    });
   };
-  const _isClobbered = function _isClobbered2(element) {
-    const realTagName = getNodeName ? getNodeName(element) : null;
+  const _isClobbered = function _isClobbered2(element2) {
+    const realTagName = getNodeName ? getNodeName(element2) : null;
     if (typeof realTagName !== "string") return false;
     if (transformCaseFunc(realTagName) !== "form") return false;
-    return typeof element.nodeName !== "string" || typeof element.textContent !== "string" || typeof element.removeChild !== "function" || element.attributes !== getAttributes(element) || typeof element.removeAttribute !== "function" || typeof element.removeAttributeNode !== "function" || typeof element.getAttributeNode !== "function" || typeof element.setAttribute !== "function" || typeof element.namespaceURI !== "string" || typeof element.insertBefore !== "function" || typeof element.hasChildNodes !== "function" || element.nodeType !== getNodeType(element) || element.childNodes !== getChildNodes(element);
+    return typeof element2.nodeName !== "string" || typeof element2.textContent !== "string" || typeof element2.removeChild !== "function" || element2.attributes !== getAttributes(element2) || typeof element2.removeAttribute !== "function" || typeof element2.removeAttributeNode !== "function" || typeof element2.getAttributeNode !== "function" || typeof element2.setAttribute !== "function" || typeof element2.namespaceURI !== "string" || typeof element2.insertBefore !== "function" || typeof element2.hasChildNodes !== "function" || element2.nodeType !== getNodeType(element2) || element2.childNodes !== getChildNodes(element2);
   };
   const _isDocumentFragment = function _isDocumentFragment2(value) {
     if (!getNodeType || typeof value !== "object" || value === null) return false;
@@ -6745,7 +7434,7 @@ function createDOMPurify() {
   }
   const _isUnsafeNode = function _isUnsafeNode2(currentNode, tagName) {
     if (SAFE_FOR_XML && currentNode.hasChildNodes() && !_isNode(currentNode.firstElementChild) && regExpTest(ELEMENT_MARKUP_PROBE, currentNode.textContent) && regExpTest(ELEMENT_MARKUP_PROBE, currentNode.innerHTML)) return true;
-    if (SAFE_FOR_XML && currentNode.namespaceURI === HTML_NAMESPACE && LITERAL_TEXT_ELEMENTS[tagName] && (_isNode(currentNode.firstElementChild) || typeof currentNode.textContent === "string" && regExpTest(LITERAL_TEXT_CLOSE[tagName], currentNode.textContent))) return true;
+    if (SAFE_FOR_XML && LITERAL_TEXT_ELEMENTS[tagName] && _readNodeType(currentNode) === NODE_TYPE.element && _readNamespaceURI(currentNode) === HTML_NAMESPACE && (_isNode(currentNode.firstElementChild) || typeof currentNode.textContent === "string" && regExpTest(ELEMENT_MARKUP_PROBE, currentNode.textContent))) return true;
     if (currentNode.nodeType === NODE_TYPE.processingInstruction) return true;
     if (SAFE_FOR_XML && currentNode.nodeType === NODE_TYPE.comment && regExpTest(COMMENT_MARKUP_PROBE, currentNode.data)) return true;
     return false;
@@ -6760,7 +7449,7 @@ function createDOMPurify() {
   };
   const _sanitizeDisallowedNode = function _sanitizeDisallowedNode2(currentNode, tagName, root) {
     if (!FORBID_TAGS[tagName] && _isBasicCustomElement(tagName) && _matchesNameCheck(CUSTOM_ELEMENT_HANDLING.tagNameCheck, tagName)) return false;
-    if (KEEP_CONTENT && !FORBID_CONTENTS[tagName]) {
+    if (KEEP_CONTENT && !FORBID_CONTENTS[tagName] && !FORBID_CONTENTS[stringToLowerCase(tagName)]) {
       const parentNode = getParentNode(currentNode);
       const childNodes = getChildNodes(currentNode);
       if (childNodes && parentNode) {
@@ -6784,6 +7473,7 @@ function createDOMPurify() {
     return true;
   };
   const _sanitizeElements = function _sanitizeElements2(currentNode, root) {
+    _markVisited(currentNode);
     _executeHooks(hooks.beforeSanitizeElements, currentNode, null);
     if (_handleHookDetachedNode(currentNode, root)) return true;
     if (_isClobbered(currentNode)) {
@@ -6877,6 +7567,10 @@ function createDOMPurify() {
       return false;
     }
   };
+  const _isUnsafeAttributeValue = function _isUnsafeAttributeValue2(name, value) {
+    if (SAFE_FOR_XML && regExpTest(/((--!?|])>)|<\/(style|script|title|xmp|textarea|noscript|iframe|noembed|noframes)/i, value)) return true;
+    return stringToLowerCase(name) === "attributename" && stringMatch(value, "href") !== null;
+  };
   const _sanitizeAttributes = function _sanitizeAttributes2(currentNode, root) {
     _executeHooks(hooks.beforeSanitizeAttributes, currentNode, null);
     if (_handleHookDetachedNode(currentNode, root)) return;
@@ -6910,11 +7604,7 @@ function createDOMPurify() {
         value = SANITIZE_NAMED_PROPS_PREFIX + value;
         recreatedNamedProp = true;
       }
-      if (SAFE_FOR_XML && regExpTest(/((--!?|])>)|<\/(style|script|title|xmp|textarea|noscript|iframe|noembed|noframes)/i, value)) {
-        _removeAttribute(name, currentNode, attr);
-        continue;
-      }
-      if (lcName === "attributename" && stringMatch(value, "href")) {
+      if (_isUnsafeAttributeValue(name, value)) {
         _removeAttribute(name, currentNode, attr);
         continue;
       }
@@ -6957,6 +7647,7 @@ function createDOMPurify() {
         }
       }
     }
+    if (SAFE_FOR_TEMPLATES) _scrubOwnCharacterData(fragment);
     _executeHooks(hooks.afterSanitizeShadowDOM, fragment, null);
   };
   const _sanitizeAttachedShadowRoots = function _sanitizeAttachedShadowRoots2(root) {
@@ -7020,6 +7711,8 @@ function createDOMPurify() {
     if (hooks.uponSanitizeAttribute.length > 0) ALLOWED_ATTR = clone(ALLOWED_ATTR);
     DOMPurify.removed = [];
     const inPlace = IN_PLACE && typeof dirty !== "string" && _isNode(dirty);
+    let inPlaceNodes = [];
+    const outerVisited = IN_PLACE_VISITED;
     if (inPlace) {
       _neutralizePatchLinkage(dirty);
       const nn = _readNodeName(dirty);
@@ -7034,12 +7727,8 @@ function createDOMPurify() {
         _neutralizeRoot(dirty);
         throw typeErrorCreate("root node is clobbered and cannot be sanitized in-place");
       }
-      try {
-        _sanitizeAttachedShadowRoots(dirty);
-      } catch (error2) {
-        _neutralizeRoot(dirty);
-        throw error2;
-      }
+      inPlaceNodes = _collectLiveNodes(dirty);
+      IN_PLACE_VISITED = setCreate();
     } else if (_isNode(dirty)) {
       body = _initDocument("<!---->");
       importedNode = body.ownerDocument.importNode(dirty, true);
@@ -7055,30 +7744,25 @@ function createDOMPurify() {
     if (body && FORCE_BODY) _forceRemove(body.firstChild);
     const walkRoot = inPlace ? dirty : body;
     try {
+      if (inPlace) _sanitizeAttachedShadowRoots(dirty);
       const nodeIterator = _createNodeIterator(walkRoot);
       while (currentNode = nodeIterator.nextNode()) {
         _sanitizeElements(currentNode, walkRoot);
         _sanitizeAttributes(currentNode, walkRoot);
         if (_isDocumentFragment(currentNode.content)) _sanitizeShadowDOM2(currentNode.content);
       }
+      if (inPlace) _sanitizeUnvisitedNodes(dirty, inPlaceNodes);
     } catch (error2) {
       if (inPlace) {
         _neutralizeRoot(dirty);
-        arrayForEach(DOMPurify.removed, (entry) => {
-          if (entry.element) _neutralizeSubtree(entry.element);
-        });
+        _neutralizeDiscarded(dirty, inPlaceNodes);
       }
       throw error2;
+    } finally {
+      IN_PLACE_VISITED = outerVisited;
     }
     if (inPlace) {
-      let rootWasRemoved = false;
-      arrayForEach(DOMPurify.removed, (entry) => {
-        if (entry.element) {
-          if (entry.element === dirty) rootWasRemoved = true;
-          _neutralizeSubtree(entry.element);
-        }
-      });
-      if (rootWasRemoved) throw typeErrorCreate("a node selected for removal could not be safely returned; refusing to sanitize in place");
+      if (_neutralizeDiscarded(dirty, inPlaceNodes)) throw typeErrorCreate("a node selected for removal could not be safely returned; refusing to sanitize in place");
       if (SAFE_FOR_TEMPLATES) _scrubTemplateExpressions2(dirty);
       return dirty;
     }
@@ -7115,6 +7799,7 @@ function createDOMPurify() {
     if (!CONFIG) _parseConfig({});
     const lcTag = transformCaseFunc(tag);
     const lcName = transformCaseFunc(attr);
+    if (typeof value === "string" && (_isUnsafeAttributeValue(attr, value) || !ALLOW_SELF_CLOSE_IN_ATTR && regExpTest(SELF_CLOSING_TAG, value))) return false;
     return _isValidAttribute(lcTag, lcName, value);
   };
   DOMPurify.addHook = function(entryPoint, hookFunction) {
@@ -10106,95 +10791,120 @@ function list(state, startLine, endLine, silent) {
 }
 
 // node_modules/markdown-it/lib/rules_block/reference.mjs
+var MAX_LABEL_LENGTH = 999;
+function countCodePoints(str) {
+  let length = str.length;
+  for (let i = 0; i < str.length - 1; i++) {
+    const high = str.charCodeAt(i);
+    if (high < 55296 || high > 56319) {
+      continue;
+    }
+    const low = str.charCodeAt(i + 1);
+    if (low >= 56320 && low <= 57343) {
+      length--;
+      i++;
+    }
+  }
+  return length;
+}
+function lineEnd(state, line) {
+  return Math.min(state.eMarks[line] + 1, state.src.length);
+}
+function getNextLinePos(state, nextLine) {
+  const endLine = state.lineMax;
+  if (nextLine >= endLine || state.isEmpty(nextLine)) {
+    return -1;
+  }
+  let isContinuation = false;
+  if (state.sCount[nextLine] - state.blkIndent > 3) {
+    isContinuation = true;
+  }
+  if (state.sCount[nextLine] < 0) {
+    isContinuation = true;
+  }
+  if (!isContinuation) {
+    const terminatorRules = state.md.block.ruler.getRules("reference");
+    const oldParentType = state.parentType;
+    state.parentType = "reference";
+    let terminate = false;
+    for (let i = 0, l = terminatorRules.length; i < l; i++) {
+      if (terminatorRules[i](state, nextLine, endLine, true)) {
+        terminate = true;
+        break;
+      }
+    }
+    state.parentType = oldParentType;
+    if (terminate) {
+      return -1;
+    }
+  }
+  return state.bMarks[nextLine] + state.tShift[nextLine];
+}
 function reference(state, startLine, _endLine, silent) {
+  const src = state.src;
   let pos = state.bMarks[startLine] + state.tShift[startLine];
-  let max = state.eMarks[startLine];
   let nextLine = startLine + 1;
   if (state.sCount[startLine] - state.blkIndent >= 4) {
     return false;
   }
-  if (state.src.charCodeAt(pos) !== 91) {
+  if (src.charCodeAt(pos) !== 91) {
     return false;
   }
-  function getNextLine(nextLine2) {
-    const endLine = state.lineMax;
-    if (nextLine2 >= endLine || state.isEmpty(nextLine2)) {
-      return null;
-    }
-    let isContinuation = false;
-    if (state.sCount[nextLine2] - state.blkIndent > 3) {
-      isContinuation = true;
-    }
-    if (state.sCount[nextLine2] < 0) {
-      isContinuation = true;
-    }
-    if (!isContinuation) {
-      const terminatorRules = state.md.block.ruler.getRules("reference");
-      const oldParentType = state.parentType;
-      state.parentType = "reference";
-      let terminate = false;
-      for (let i = 0, l = terminatorRules.length; i < l; i++) {
-        if (terminatorRules[i](state, nextLine2, endLine, true)) {
-          terminate = true;
-          break;
-        }
-      }
-      state.parentType = oldParentType;
-      if (terminate) {
-        return null;
-      }
-    }
-    const pos2 = state.bMarks[nextLine2] + state.tShift[nextLine2];
-    const max2 = state.eMarks[nextLine2];
-    return state.src.slice(pos2, max2 + 1);
-  }
-  let str = state.src.slice(pos, max + 1);
-  max = str.length;
+  let max = lineEnd(state, startLine);
+  let rawLabel = "";
   let labelEnd = -1;
-  for (pos = 1; pos < max; pos++) {
-    const ch = str.charCodeAt(pos);
+  let segmentStart = ++pos;
+  while (pos < max) {
+    if (rawLabel.length + pos - segmentStart > MAX_LABEL_LENGTH * 2) {
+      return false;
+    }
+    let ch = src.charCodeAt(pos);
     if (ch === 91) {
       return false;
-    } else if (ch === 93) {
+    }
+    if (ch === 93) {
       labelEnd = pos;
       break;
-    } else if (ch === 10) {
-      const lineContent = getNextLine(nextLine);
-      if (lineContent !== null) {
-        str += lineContent;
-        max = str.length;
-        nextLine++;
-      }
-    } else if (ch === 92) {
-      pos++;
-      if (pos < max && str.charCodeAt(pos) === 10) {
-        const lineContent = getNextLine(nextLine);
-        if (lineContent !== null) {
-          str += lineContent;
-          max = str.length;
-          nextLine++;
-        }
-      }
     }
+    if (ch === 92) {
+      ch = src.charCodeAt(++pos);
+    }
+    if (ch === 10 && pos < max) {
+      const nextPos = getNextLinePos(state, nextLine);
+      if (nextPos < 0) {
+        return false;
+      }
+      rawLabel += src.slice(segmentStart, max);
+      pos = segmentStart = nextPos;
+      max = lineEnd(state, nextLine++);
+      continue;
+    }
+    pos++;
   }
-  if (labelEnd < 0 || str.charCodeAt(labelEnd + 1) !== 58) {
+  if (labelEnd < 0 || src.charCodeAt(labelEnd + 1) !== 58) {
     return false;
   }
-  for (pos = labelEnd + 2; pos < max; pos++) {
-    const ch = str.charCodeAt(pos);
+  rawLabel += src.slice(segmentStart, labelEnd);
+  if (rawLabel.length > MAX_LABEL_LENGTH && countCodePoints(rawLabel) > MAX_LABEL_LENGTH) {
+    return false;
+  }
+  pos = labelEnd + 2;
+  while (pos < max) {
+    const ch = src.charCodeAt(pos);
     if (ch === 10) {
-      const lineContent = getNextLine(nextLine);
-      if (lineContent !== null) {
-        str += lineContent;
-        max = str.length;
-        nextLine++;
+      const nextPos = getNextLinePos(state, nextLine);
+      if (nextPos < 0) {
+        break;
       }
+      pos = nextPos;
+      max = lineEnd(state, nextLine++);
     } else if (isSpace(ch)) {
+      pos++;
     } else {
       break;
     }
   }
-  const destRes = state.md.helpers.parseLinkDestination(str, pos, max);
+  const destRes = state.md.helpers.parseLinkDestination(src, pos, max);
   if (!destRes.ok) {
     return false;
   }
@@ -10204,55 +10914,57 @@ function reference(state, startLine, _endLine, silent) {
   }
   pos = destRes.pos;
   const destEndPos = pos;
+  const destEndMax = max;
   const destEndLineNo = nextLine;
-  const start = pos;
-  for (; pos < max; pos++) {
-    const ch = str.charCodeAt(pos);
+  while (pos < max) {
+    const ch = src.charCodeAt(pos);
     if (ch === 10) {
-      const lineContent = getNextLine(nextLine);
-      if (lineContent !== null) {
-        str += lineContent;
-        max = str.length;
-        nextLine++;
+      const nextPos = getNextLinePos(state, nextLine);
+      if (nextPos < 0) {
+        break;
       }
+      pos = nextPos;
+      max = lineEnd(state, nextLine++);
     } else if (isSpace(ch)) {
+      pos++;
     } else {
       break;
     }
   }
-  let titleRes = state.md.helpers.parseLinkTitle(str, pos, max);
+  const titleStart = pos;
+  let titleRes = state.md.helpers.parseLinkTitle(src, pos, max);
   while (titleRes.can_continue) {
-    const lineContent = getNextLine(nextLine);
-    if (lineContent === null) break;
-    str += lineContent;
-    pos = max;
-    max = str.length;
-    nextLine++;
-    titleRes = state.md.helpers.parseLinkTitle(str, pos, max, titleRes);
+    const nextPos = getNextLinePos(state, nextLine);
+    if (nextPos < 0) break;
+    pos = nextPos;
+    max = lineEnd(state, nextLine++);
+    titleRes = state.md.helpers.parseLinkTitle(src, pos, max, titleRes);
   }
   let title;
-  if (pos < max && start !== pos && titleRes.ok) {
+  if (titleStart !== destEndPos && titleRes.ok) {
     title = titleRes.str;
     pos = titleRes.pos;
   } else {
     title = "";
     pos = destEndPos;
+    max = destEndMax;
     nextLine = destEndLineNo;
   }
   while (pos < max) {
-    const ch = str.charCodeAt(pos);
+    const ch = src.charCodeAt(pos);
     if (!isSpace(ch)) {
       break;
     }
     pos++;
   }
-  if (pos < max && str.charCodeAt(pos) !== 10) {
+  if (pos < max && src.charCodeAt(pos) !== 10) {
     if (title) {
       title = "";
       pos = destEndPos;
+      max = destEndMax;
       nextLine = destEndLineNo;
       while (pos < max) {
-        const ch = str.charCodeAt(pos);
+        const ch = src.charCodeAt(pos);
         if (!isSpace(ch)) {
           break;
         }
@@ -10260,10 +10972,10 @@ function reference(state, startLine, _endLine, silent) {
       }
     }
   }
-  if (pos < max && str.charCodeAt(pos) !== 10) {
+  if (pos < max && src.charCodeAt(pos) !== 10) {
     return false;
   }
-  const label = normalizeReference(str.slice(1, labelEnd));
+  const label = normalizeReference(rawLabel);
   if (!label) {
     return false;
   }
@@ -10656,6 +11368,7 @@ function StateInline(src, md, env, outTokens) {
   this._prev_delimiters = [];
   this.backticks = {};
   this.backticksScanned = false;
+  this.skipHtmlSpecial = false;
   this.linkLevel = 0;
 }
 StateInline.prototype.pushPending = function() {
@@ -11441,6 +12154,41 @@ function isLetter(ch) {
   const lc = ch | 32;
   return lc >= 97 && lc <= 122;
 }
+function scanSpecial(state, pos) {
+  const src = state.src;
+  let start;
+  let terminator;
+  if (src.startsWith("<!--", pos)) {
+    if (src.startsWith(">", pos + 4)) {
+      return pos + 5;
+    }
+    if (src.startsWith("->", pos + 4)) {
+      return pos + 6;
+    }
+    start = pos + 4;
+    terminator = "-->";
+  } else if (src.startsWith("<![CDATA[", pos)) {
+    start = pos + 9;
+    terminator = "]]>";
+  } else if (src.charCodeAt(pos + 1) === 63) {
+    start = pos + 2;
+    terminator = "?>";
+  } else if (isLetter(src.charCodeAt(pos + 2))) {
+    start = pos + 3;
+    terminator = ">";
+  } else {
+    return -1;
+  }
+  if (state.skipHtmlSpecial) {
+    return -1;
+  }
+  const end = src.indexOf(terminator, start);
+  if (end < 0) {
+    state.skipHtmlSpecial = true;
+    return -1;
+  }
+  return end + terminator.length;
+}
 function html_inline(state, silent) {
   if (!state.md.options.html) {
     return false;
@@ -11450,21 +12198,26 @@ function html_inline(state, silent) {
   if (state.src.charCodeAt(pos) !== 60 || pos + 2 >= max) {
     return false;
   }
+  let end;
   const ch = state.src.charCodeAt(pos + 1);
-  if (ch !== 33 && ch !== 63 && ch !== 47 && !isLetter(ch)) {
+  if (ch === 33 || ch === 63) {
+    end = scanSpecial(state, pos);
+  } else if (ch === 47 || isLetter(ch)) {
+    const match2 = state.src.slice(pos).match(HTML_OPEN_CLOSE_TAG_RE);
+    end = match2 ? pos + match2[0].length : -1;
+  } else {
     return false;
   }
-  const match2 = state.src.slice(pos).match(HTML_TAG_RE);
-  if (!match2) {
+  if (end < 0) {
     return false;
   }
   if (!silent) {
     const token = state.push("html_inline", "", 0);
-    token.content = match2[0];
+    token.content = state.src.slice(pos, end);
     if (isLinkOpen2(token.content)) state.linkLevel++;
     if (isLinkClose2(token.content)) state.linkLevel--;
   }
-  state.pos += match2[0].length;
+  state.pos = end;
   return true;
 }
 
@@ -12802,6 +13555,102 @@ function renderChatMessageContent(message) {
   };
 }
 
+// src/attachments.ts
+var FILE_REF_PATTERN3 = /^sf_[A-Za-z0-9][A-Za-z0-9_-]*$/;
+var MAX_ATTACHMENTS_PER_MESSAGE2 = 8;
+var STATES2 = /* @__PURE__ */ new Set(["available", "expired", "deleted", "quarantined"]);
+function isRecord2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function nonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+function isSize2(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+function toGeneratedFile(raw, turnRef2) {
+  if (!isRecord2(raw)) return null;
+  const fileRef = raw["file_ref"];
+  if (typeof fileRef !== "string" || !FILE_REF_PATTERN3.test(fileRef)) return null;
+  const fileName = nonEmptyString(raw["filename"]);
+  const contentType = nonEmptyString(raw["content_type"]);
+  const state = raw["state"];
+  if (!fileName || !contentType || !isSize2(raw["size"]) || typeof state !== "string" || !STATES2.has(state)) {
+    return null;
+  }
+  if (raw["owner_role"] !== "assistant" || raw["direction"] !== "outbound" || raw["message_ref_kind"] !== "turn" || raw["message_ref"] !== turnRef2) {
+    return null;
+  }
+  return {
+    fileRef,
+    label: fileName,
+    fileName,
+    contentType,
+    size: raw["size"],
+    state,
+    generated: true
+  };
+}
+var OWNERSHIP_FIELDS = ["owner_role", "direction", "message_ref", "message_ref_kind"];
+function toUserFile(raw, clientMsgId, pendingAllowed) {
+  if (typeof raw === "string") {
+    return pendingAllowed && FILE_REF_PATTERN3.test(raw) ? { fileRef: raw, label: "Attached file", fileName: null, contentType: null, size: null, state: null, generated: false } : null;
+  }
+  if (!isRecord2(raw)) return null;
+  const fileRef = raw["file_ref"];
+  if (typeof fileRef !== "string" || !FILE_REF_PATTERN3.test(fileRef)) return null;
+  const pending = OWNERSHIP_FIELDS.every((field) => raw[field] === void 0);
+  if (pending) {
+    if (!pendingAllowed) return null;
+  } else if (clientMsgId === null || raw["owner_role"] !== "user" || raw["direction"] !== "inbound" || raw["message_ref_kind"] !== "client_msg_id" || raw["message_ref"] !== clientMsgId) {
+    return null;
+  }
+  const fileName = nonEmptyString(raw["filename"]);
+  const state = typeof raw["state"] === "string" && STATES2.has(raw["state"]) ? raw["state"] : null;
+  return {
+    fileRef,
+    label: fileName ?? "Attached file",
+    fileName,
+    contentType: nonEmptyString(raw["content_type"]),
+    size: isSize2(raw["size"]) ? raw["size"] : null,
+    state,
+    generated: false
+  };
+}
+function getMessageAttachments(message) {
+  const raw = message.meta?.["attachments"];
+  if (!Array.isArray(raw)) return [];
+  let project2 = null;
+  if (message.type === "chat::answer" && message.role === "assistant") {
+    const turnRef2 = nonEmptyString(message.meta?.["turnRef"]);
+    if (turnRef2) project2 = (value) => toGeneratedFile(value, turnRef2);
+  } else if (message.role === "user" && (message.type === "chat::message" || message.type === "chat::echo")) {
+    const clientMsgId = message.clientMsgId ?? nonEmptyString(message.meta?.["client_msg_id"]);
+    const pendingAllowed = message.type === "chat::message";
+    project2 = (value) => toUserFile(value, clientMsgId, pendingAllowed);
+  }
+  if (!project2) return [];
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  for (const item of raw) {
+    if (result.length >= MAX_ATTACHMENTS_PER_MESSAGE2) break;
+    const attachment = project2(item);
+    if (!attachment || seen.has(attachment.fileRef)) continue;
+    seen.add(attachment.fileRef);
+    result.push(attachment);
+  }
+  return result;
+}
+function findGeneratedFile(message, fileRef) {
+  return getMessageAttachments(message).find((attachment) => attachment.generated && attachment.fileRef === fileRef) ?? null;
+}
+var UNSAFE_FILENAME_CHARS = /[\u0000-\u001f\u007f<>:"/\\|?*‪-‮⁦-⁩]/g;
+function safeDownloadFilename(name) {
+  const base2 = (name ?? "").split(/[\\/]/).pop() ?? "";
+  const cleaned = base2.replace(UNSAFE_FILENAME_CHARS, "_").replace(/^[\s.]+|[\s.]+$/g, "").slice(0, 255);
+  return cleaned || "download";
+}
+
 // src/debug.ts
 function hasWindowLocalStorageDebugFlag() {
   try {
@@ -12828,6 +13677,44 @@ function createDebugLogger2(enabled) {
 }
 
 // src/history-client.ts
+var HISTORY_PAGE_LIMIT = 100;
+var MAX_HISTORY_PAGES = 100;
+function isRecord3(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function parseTranscriptPage(body) {
+  if (!isRecord3(body) || body.ok !== true || !isRecord3(body.data)) {
+    throw new Error("History API returned an unsuccessful or malformed response");
+  }
+  const data = body.data;
+  if (!Array.isArray(data.messages) || !(data.next_cursor === null || typeof data.next_cursor === "string" && data.next_cursor.length > 0) || typeof data.incomplete !== "boolean" || !(data.incomplete_reason === null || typeof data.incomplete_reason === "string") || typeof data.truncated !== "boolean" || data.truncated !== (data.next_cursor !== null) || data.messages.length > HISTORY_PAGE_LIMIT || data.next_cursor !== null && data.messages.length === 0) {
+    throw new Error("History API returned a malformed transcript page");
+  }
+  for (const message of data.messages) {
+    if (!isRecord3(message) || !Number.isSafeInteger(message.id) || message.id <= 0 || typeof message.timestamp !== "string" || Number.isNaN(Date.parse(message.timestamp)) || typeof message.message_type !== "string" || !/^chat::(message|answer|hail|forward|question)$/.test(message.message_type) || message.direction !== "in" && message.direction !== "out" || message.role !== "user" && message.role !== "assistant" || message.direction === "in" && message.role !== "user" || !Array.isArray(message.content) || !message.content.every((part) => typeof part === "string") || message.source !== "session-manager") {
+      throw new Error("History API returned a malformed transcript message");
+    }
+  }
+  if (data.next_cursor !== null) {
+    const last = data.messages[data.messages.length - 1];
+    if (data.next_cursor !== `${last.timestamp}|${last.id}`) {
+      throw new Error("History API returned an impossible transcript cursor");
+    }
+  }
+  return data;
+}
+function projectMessage(message) {
+  return {
+    id: String(message.id),
+    type: message.message_type,
+    role: message.role,
+    direction: message.direction,
+    source: message.source,
+    content: message.content,
+    ts: message.timestamp,
+    ...message.message_type === "chat::answer" && message.role === "assistant" ? { status: "final" } : {}
+  };
+}
 async function requestJson(url, bearerToken, init) {
   const response = await fetch(url, {
     ...init,
@@ -12854,20 +13741,40 @@ function createHistoryClient(args) {
       return body.data?.conversations ?? [];
     },
     async getMessages(sessionId) {
-      const body = await requestJson(
-        `${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/messages/`,
-        bearerToken
-      );
-      return (body.data?.messages ?? []).map((message) => ({
-        id: message.id,
-        type: message.type,
-        role: message.role,
-        content: message.content,
-        status: message.status,
-        ts: message.ts ?? null,
-        actor: parseRawActor(message.actor ?? null),
-        meta: message.meta ?? {}
-      }));
+      const messages = [];
+      const seenIds = /* @__PURE__ */ new Set();
+      const seenCursors = /* @__PURE__ */ new Set();
+      const sources = /* @__PURE__ */ new Set();
+      let cursor = null;
+      let incomplete = false;
+      let incompleteReason = null;
+      for (let pageNumber = 0; pageNumber < MAX_HISTORY_PAGES; pageNumber += 1) {
+        const url = new URL(`${baseUrl}/api/chat/conversations/${encodeURIComponent(sessionId)}/messages/`);
+        url.searchParams.set("limit", String(HISTORY_PAGE_LIMIT));
+        if (cursor !== null) url.searchParams.set("cursor", cursor);
+        const page = parseTranscriptPage(await requestJson(url.toString(), bearerToken));
+        incomplete || (incomplete = page.incomplete);
+        incompleteReason ?? (incompleteReason = page.incomplete_reason);
+        for (const message of page.messages) {
+          sources.add(message.source);
+          if (!seenIds.has(message.id)) {
+            seenIds.add(message.id);
+            messages.push(projectMessage(message));
+          }
+        }
+        if (page.next_cursor === null) {
+          return {
+            messages,
+            audit: { incomplete, incompleteReason, truncated: false, sources: [...sources] }
+          };
+        }
+        if (seenCursors.has(page.next_cursor)) {
+          throw new Error("History API returned a repeated transcript cursor");
+        }
+        seenCursors.add(page.next_cursor);
+        cursor = page.next_cursor;
+      }
+      throw new Error("History exceeds the page limit; transcript was not opened partially");
     },
     async renameConversation(sessionId, title) {
       await requestJson(
@@ -13366,11 +14273,11 @@ var HistoryController = class {
     this.state.menuSessionId = null;
     this.render();
     try {
-      const messages = await client.getMessages(sessionId);
+      const transcript = await client.getMessages(sessionId);
       if (this.destroyed || generation !== this.messagesGeneration || client !== this.client) {
         return;
       }
-      this.callbacks.onOpenHistorical(sessionId, messages);
+      this.callbacks.onOpenHistorical(sessionId, transcript);
       this.render();
     } catch (error2) {
       if (this.destroyed || generation !== this.messagesGeneration || client !== this.client) {
@@ -13491,14 +14398,14 @@ var HistoryController = class {
 
 // src/history-dom.ts
 function createElement2(tagName, className, textContent) {
-  const element = document.createElement(tagName);
+  const element2 = document.createElement(tagName);
   if (className) {
-    element.className = className;
+    element2.className = className;
   }
   if (textContent !== void 0) {
-    element.textContent = textContent;
+    element2.textContent = textContent;
   }
-  return element;
+  return element2;
 }
 function createHistoryDom() {
   const host = createElement2("div");
@@ -13534,6 +14441,189 @@ function createHistoryDom() {
     list: list2
   };
 }
+
+// src/human-assistance.ts
+function element(tag, className) {
+  const result = document.createElement(tag);
+  result.className = className;
+  return result;
+}
+function statusText(card) {
+  const labels = {
+    pending: "Awaiting your response",
+    sent: "Sent, awaiting acknowledgement",
+    accepted: "Accepted, awaiting resolution",
+    rejected: "Rejected",
+    resolved: "Resolved",
+    expired: "Expired",
+    revoked: "Revoked",
+    delivery_failed: "Could not deliver request",
+    cancelled: "Request cancelled"
+  };
+  return labels[card.status];
+}
+var HumanAssistanceView = class {
+  constructor(host, controller) {
+    this.host = host;
+    this.controller = controller;
+    this.nodes = /* @__PURE__ */ new Map();
+    this.deadlineTimers = /* @__PURE__ */ new Map();
+  }
+  render(cards) {
+    const ids = new Set(cards.map((card) => card.request.request_id));
+    for (const [id, node] of this.nodes) {
+      if (!ids.has(id)) {
+        node.remove();
+        this.nodes.delete(id);
+        this.clearDeadline(id);
+      }
+    }
+    for (const card of cards) {
+      const id = card.request.request_id;
+      let node = this.nodes.get(id);
+      if (!node) {
+        node = this.createCard(card);
+        this.nodes.set(id, node);
+        this.host.append(node);
+        this.scheduleDeadline(card);
+      }
+      this.updateCard(node, card);
+    }
+    this.host.hidden = cards.length === 0;
+  }
+  destroy() {
+    for (const id of this.deadlineTimers.keys()) this.clearDeadline(id);
+    this.nodes.clear();
+    this.host.replaceChildren();
+    this.host.hidden = true;
+  }
+  clearDeadline(id) {
+    const timer = this.deadlineTimers.get(id);
+    if (timer !== void 0) window.clearTimeout(timer);
+    this.deadlineTimers.delete(id);
+  }
+  scheduleDeadline(card) {
+    const delay = Date.parse(card.request.deadline_at) - Date.now();
+    if (card.status !== "pending" || delay <= 0) return;
+    const id = card.request.request_id;
+    this.deadlineTimers.set(id, window.setTimeout(() => {
+      this.deadlineTimers.delete(id);
+      this.render(this.controller.getCards());
+      if (this.nodes.has(id)) this.scheduleDeadline(card);
+    }, Math.min(delay + 1, 2147483647)));
+  }
+  createCard(card) {
+    const id = card.request.request_id;
+    const cardNode = element("article", "cortex-widget__ha-card");
+    cardNode.dataset.haRequestId = id;
+    cardNode.setAttribute("aria-label", "Human assistance request");
+    const heading2 = element("h3", "cortex-widget__ha-heading");
+    heading2.textContent = "Human assistance";
+    const prompt = element("p", "cortex-widget__ha-prompt");
+    prompt.textContent = card.request.question;
+    cardNode.append(heading2, prompt);
+    if (card.request.options.length) {
+      const label = element("label", "cortex-widget__ha-label");
+      label.textContent = "Choose an option";
+      const select = element("select", "cortex-widget__ha-select");
+      select.dataset.haControl = "option";
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = "Select\u2026";
+      select.append(empty);
+      for (const option of card.request.options) {
+        const choice = document.createElement("option");
+        choice.value = option.id;
+        choice.textContent = option.label;
+        select.append(choice);
+      }
+      if (card.request.allow_text) {
+        const other = document.createElement("option");
+        other.value = "";
+        other.dataset.haOther = "true";
+        other.textContent = "Other\u2026";
+        select.append(other);
+      }
+      select.addEventListener("change", () => {
+        const other = select.options[select.selectedIndex]?.dataset.haOther === "true";
+        cardNode.dataset.haOtherSelected = other ? "true" : "";
+        try {
+          this.controller.selectOption(id, other ? null : select.value || null);
+        } catch {
+        }
+        if (other) cardNode.querySelector('[data-ha-control="text"]')?.focus();
+      });
+      label.append(select);
+      cardNode.append(label);
+    }
+    if (card.request.allow_text) {
+      const label = element("label", "cortex-widget__ha-label");
+      label.textContent = card.request.options.length ? "Other answer" : "Your response";
+      const input = element("textarea", "cortex-widget__ha-text");
+      input.dataset.haControl = "text";
+      input.maxLength = 4096;
+      input.addEventListener("input", () => {
+        try {
+          this.controller.setText(id, input.value);
+        } catch {
+        }
+      });
+      label.append(input);
+      cardNode.append(label);
+    }
+    const status = element("p", "cortex-widget__ha-status");
+    status.setAttribute("role", "status");
+    const error2 = element("p", "cortex-widget__ha-error");
+    error2.setAttribute("role", "alert");
+    const actions = element("div", "cortex-widget__ha-actions");
+    for (const [action, title] of [["submit", "Submit"], ["refuse", "Refuse"], ["retry", "Retry"]]) {
+      const button = element("button", "cortex-widget__ha-button");
+      button.type = "button";
+      button.dataset.haAction = action;
+      button.textContent = title;
+      button.addEventListener("click", () => {
+        try {
+          const result = this.controller[action](id);
+          void result.catch(() => {
+          });
+        } catch {
+        }
+      });
+      actions.append(button);
+    }
+    cardNode.append(status, error2, actions);
+    return cardNode;
+  }
+  updateCard(node, card) {
+    if (card.status !== "pending") this.clearDeadline(card.request.request_id);
+    const pending = card.status === "pending" && Date.now() < Date.parse(card.request.deadline_at);
+    const select = node.querySelector('[data-ha-control="option"]');
+    if (select) {
+      const value = card.optionId ?? "";
+      if (card.optionId) node.dataset.haOtherSelected = "";
+      if (node.dataset.haOtherSelected === "true" && card.optionId === null) {
+        const other = [...select.options].find((option) => option.dataset.haOther === "true");
+        if (other) other.selected = true;
+      } else if (select.value !== value) select.value = value;
+      select.disabled = !pending;
+    }
+    const input = node.querySelector('[data-ha-control="text"]');
+    if (input) {
+      if (input.value !== card.text) input.value = card.text;
+      input.disabled = !pending;
+    }
+    const status = node.querySelector(".cortex-widget__ha-status");
+    status.textContent = statusText(card);
+    const error2 = node.querySelector(".cortex-widget__ha-error");
+    error2.textContent = card.reason === "not_admitted" ? "Reply not accepted" : card.error ?? (card.reason ? `Reason: ${card.reason}` : "");
+    error2.hidden = !error2.textContent;
+    node.querySelector('[data-ha-action="submit"]').disabled = !pending || !card.optionId && !card.text.trim();
+    node.querySelector('[data-ha-action="refuse"]').disabled = !pending;
+    const retry = node.querySelector('[data-ha-action="retry"]');
+    retry.hidden = !(card.status === "sent" && !!card.error);
+    retry.disabled = retry.hidden || Date.now() >= Date.parse(card.request.deadline_at);
+  }
+};
 
 // src/message-flags.ts
 var TYPING_TYPES = /* @__PURE__ */ new Set(["chat::typing", "typing::start", "typing::stop"]);
@@ -13861,18 +14951,18 @@ var TranscriptVirtualizer = class {
       const item = this.items[index];
       let mounted = this.mounted.get(item.key);
       if (!mounted || mounted.version !== item.version) {
-        const element = this.renderRow(item.value);
-        if (!element) continue;
-        element.dataset.virtualKey = item.key;
-        element.dataset.virtualIndex = String(index);
+        const element2 = this.renderRow(item.value);
+        if (!element2) continue;
+        element2.dataset.virtualKey = item.key;
+        element2.dataset.virtualIndex = String(index);
         if (mounted) {
           if (mounted.element === cursor) cursor = cursor.nextSibling;
           this.resizeObserver?.unobserve(mounted.element);
-          mounted.element.replaceWith(element);
+          mounted.element.replaceWith(element2);
         }
-        mounted = { element, version: item.version };
+        mounted = { element: element2, version: item.version };
         this.mounted.set(item.key, mounted);
-        this.resizeObserver?.observe(element);
+        this.resizeObserver?.observe(element2);
       } else {
         mounted.element.dataset.virtualIndex = String(index);
       }
@@ -13903,6 +14993,9 @@ var TranscriptVirtualizer = class {
     }
   }
 };
+
+// src/types.ts
+var MAX_COMPOSER_ATTACHMENTS = 8;
 
 // src/renderer.ts
 var _warnedMissingActorIds = /* @__PURE__ */ new Set();
@@ -14053,7 +15146,7 @@ function formatFileSize(size) {
   }
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
-function isRecord2(value) {
+function isRecord4(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function toNonEmptyString(value) {
@@ -14067,7 +15160,7 @@ function normalizeQuestionOptions2(value) {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value.filter((item) => isRecord2(item)).map((item) => ({
+  return value.filter((item) => isRecord4(item)).map((item) => ({
     id: String(item["id"] ?? ""),
     label: String(item["label"] ?? "")
   })).filter((option) => option.id !== "" && option.label !== "");
@@ -14077,7 +15170,7 @@ function normalizeQuestionFields2(value) {
     return [];
   }
   const supported = /* @__PURE__ */ new Set(["select", "radio", "text", "boolean", "date", "email"]);
-  return value.filter((item) => isRecord2(item)).map((item) => {
+  return value.filter((item) => isRecord4(item)).map((item) => {
     const key = toNonEmptyString(item["key"]);
     const rawType = toNonEmptyString(item["type"]);
     if (!key || !rawType || !supported.has(rawType)) {
@@ -14108,7 +15201,7 @@ function synthesizeAskUserChoiceQuestion(rawQuestions, questionRef) {
   }
   const options = [];
   for (const item of rawQuestions) {
-    if (!isRecord2(item) || item["type"] != null) {
+    if (!isRecord4(item) || item["type"] != null) {
       return null;
     }
     const id = toNonEmptyString(item["key"]);
@@ -14163,101 +15256,102 @@ function getDeliveryStatusLabel(status) {
   }
   return "Failed";
 }
-function toAttachmentViewModel(attachment) {
-  if (typeof attachment === "string") {
-    const ref = attachment.trim();
-    if (!ref) {
-      return null;
-    }
-    if (!ref.startsWith("sf_")) {
-      return null;
-    }
-    return {
-      id: ref,
-      label: "Attached file",
-      url: null,
-      fileName: null,
-      contentType: null,
-      size: null,
-      fileRef: ref,
-      downloadMintUrl: null,
-      ownerRole: null,
-      direction: null,
-      messageRef: null
-    };
-  }
-  if (!isRecord2(attachment)) {
-    return null;
-  }
-  const fileRef = toNonEmptyString(attachment.file_ref);
-  const fileName = toNonEmptyString(attachment.filename) ?? toNonEmptyString(attachment.file_name) ?? toNonEmptyString(attachment.name);
-  const downloadMintUrl = toNonEmptyString(attachment.download_mint_url);
-  const url = downloadMintUrl ?? toNonEmptyString(attachment.download_url) ?? toNonEmptyString(attachment.url) ?? toNonEmptyString(attachment.href);
-  const contentType = toNonEmptyString(attachment.content_type) ?? toNonEmptyString(attachment.mime_type) ?? toNonEmptyString(attachment.type);
-  const size = typeof attachment.size === "number" ? attachment.size : typeof attachment.size_bytes === "number" ? attachment.size_bytes : null;
-  const ownerRole = toNonEmptyString(attachment.owner_role);
-  const direction = toNonEmptyString(attachment.direction);
-  const messageRef = toNonEmptyString(attachment.message_ref);
-  const label = fileName ?? "Attached file";
-  if (!fileName && !fileRef && !url) {
-    return null;
-  }
-  return {
-    id: fileRef,
-    label,
-    url,
-    fileName,
-    contentType,
-    size,
-    fileRef,
-    downloadMintUrl,
-    ownerRole,
-    direction,
-    messageRef
-  };
+function describeFile(attachment) {
+  const parts = [];
+  if (attachment.contentType) parts.push(attachment.contentType);
+  if (attachment.size !== null) parts.push(formatFileSize(attachment.size));
+  return parts.join(" \xB7 ");
 }
-function attachmentOwnerMatchesRole(messageRole, ownerRole) {
-  if (!ownerRole) return false;
-  if (messageRole === "assistant") return ownerRole === "assistant";
-  if (messageRole === "operator") return ownerRole === "operator";
-  if (messageRole === "user") return ownerRole === "user";
-  return false;
-}
-function attachmentBindingMatchesMessage(message, attachment) {
-  if (!attachment.messageRef) return false;
-  return attachment.messageRef === message.clientMsgId || attachment.messageRef === message.id;
-}
-function attachmentBelongsToMessage(message, attachment) {
-  if (message.role === "user") {
-    if (!attachment.ownerRole) return true;
-    return attachment.ownerRole === "user";
+function createAttachedFileChip(attachment) {
+  const item = document.createElement("li");
+  item.className = "cortex-widget__message-attachment";
+  item.setAttribute("data-testid", "message-attachment");
+  const label = document.createElement("span");
+  label.className = "cortex-widget__message-attachment-label";
+  label.textContent = attachment.label;
+  item.appendChild(label);
+  const detailsText = describeFile(attachment);
+  if (detailsText) {
+    const details = document.createElement("span");
+    details.className = "cortex-widget__message-attachment-details";
+    details.textContent = detailsText;
+    item.appendChild(details);
   }
-  return attachmentOwnerMatchesRole(message.role, attachment.ownerRole) && attachment.direction === "outbound" && attachmentBindingMatchesMessage(message, attachment);
+  return item;
 }
-function hasExplicitOwnedFileDescriptor(message) {
-  const attachments = message.meta?.attachments;
-  if (!Array.isArray(attachments)) {
-    return false;
+var UNAVAILABLE_STATE_LABELS = {
+  expired: "Expired",
+  deleted: "Deleted",
+  quarantined: "Unavailable"
+};
+function createGeneratedFileCard(message, attachment, state, context) {
+  const fileName = attachment.label;
+  const card = document.createElement("li");
+  card.className = "cortex-widget__file-card";
+  card.setAttribute("data-testid", "generated-file-card");
+  card.setAttribute("role", "group");
+  card.setAttribute("aria-label", `Generated file ${fileName}`);
+  card.dataset.fileRef = attachment.fileRef;
+  card.dataset.state = attachment.state ?? "available";
+  const main = document.createElement("div");
+  main.className = "cortex-widget__file-card-main";
+  const name = document.createElement("span");
+  name.className = "cortex-widget__file-card-name";
+  name.setAttribute("data-testid", "generated-file-name");
+  name.textContent = fileName;
+  main.appendChild(name);
+  const detailsText = describeFile(attachment);
+  if (detailsText) {
+    const details = document.createElement("span");
+    details.className = "cortex-widget__file-card-details";
+    details.textContent = detailsText;
+    main.appendChild(details);
   }
-  return attachments.some((raw) => {
-    const vm = toAttachmentViewModel(raw);
-    return vm !== null && attachmentBelongsToMessage(message, vm);
-  });
+  const download = state.fileDownloads[attachment.fileRef];
+  const unavailableLabel = attachment.state && attachment.state !== "available" ? UNAVAILABLE_STATE_LABELS[attachment.state] ?? "Unavailable" : null;
+  let statusText2 = "";
+  let buttonText = "Download";
+  let disabled = false;
+  if (unavailableLabel) {
+    statusText2 = unavailableLabel;
+    buttonText = unavailableLabel;
+    disabled = true;
+  } else if (state.isHistoricalView) {
+    statusText2 = "Open this conversation live to download";
+    disabled = true;
+  } else if (!context.downloadsAvailable) {
+    statusText2 = "Download unavailable";
+    disabled = true;
+  } else if (download?.status === "downloading") {
+    statusText2 = "Downloading\u2026";
+    buttonText = "Downloading\u2026";
+    disabled = true;
+  } else if (download?.status === "failed") {
+    statusText2 = `Download failed: ${download.error?.message ?? "unknown error"}`;
+    buttonText = download.retryable ? "Retry download" : "Unavailable";
+    disabled = !download.retryable;
+  }
+  card.dataset.downloadStatus = download?.status ?? (disabled ? "disabled" : "idle");
+  const status = document.createElement("span");
+  status.className = "cortex-widget__file-card-status";
+  status.setAttribute("data-testid", "generated-file-status");
+  status.setAttribute("aria-live", "polite");
+  status.textContent = statusText2;
+  main.appendChild(status);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cortex-widget__file-card-download";
+  button.setAttribute("data-testid", "generated-file-download");
+  button.dataset.downloadFileRef = attachment.fileRef;
+  button.dataset.messageId = message.id;
+  button.textContent = buttonText;
+  button.setAttribute("aria-label", `${buttonText} ${fileName}`);
+  button.disabled = disabled;
+  if (download?.status === "downloading") button.setAttribute("aria-busy", "true");
+  card.append(main, button);
+  return card;
 }
-function getMessageAttachments(message) {
-  if (message.type === "chat::question") {
-    return [];
-  }
-  const attachments = message.meta?.attachments;
-  if (!Array.isArray(attachments)) {
-    return [];
-  }
-  if (message.role !== "user" && !hasExplicitOwnedFileDescriptor(message)) {
-    return [];
-  }
-  return attachments.map((attachment) => toAttachmentViewModel(attachment)).filter((attachment) => attachment !== null && attachmentBelongsToMessage(message, attachment));
-}
-function createTranscriptMessage(message, state, options) {
+function createTranscriptMessage(message, state, options, context) {
   const rendered = renderChatMessageContent(message);
   const attachments = getMessageAttachments(message);
   const hasTextContent = rendered.format === "html" ? rendered.html.trim().length > 0 : rendered.text.trim().length > 0;
@@ -14333,7 +15427,7 @@ function createTranscriptMessage(message, state, options) {
       text3.className = "cortex-widget__bubble-text cortex-widget__markdown";
       text3.innerHTML = rendered.html;
       bubble.appendChild(text3);
-    } else if (attachments.length > 0) {
+    } else if (attachments.length > 0 && message.role === "user") {
       const fallback = document.createElement("div");
       fallback.className = "cortex-widget__bubble-text";
       fallback.textContent = "Attachment sent";
@@ -14346,7 +15440,7 @@ function createTranscriptMessage(message, state, options) {
       text3.className = "cortex-widget__bubble-text";
       text3.textContent = rendered.text;
       bubble.appendChild(text3);
-    } else if (attachments.length > 0) {
+    } else if (attachments.length > 0 && message.role === "user") {
       const fallback = document.createElement("div");
       fallback.className = "cortex-widget__bubble-text";
       fallback.textContent = "Attachment sent";
@@ -14362,49 +15456,10 @@ function createTranscriptMessage(message, state, options) {
     const attachmentList = document.createElement("ul");
     attachmentList.className = "cortex-widget__message-attachments";
     attachmentList.setAttribute("data-testid", "message-attachments");
+    const generated = attachments.some((attachment) => attachment.generated);
+    attachmentList.setAttribute("aria-label", generated ? "Generated files" : "Attached files");
     for (const attachment of attachments) {
-      const item = document.createElement("li");
-      item.className = "cortex-widget__message-attachment";
-      const downloadTarget = attachment.downloadMintUrl ?? attachment.url;
-      const hasDownloadLink = Boolean(downloadTarget);
-      if (hasDownloadLink && downloadTarget) {
-        const link2 = document.createElement("a");
-        link2.className = "cortex-widget__message-attachment-link";
-        link2.href = downloadTarget;
-        link2.rel = "noopener noreferrer";
-        if (attachment.downloadMintUrl) {
-          link2.setAttribute("data-download-mint-url", attachment.downloadMintUrl);
-        }
-        if (attachment.fileRef) {
-          link2.setAttribute("data-file-ref", attachment.fileRef);
-        }
-        if (attachment.fileName) {
-          link2.download = attachment.fileName;
-          link2.setAttribute("data-filename", attachment.fileName);
-        }
-        link2.setAttribute("data-testid", "message-attachment-link");
-        const label = document.createElement("span");
-        label.className = "cortex-widget__message-attachment-label";
-        label.textContent = attachment.label;
-        const detailsParts = [];
-        if (attachment.contentType) {
-          detailsParts.push(attachment.contentType);
-        }
-        if (attachment.size !== null) {
-          detailsParts.push(formatFileSize(attachment.size));
-        }
-        link2.appendChild(label);
-        if (detailsParts.length > 0) {
-          const details = document.createElement("span");
-          details.className = "cortex-widget__message-attachment-details";
-          details.textContent = detailsParts.join(" \xB7 ");
-          link2.appendChild(details);
-        }
-        item.appendChild(link2);
-      } else {
-        item.textContent = attachment.label;
-      }
-      attachmentList.appendChild(item);
+      attachmentList.appendChild(attachment.generated ? createGeneratedFileCard(message, attachment, state, context) : createAttachedFileChip(attachment));
     }
     bubble.appendChild(attachmentList);
   }
@@ -14565,13 +15620,20 @@ function getMessageVersion(message, state) {
     content,
     meta,
     getQuestionRef(state.chat.activeQuestion) ?? "",
-    state.isAwaitingAnswer ? "1" : "0"
+    state.isAwaitingAnswer ? "1" : "0",
+    fileDownloadsVersion(message, state)
   ].join("\0");
 }
-function renderTranscript(transcriptEl, state, options) {
+function fileDownloadsVersion(message, state) {
+  return getMessageAttachments(message).filter((attachment) => attachment.generated).map((attachment) => {
+    const download = state.fileDownloads[attachment.fileRef];
+    return download ? `${attachment.fileRef}:${download.status}:${download.error?.code ?? ""}` : "";
+  }).join(",");
+}
+function renderTranscript(transcriptEl, state, options, context) {
   const transcript = state.chat.transcript;
-  const scopeKey = `${state.isHistoricalView ? "history" : "live"}:${state.chat.connection.sessionId ?? ""}`;
-  const renderRow = (message) => createTranscriptMessage(message, state, options);
+  const scopeKey = `${state.isHistoricalView ? "history" : "live"}:${context.downloadsAvailable ? "dl" : "nodl"}:${state.chat.connection.sessionId ?? ""}`;
+  const renderRow = (message) => createTranscriptMessage(message, state, options, context);
   const existing = transcriptProjections.get(transcriptEl);
   const mutation = state.chat.transcriptMutation;
   if (existing && existing.scopeKey === scopeKey && existing.transcript === transcript && existing.revision === state.chat.transcriptRevision) {
@@ -14638,7 +15700,7 @@ function destroyTranscriptRenderer(transcriptEl) {
   transcriptProjections.get(transcriptEl)?.virtualizer.destroy();
   transcriptProjections.delete(transcriptEl);
 }
-function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
+function renderWidget(dom, state, options, attachmentsAvailable, isUploading, downloadsAvailable = false) {
   applyResolvedTheme(dom.host, dom.root, options.theme, {
     dark: "cortex-widget--dark",
     light: "cortex-widget--light"
@@ -14702,7 +15764,7 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
   }
   const questionLocksInput = !!state.chat.activeQuestion && !state.chat.activeQuestion.allow_reply;
   const inputLocked = state.isDestroyed || state.chat.input.locked || state.isAwaitingAnswer || isUploading || questionLocksInput || state.isHistoricalView;
-  const hasSendableContent = dom.textarea.value.trim().length > 0 || state.selectedFile !== null;
+  const hasSendableContent = dom.textarea.value.trim().length > 0 || state.selectedFiles.length > 0;
   dom.textarea.disabled = inputLocked;
   dom.textarea.placeholder = state.isHistoricalView ? "History view is read-only" : options.placeholder;
   dom.sendButton.disabled = inputLocked;
@@ -14710,22 +15772,87 @@ function renderWidget(dom, state, options, attachmentsAvailable, isUploading) {
   dom.sendButton.setAttribute("aria-label", "Send message");
   dom.sendButton.setAttribute("title", "Send message");
   dom.sendButton.dataset.empty = hasSendableContent ? "false" : "true";
-  dom.attachButton.disabled = !attachmentsAvailable || state.chat.input.locked || state.isAwaitingAnswer || isUploading;
+  dom.attachButton.disabled = !attachmentsAvailable || state.chat.input.locked || state.isAwaitingAnswer || isUploading || state.isHistoricalView || state.selectedFiles.length >= MAX_COMPOSER_ATTACHMENTS;
   dom.fileInput.disabled = dom.attachButton.disabled;
   dom.fileHint.textContent = attachmentsAvailable ? "" : "Attachments unavailable";
   dom.fileHint.title = attachmentsAvailable ? "" : "Attachments unavailable";
-  if (state.selectedFile) {
-    dom.fileChip.dataset.visible = "true";
-    dom.fileChipName.textContent = state.selectedFile.name;
-    dom.fileChipMeta.textContent = `${formatFileSize(state.selectedFile.size)}${state.selectedFile.type ? ` \xB7 ${state.selectedFile.type}` : ""}`;
-    dom.fileChipRemove.disabled = state.isAwaitingAnswer || isUploading;
-  } else {
-    dom.fileChip.dataset.visible = "false";
-    dom.fileChipName.textContent = "";
-    dom.fileChipMeta.textContent = "";
-    dom.fileChipRemove.disabled = true;
+  renderComposerFiles(dom.fileChips, state.selectedFiles, state.isAwaitingAnswer || isUploading);
+  const audit = state.historyAudit;
+  dom.historyNotice.hidden = !state.isHistoricalView || audit === null;
+  dom.historyNotice.textContent = audit === null ? "" : audit.incomplete ? `Audit history may be incomplete (${audit.incompleteReason ?? "best effort"}). Source: ${audit.sources.join(", ") || "audit"}.` : `Audit history. Source: ${audit.sources.join(", ") || "audit"}.`;
+  renderTranscript(dom.transcript, state, options, { downloadsAvailable });
+}
+function composerFileStatusText(file) {
+  if (file.status === "uploading") return "Uploading\u2026";
+  if (file.status === "uploaded") return "Uploaded";
+  if (file.status === "failed") return `Upload failed: ${file.error?.message ?? "unknown error"}`;
+  return "";
+}
+function renderComposerFiles(list2, files, busy) {
+  list2.dataset.visible = files.length > 0 ? "true" : "false";
+  const existing = /* @__PURE__ */ new Map();
+  for (const child of Array.from(list2.children)) {
+    if (child.dataset.fileId) existing.set(child.dataset.fileId, child);
   }
-  renderTranscript(dom.transcript, state, options);
+  files.forEach((file, index) => {
+    let chip = existing.get(file.id);
+    existing.delete(file.id);
+    if (!chip) chip = createComposerFileChip(file);
+    updateComposerFileChip(chip, file, busy);
+    if (list2.children[index] !== chip) list2.insertBefore(chip, list2.children[index] ?? null);
+  });
+  for (const stale of existing.values()) stale.remove();
+}
+function createComposerFileChip(file) {
+  const chip = document.createElement("li");
+  chip.className = "cortex-widget__file-chip";
+  chip.dataset.fileId = file.id;
+  chip.setAttribute("data-testid", "selected-file-chip");
+  const main = document.createElement("div");
+  main.className = "cortex-widget__file-chip-main";
+  const name = document.createElement("span");
+  name.className = "cortex-widget__file-chip-name";
+  name.textContent = file.name;
+  const meta = document.createElement("span");
+  meta.className = "cortex-widget__file-chip-meta";
+  meta.textContent = `${formatFileSize(file.size)}${file.type ? ` \xB7 ${file.type}` : ""}`;
+  const status = document.createElement("span");
+  status.className = "cortex-widget__file-chip-status";
+  status.setAttribute("data-testid", "selected-file-status");
+  status.setAttribute("aria-live", "polite");
+  const progress = document.createElement("progress");
+  progress.className = "cortex-widget__file-chip-progress";
+  progress.setAttribute("data-testid", "selected-file-progress");
+  progress.setAttribute("aria-label", `Uploading ${file.name}`);
+  progress.hidden = true;
+  main.append(name, meta, status, progress);
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "cortex-widget__file-retry";
+  retry.textContent = "Retry";
+  retry.setAttribute("data-testid", "retry-file-upload");
+  retry.setAttribute("aria-label", `Retry upload of ${file.name}`);
+  retry.dataset.retryFileId = file.id;
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "cortex-widget__file-remove";
+  remove.textContent = "Remove";
+  remove.setAttribute("data-testid", "remove-file");
+  remove.setAttribute("aria-label", `Remove ${file.name}`);
+  remove.dataset.removeFileId = file.id;
+  chip.append(main, retry, remove);
+  return chip;
+}
+function updateComposerFileChip(chip, file, busy) {
+  chip.dataset.status = file.status;
+  const status = chip.querySelector(".cortex-widget__file-chip-status");
+  const statusText2 = composerFileStatusText(file);
+  if (status.textContent !== statusText2) status.textContent = statusText2;
+  chip.querySelector(".cortex-widget__file-chip-progress").hidden = file.status !== "uploading";
+  const retry = chip.querySelector(".cortex-widget__file-retry");
+  retry.hidden = !(file.status === "failed" && file.retryable);
+  retry.disabled = busy;
+  chip.querySelector(".cortex-widget__file-remove").disabled = busy;
 }
 
 // src/chat-widget.ts
@@ -14754,6 +15881,30 @@ var EMPTY_CHAT_STATE = {
   workerState: { state: "idle" }
 };
 var MAX_RUNTIME_CHAT_TITLE_LENGTH = 120;
+var DOWNLOAD_URL_REVOKE_DELAY_MS = 1e3;
+var NON_RETRYABLE_FILE_ERRORS = /* @__PURE__ */ new Set([
+  "attachments_unavailable",
+  "downloads_unavailable",
+  "file_access_denied",
+  "file_api_unavailable",
+  "file_expired",
+  "file_not_found",
+  "file_too_large",
+  "file_type_rejected",
+  "invalid_attachment",
+  "too_many_attachments",
+  "upload_failed"
+]);
+function isRetryableFileError(error2, widgetError) {
+  if (NON_RETRYABLE_FILE_ERRORS.has(widgetError.code)) return false;
+  if (error2 && typeof error2 === "object" && typeof error2.retryable === "boolean") {
+    return error2.retryable;
+  }
+  return true;
+}
+function isSameSelectedFile(a, b) {
+  return a === b || a.name === b.name && a.size === b.size && a.type === b.type && a.lastModified === b.lastModified;
+}
 function cloneChatState(state) {
   return {
     session: {
@@ -14820,6 +15971,7 @@ var ChatWidget = class {
   constructor(args) {
     this.liveChatState = EMPTY_CHAT_STATE;
     this.historicalTranscript = [];
+    this.historicalAudit = null;
     this.historicalTranscriptRevision = 0;
     this.chatView = { kind: "live" };
     this.historyController = null;
@@ -14828,8 +15980,13 @@ var ChatWidget = class {
     this.liveConnectPromise = null;
     this.mounted = false;
     this.domCleanup = /* @__PURE__ */ new Set();
+    this.composerFileSeq = 0;
+    this.pendingDownloadUrls = /* @__PURE__ */ new Map();
     this.unsubscribeController = null;
     this.unsubscribeRawMessages = null;
+    this.humanAssistanceController = null;
+    this.humanAssistanceView = null;
+    this.unsubscribeHumanAssistance = null;
     this.ui = {
       isOpen: false,
       isReady: false,
@@ -14838,10 +15995,8 @@ var ChatWidget = class {
       isTyping: false,
       isUploading: false,
       attachmentsAvailable: false,
-      selectedFile: null,
-      selectedFileValue: null,
-      cachedUploadedAttachmentRef: null,
-      cachedUploadedFile: null,
+      composerFiles: [],
+      fileDownloads: /* @__PURE__ */ new Map(),
       draftText: "",
       error: null
     };
@@ -14861,23 +16016,35 @@ var ChatWidget = class {
       void this.handleSend();
     };
     this.onAttachClick = () => {
-      if (!this.ui.attachmentsAvailable || this.ui.isUploading || this.ui.isAwaitingAnswer || this.getDisplayedChatState().input.locked) {
+      if (!this.ui.attachmentsAvailable || this.ui.isUploading || this.ui.isAwaitingAnswer || this.ui.composerFiles.length >= MAX_COMPOSER_ATTACHMENTS || this.getDisplayedChatState().input.locked) {
         return;
       }
       this.dom.fileInput.click();
     };
     this.onFileChange = () => {
-      const file = this.dom.fileInput.files?.[0] ?? null;
-      if (!this.ui.attachmentsAvailable || !file) {
-        this.dom.fileInput.value = "";
+      const files = Array.from(this.dom.fileInput.files ?? []);
+      this.dom.fileInput.value = "";
+      if (!this.ui.attachmentsAvailable || files.length === 0) {
         return;
       }
-      this.setSelectedFile(file);
+      this.addComposerFiles(files);
       this.notifyAndRender();
     };
-    this.onRemoveFile = () => {
-      this.clearSelectedFile();
-      this.notifyAndRender();
+    this.onFileChipsClick = (event) => {
+      const target = event.target;
+      const removeButton = target.closest("[data-remove-file-id]");
+      if (removeButton) {
+        const fileId = removeButton.dataset.removeFileId;
+        if (!removeButton.disabled && fileId) {
+          this.removeComposerFile(fileId);
+        }
+        return;
+      }
+      const retryButton = target.closest("[data-retry-file-id]");
+      const retryId = retryButton?.dataset.retryFileId;
+      if (retryButton && !retryButton.disabled && retryId) {
+        void this.retryComposerUpload(retryId);
+      }
     };
     this.onAuthSubmitClick = () => {
       void this.handleLoginSubmit();
@@ -14932,7 +16099,7 @@ var ChatWidget = class {
         callbacks: {
           getLiveSessionId: () => this.getLiveSessionId(),
           onOpenCurrent: () => this.showLive(),
-          onOpenHistorical: (sessionId, messages) => this.showHistoricalTranscript(sessionId, messages),
+          onOpenHistorical: (sessionId, transcript) => this.showHistoricalTranscript(sessionId, transcript),
           onStartNewChat: () => this.startNewChat(),
           onError: (error2, code2, message) => this.handleHistoryError(error2, code2, message)
         }
@@ -14963,8 +16130,14 @@ var ChatWidget = class {
     this.ui.isAwaitingAnswer = false;
     this.ui.isTyping = false;
     this.ui.isUploading = false;
+    for (const [url, timer] of this.pendingDownloadUrls) {
+      window.clearTimeout(timer);
+      URL.revokeObjectURL(url);
+    }
+    this.pendingDownloadUrls.clear();
     this.historyController?.destroy();
     this.historyController = null;
+    this.teardownHumanAssistance();
     this.teardownLiveListeners();
     for (const dispose of Array.from(this.domCleanup)) {
       dispose();
@@ -14985,21 +16158,22 @@ var ChatWidget = class {
     }
     this.chatView = { kind: "live" };
     this.historicalTranscript = [];
+    this.historicalAudit = null;
     this.historicalTranscriptRevision += 1;
     this.ui.error = null;
     this.notifyAndRender();
   }
-  showHistoricalTranscript(sessionId, messages) {
+  showHistoricalTranscript(sessionId, transcript) {
     if (this.ui.isDestroyed) {
       return;
     }
     this.chatView = { kind: "historical", sessionId };
-    this.historicalTranscript = [...messages];
+    this.historicalTranscript = [...transcript.messages];
+    this.historicalAudit = transcript.audit;
     this.historicalTranscriptRevision += 1;
     this.ui.isAwaitingAnswer = false;
     this.ui.isTyping = false;
     this.clearDraftComposer();
-    this.clearSelectedFile();
     this.notifyAndRender();
   }
   async startNewChat() {
@@ -15050,7 +16224,30 @@ var ChatWidget = class {
     });
     this.liveChatState = this.controller.getState();
     this.ui.attachmentsAvailable = typeof this.client.uploadFile === "function";
+    this.ui.fileDownloads = /* @__PURE__ */ new Map();
+    this.initializeHumanAssistance();
     this.bindControllerListeners();
+  }
+  initializeHumanAssistance() {
+    const client = this.client;
+    const factory = createHumanAssistanceController;
+    if (typeof factory !== "function" || !Array.isArray(client.humanAssistanceRequests) || typeof client.onHumanAssistance !== "function" || typeof client.replyHumanAssistance !== "function") {
+      return;
+    }
+    const controller = factory({ client });
+    const view = new HumanAssistanceView(this.dom.humanAssistance, controller);
+    this.humanAssistanceController = controller;
+    this.humanAssistanceView = view;
+    this.unsubscribeHumanAssistance = controller.subscribe((cards) => view.render(cards));
+    view.render(controller.getCards());
+  }
+  teardownHumanAssistance() {
+    this.unsubscribeHumanAssistance?.();
+    this.unsubscribeHumanAssistance = null;
+    this.humanAssistanceController?.destroy();
+    this.humanAssistanceController = null;
+    this.humanAssistanceView?.destroy();
+    this.humanAssistanceView = null;
   }
   bindControllerListeners() {
     this.unsubscribeController = this.controller.subscribe((nextState) => {
@@ -15106,7 +16303,7 @@ var ChatWidget = class {
     this.dom.composer.addEventListener("submit", this.onComposerSubmit);
     this.dom.attachButton.addEventListener("click", this.onAttachClick);
     this.dom.fileInput.addEventListener("change", this.onFileChange);
-    this.dom.fileChipRemove.addEventListener("click", this.onRemoveFile);
+    this.dom.fileChips.addEventListener("click", this.onFileChipsClick);
     this.dom.authSubmitButton.addEventListener("click", this.onAuthSubmitClick);
     this.dom.authPasswordInput.addEventListener("keydown", this.onAuthPasswordKeyDown);
     this.dom.launcher.addEventListener("click", this.onLauncherClick);
@@ -15117,7 +16314,7 @@ var ChatWidget = class {
     this.domCleanup.add(() => this.dom.composer.removeEventListener("submit", this.onComposerSubmit));
     this.domCleanup.add(() => this.dom.attachButton.removeEventListener("click", this.onAttachClick));
     this.domCleanup.add(() => this.dom.fileInput.removeEventListener("change", this.onFileChange));
-    this.domCleanup.add(() => this.dom.fileChipRemove.removeEventListener("click", this.onRemoveFile));
+    this.domCleanup.add(() => this.dom.fileChips.removeEventListener("click", this.onFileChipsClick));
     this.domCleanup.add(() => this.dom.authSubmitButton.removeEventListener("click", this.onAuthSubmitClick));
     this.domCleanup.add(() => this.dom.authPasswordInput.removeEventListener("keydown", this.onAuthPasswordKeyDown));
     this.domCleanup.add(() => this.dom.launcher.removeEventListener("click", this.onLauncherClick));
@@ -15135,6 +16332,7 @@ var ChatWidget = class {
     }
   }
   async resetLiveSession() {
+    this.teardownHumanAssistance();
     this.teardownLiveListeners();
     try {
       await this.controller.disconnect();
@@ -15149,6 +16347,8 @@ var ChatWidget = class {
     });
     this.liveChatState = this.controller.getState();
     this.ui.attachmentsAvailable = typeof this.client.uploadFile === "function";
+    this.ui.fileDownloads = /* @__PURE__ */ new Map();
+    this.initializeHumanAssistance();
     this.liveConnected = false;
     this.liveConnectPromise = null;
     this.bindControllerListeners();
@@ -15199,7 +16399,20 @@ ${token}`;
       isAwaitingAnswer: this.chatView.kind === "historical" ? false : this.ui.isAwaitingAnswer,
       isTyping: this.chatView.kind === "historical" ? false : this.ui.isTyping,
       isHistoricalView: this.chatView.kind === "historical",
-      selectedFile: this.ui.selectedFile ? { ...this.ui.selectedFile } : null,
+      historyAudit: this.chatView.kind === "historical" ? this.historicalAudit : null,
+      selectedFiles: this.ui.composerFiles.map((entry) => ({
+        id: entry.id,
+        name: entry.file.name,
+        size: entry.file.size,
+        type: entry.file.type,
+        status: entry.status,
+        error: entry.error ? { ...entry.error } : null,
+        retryable: entry.retryable
+      })),
+      fileDownloads: Object.fromEntries(Array.from(this.ui.fileDownloads, ([fileRef, download]) => [
+        fileRef,
+        { ...download, error: download.error ? { ...download.error } : null }
+      ])),
       chat: displayedChatState,
       error: this.ui.error ? { ...this.ui.error } : null
     };
@@ -15248,35 +16461,81 @@ ${token}`;
     }
     this.syncTextareaValue();
     const state = this.getPublicState();
-    renderWidget(this.dom, state, this.options, this.ui.attachmentsAvailable, this.ui.isUploading);
+    renderWidget(
+      this.dom,
+      state,
+      this.options,
+      this.ui.attachmentsAvailable,
+      this.ui.isUploading,
+      typeof this.client.downloadFile === "function"
+    );
     this.resizeComposerTextarea();
     this.historyController?.setLiveSessionId(this.getLiveSessionId());
     this.options.onStateChange?.(state);
   }
-  setSelectedFile(file) {
-    this.ui.selectedFileValue = file;
-    this.ui.selectedFile = file ? {
-      name: file.name,
-      size: file.size,
-      type: file.type
-    } : null;
-    if (!file || this.ui.cachedUploadedFile !== file) {
-      this.ui.cachedUploadedAttachmentRef = null;
-      this.ui.cachedUploadedFile = null;
+  addComposerFiles(files) {
+    const selected = [...this.ui.composerFiles];
+    let overflow = 0;
+    for (const file of files) {
+      if (selected.some((entry) => isSameSelectedFile(entry.file, file))) {
+        continue;
+      }
+      if (selected.length >= MAX_COMPOSER_ATTACHMENTS) {
+        overflow += 1;
+        continue;
+      }
+      this.composerFileSeq += 1;
+      selected.push({
+        id: `file_${this.composerFileSeq}`,
+        file,
+        status: "selected",
+        uploadedRef: null,
+        error: null,
+        retryable: false
+      });
+    }
+    this.ui.composerFiles = selected;
+    if (overflow > 0) {
+      this.ui.error = {
+        code: "too_many_attachments",
+        message: `You can attach up to ${MAX_COMPOSER_ATTACHMENTS} files to one message.`
+      };
     }
   }
-  clearSelectedFile() {
-    this.setSelectedFile(null);
+  removeComposerFile(fileId) {
+    if (this.ui.isUploading || this.ui.isAwaitingAnswer) {
+      return;
+    }
+    const index = this.ui.composerFiles.findIndex((entry) => entry.id === fileId);
+    if (index < 0) {
+      return;
+    }
+    this.ui.composerFiles = this.ui.composerFiles.filter((entry) => entry.id !== fileId);
+    const error2 = this.ui.error;
+    const failedRemain = this.ui.composerFiles.some((entry) => entry.status === "failed");
+    if (error2 && (error2.code === "too_many_attachments" || !failedRemain && this.isComposerUploadError(error2))) {
+      this.ui.error = null;
+    }
+    this.notifyAndRender();
+    const removeButtons = Array.from(this.dom.fileChips.querySelectorAll("[data-remove-file-id]"));
+    (removeButtons[index] ?? removeButtons[index - 1] ?? this.dom.attachButton).focus();
+  }
+  isComposerUploadError(error2) {
+    return error2.code === "upload_failed" || error2.code === "attachments_unavailable" || error2.code.startsWith("file_");
+  }
+  updateComposerFile(fileId, patch) {
+    this.ui.composerFiles = this.ui.composerFiles.map((entry) => entry.id === fileId ? { ...entry, ...patch } : entry);
+  }
+  clearComposerFiles() {
+    this.ui.composerFiles = [];
     this.dom.fileInput.value = "";
   }
   clearDraftComposer() {
     this.ui.draftText = "";
-    this.clearSelectedFile();
-    this.ui.cachedUploadedAttachmentRef = null;
-    this.ui.cachedUploadedFile = null;
+    this.clearComposerFiles();
   }
   buildUploadedAttachment(fileRef, file) {
-    if (!/^sf_[A-Za-z0-9][A-Za-z0-9_-]*$/.test(fileRef)) {
+    if (!FILE_REF_PATTERN3.test(fileRef)) {
       throw createWidgetError("upload_failed", "Upload did not return a canonical sf_ file_ref.");
     }
     const meta = {};
@@ -15285,16 +16544,12 @@ ${token}`;
     meta.size = file.size;
     return { file_ref: fileRef, ...meta };
   }
-  async uploadSelectedFile() {
-    const file = this.ui.selectedFileValue;
-    if (!file) {
-      return null;
+  // Upload one composer file once; a file that already has its sf_ ref is never uploaded again.
+  async uploadComposerFile(entry) {
+    if (entry.uploadedRef) {
+      return true;
     }
-    if (this.ui.cachedUploadedAttachmentRef && this.ui.cachedUploadedFile === file) {
-      return this.ui.cachedUploadedAttachmentRef;
-    }
-    this.ui.isUploading = true;
-    this.ui.error = null;
+    this.updateComposerFile(entry.id, { status: "uploading", error: null, retryable: false });
     this.notifyAndRender();
     try {
       if (typeof this.client.uploadFile !== "function") {
@@ -15303,18 +16558,88 @@ ${token}`;
           "Attachments are unavailable for the current client."
         );
       }
-      const fileRef = await this.client.uploadFile(file);
-      const attachmentRef = this.buildUploadedAttachment(fileRef, file);
-      this.ui.cachedUploadedAttachmentRef = attachmentRef;
-      this.ui.cachedUploadedFile = file;
-      this.ui.isUploading = false;
-      this.notifyAndRender();
-      return attachmentRef;
+      const fileRef = await this.client.uploadFile(entry.file);
+      const uploadedRef = this.buildUploadedAttachment(fileRef, entry.file);
+      this.updateComposerFile(entry.id, { status: "uploaded", uploadedRef, error: null, retryable: false });
+      return true;
     } catch (error2) {
-      this.resolveUploadError(error2);
-      this.notifyAndRender();
+      const widgetError = toWidgetError(error2, "upload_failed", "Attachment upload failed");
+      this.updateComposerFile(entry.id, {
+        status: "failed",
+        error: widgetError,
+        retryable: isRetryableFileError(error2, widgetError)
+      });
+      this.debug.log("[cortex-chat-widget] upload failed", {
+        code: widgetError.code,
+        message: widgetError.message,
+        details: error2 && typeof error2 === "object" && "details" in error2 ? error2.details : void 0
+      });
+      this.options.onError?.(error2);
+      return false;
+    }
+  }
+  setComposerUploadFailure(failed) {
+    this.ui.error = failed.length === 1 && failed[0].error ? { ...failed[0].error } : {
+      code: "upload_failed",
+      message: `${failed.length} files could not be uploaded. Retry or remove them to send.`
+    };
+  }
+  /**
+   * Upload every composer file that has no sf_ ref yet, in selection order.
+   * Returns the ordered refs only when every selected file is uploaded and the
+   * selection did not change meanwhile; otherwise nothing is sent.
+   */
+  async uploadComposerFiles() {
+    const entries2 = [...this.ui.composerFiles];
+    const blocked = entries2.filter((entry) => entry.status === "failed" && !entry.retryable);
+    if (blocked.length > 0) {
+      this.setComposerUploadFailure(blocked);
       return null;
     }
+    this.ui.isUploading = true;
+    this.ui.error = null;
+    this.notifyAndRender();
+    for (const entry of entries2) {
+      await this.uploadComposerFile(entry);
+      if (this.ui.isDestroyed) {
+        return null;
+      }
+    }
+    this.ui.isUploading = false;
+    const current = this.ui.composerFiles;
+    const failed = current.filter((entry) => entry.status === "failed");
+    if (failed.length > 0) {
+      this.setComposerUploadFailure(failed);
+      return null;
+    }
+    const unchanged = current.length === entries2.length && current.every((entry, index) => entry.id === entries2[index].id && entry.uploadedRef !== null);
+    if (!unchanged) {
+      return null;
+    }
+    const refs = current.map((entry) => entry.uploadedRef);
+    if (new Set(refs.map((ref) => ref.file_ref)).size !== refs.length) {
+      this.ui.error = { code: "invalid_attachment", message: "Two selected files resolved to the same upload. Remove one to send." };
+      return null;
+    }
+    return refs;
+  }
+  async retryComposerUpload(fileId) {
+    const entry = this.ui.composerFiles.find((candidate) => candidate.id === fileId);
+    if (!entry || entry.status !== "failed" || !entry.retryable || this.ui.isUploading || this.ui.isAwaitingAnswer || this.ui.isDestroyed) {
+      return;
+    }
+    this.ui.isUploading = true;
+    this.ui.error = null;
+    await this.uploadComposerFile(entry);
+    if (this.ui.isDestroyed) {
+      return;
+    }
+    this.ui.isUploading = false;
+    const failed = this.ui.composerFiles.filter((candidate) => candidate.status === "failed");
+    if (failed.length > 0) {
+      this.setComposerUploadFailure(failed);
+    }
+    this.notifyAndRender();
   }
   async handleSend() {
     if (this.ui.isDestroyed || this.chatView.kind === "historical") {
@@ -15322,7 +16647,7 @@ ${token}`;
     }
     const content = this.ui.draftText.trim();
     const hasContent = content.length > 0;
-    const hasFile = this.ui.selectedFileValue !== null;
+    const hasFile = this.ui.composerFiles.length > 0;
     const displayedChatState = this.getDisplayedChatState();
     const activeQuestion = this.liveChatState.activeQuestion;
     if (activeQuestion && !activeQuestion.allow_reply) {
@@ -15332,19 +16657,22 @@ ${token}`;
       return;
     }
     this.ui.error = null;
-    let attachmentRef = null;
+    let attachments;
     if (hasFile) {
-      attachmentRef = await this.uploadSelectedFile();
-      if (this.ui.selectedFileValue && attachmentRef === null) {
+      const uploaded = await this.uploadComposerFiles();
+      if (uploaded === null) {
+        this.ui.isUploading = false;
+        this.notifyAndRender();
         return;
       }
+      attachments = uploaded;
     }
     const questionRef = getQuestionRef2(activeQuestion);
     const questionMeta = questionRef ? { question_ref: questionRef } : void 0;
     try {
       const sendRequest = {
         content: [content],
-        attachments: attachmentRef ? [attachmentRef] : void 0,
+        attachments,
         meta: questionMeta
       };
       this.debug.log("[cortex-chat-widget] handleSend -> controller.sendMessage start", {
@@ -15425,19 +16753,19 @@ ${token}`;
       return;
     }
     const answers = {};
-    for (const element of Array.from(form.elements)) {
-      if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement)) {
+    for (const element2 of Array.from(form.elements)) {
+      if (!(element2 instanceof HTMLInputElement || element2 instanceof HTMLSelectElement)) {
         continue;
       }
-      if (!element.name) {
+      if (!element2.name) {
         continue;
       }
-      const questionType = element.getAttribute("data-question-type");
-      const value = questionType === "boolean" && element instanceof HTMLInputElement ? element.checked : element.value.trim();
-      if (element.required && (value === "" || value === false)) {
+      const questionType = element2.getAttribute("data-question-type");
+      const value = questionType === "boolean" && element2 instanceof HTMLInputElement ? element2.checked : element2.value.trim();
+      if (element2.required && (value === "" || value === false)) {
         return;
       }
-      answers[element.name] = value;
+      answers[element2.name] = value;
     }
     if (Object.keys(answers).length === 0) {
       return;
@@ -15466,12 +16794,13 @@ ${token}`;
     }
   }
   async handleTranscriptClick(event) {
-    const downloadLink = event.target.closest("[data-download-mint-url]");
-    if (downloadLink) {
+    const downloadButton = event.target.closest("[data-download-file-ref]");
+    if (downloadButton) {
       event.preventDefault();
-      const fileRef = downloadLink.dataset.fileRef;
-      if (fileRef) {
-        await this.downloadSessionFile(fileRef, downloadLink.dataset.filename);
+      const fileRef = downloadButton.dataset.downloadFileRef;
+      const messageId = downloadButton.dataset.messageId;
+      if (!downloadButton.disabled && fileRef && messageId) {
+        await this.downloadGeneratedFile(messageId, fileRef);
       }
       return;
     }
@@ -15495,32 +16824,81 @@ ${token}`;
       await this.handleOptionSelect(questionRef, optionId, optionLabel);
     }
   }
-  // Mint-on-click: fetch a fresh single-use download URL, then trigger a plain browser download.
-  async downloadSessionFile(fileRef, filename) {
-    const clientAny = this.client;
-    const mint = clientAny["mintSessionFileDownloadUrl"];
-    if (typeof mint !== "function") {
+  /**
+   * Download one generated file of a live answer. The descriptor is resolved
+   * again from the transcript (never from DOM or message URLs); only an
+   * available assistant file of that answer reaches client.downloadFile().
+   */
+  async downloadGeneratedFile(messageId, fileRef) {
+    if (this.ui.isDestroyed || this.chatView.kind === "historical") {
       return;
     }
-    try {
-      const url = await mint.call(this.client, fileRef);
-      this.triggerBrowserDownload(url, filename);
-    } catch (error2) {
-      this.resolveRuntimeError(error2);
-      this.notifyAndRender();
+    const message = this.liveChatState.transcript.find((candidate) => candidate.id === messageId);
+    const attachment = message ? findGeneratedFile(message, fileRef) : null;
+    if (!attachment || attachment.state !== "available") {
+      return;
     }
+    if (this.ui.fileDownloads.get(fileRef)?.status === "downloading") {
+      return;
+    }
+    const client = this.client;
+    if (typeof client.downloadFile !== "function") {
+      this.setFileDownload(fileRef, {
+        status: "failed",
+        error: { code: "downloads_unavailable", message: "Downloads are unavailable for the current client." },
+        retryable: false
+      });
+      this.notifyAndRender();
+      return;
+    }
+    this.setFileDownload(fileRef, { status: "downloading", error: null, retryable: false });
+    this.notifyAndRender();
+    try {
+      const blob = await client.downloadFile(fileRef);
+      if (this.ui.isDestroyed || this.client !== client) {
+        return;
+      }
+      if (!(blob instanceof Blob)) {
+        throw createWidgetError("file_download_failed", "Download did not return file contents.");
+      }
+      this.saveBlob(blob, safeDownloadFilename(attachment.fileName));
+      this.setFileDownload(fileRef, null);
+    } catch (error2) {
+      if (this.ui.isDestroyed || this.client !== client) {
+        return;
+      }
+      const widgetError = toWidgetError(error2, "file_download_failed", "File download failed");
+      this.setFileDownload(fileRef, {
+        status: "failed",
+        error: widgetError,
+        retryable: isRetryableFileError(error2, widgetError)
+      });
+      this.options.onError?.(error2);
+    }
+    this.notifyAndRender();
   }
-  triggerBrowserDownload(url, filename) {
-    if (typeof document === "undefined") return;
+  setFileDownload(fileRef, download) {
+    const next = new Map(this.ui.fileDownloads);
+    if (download) next.set(fileRef, download);
+    else next.delete(fileRef);
+    this.ui.fileDownloads = next;
+  }
+  // Save a downloaded Blob through a short-lived object URL; no server URL is ever used.
+  saveBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.rel = "noopener noreferrer";
-    if (filename) {
-      anchor.download = filename;
-    }
+    anchor.download = filename;
+    anchor.rel = "noopener";
+    anchor.style.display = "none";
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
+    const timer = window.setTimeout(() => {
+      this.pendingDownloadUrls.delete(url);
+      URL.revokeObjectURL(url);
+    }, DOWNLOAD_URL_REVOKE_DELAY_MS);
+    this.pendingDownloadUrls.set(url, timer);
   }
   setOpen(nextOpen) {
     if (this.options.mode === "embedded" || this.ui.isDestroyed) {
@@ -15542,18 +16920,6 @@ ${token}`;
     this.ui.error = toWidgetError(error2, code2, message);
     this.options.onError?.(error2);
     this.notifyAndRender();
-  }
-  resolveUploadError(error2) {
-    this.ui.isAwaitingAnswer = false;
-    this.ui.isUploading = false;
-    const widgetError = toWidgetError(error2, "upload_failed", "Attachment upload failed");
-    this.ui.error = widgetError;
-    this.debug.log("[cortex-chat-widget] upload failed", {
-      code: widgetError.code,
-      message: widgetError.message,
-      details: error2 && typeof error2 === "object" && "details" in error2 ? error2.details : void 0
-    });
-    this.options.onError?.(error2);
   }
   resolveRuntimeError(error2) {
     this.ui.isAwaitingAnswer = false;
@@ -15733,7 +17099,7 @@ export {
 /*! Bundled license information:
 
 dompurify/dist/purify.es.mjs:
-  (*! @license DOMPurify 3.4.16 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.16/LICENSE *)
+  (*! @license DOMPurify 3.4.17 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.17/LICENSE *)
   (*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE *)
 */
 //# sourceMappingURL=index.js.map

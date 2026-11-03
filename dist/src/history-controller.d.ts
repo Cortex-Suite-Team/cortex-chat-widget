@@ -1,9 +1,9 @@
 import type { DebugLogger } from './debug.js';
-import type { ChatMessageViewModel, HistoryClient, HistoryDom, NormalizedWidgetOptions } from './types.js';
+import type { HistoryTranscript, HistoryClient, HistoryDom, NormalizedWidgetOptions } from './types.js';
 export interface HistoryControllerCallbacks {
     getLiveSessionId(): string | null;
     onOpenCurrent(): void;
-    onOpenHistorical(sessionId: string, messages: ChatMessageViewModel[]): void;
+    onOpenHistorical(sessionId: string, transcript: HistoryTranscript): void;
     onStartNewChat(): Promise<void>;
     onError(error: unknown, code: string, message: string): void;
 }

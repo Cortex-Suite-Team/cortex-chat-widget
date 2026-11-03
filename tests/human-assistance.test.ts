@@ -31,6 +31,42 @@ const action = (node: HTMLElement, name: string) => node.querySelector<HTMLButto
 describe('Human Assistance visual host', () => {
   beforeEach(resetMocks);
 
+  it('offers Other only for mixed input and sends text without a stale option ID', async () => {
+    const client = new HAClient();
+    const { widget } = mountWidget({ client, initialOpen: true });
+    const root = (document.body.firstElementChild as HTMLElement).shadowRoot!;
+    client.notify('human_assistance::request', request('mixed', [{ id: 'no', label: 'No' }], true));
+    client.notify('human_assistance::request', request('choice', [{ id: 'no', label: 'No' }], false));
+    const mixed = card(root, 'mixed');
+    let select = mixed.querySelector<HTMLSelectElement>('[data-ha-control="option"]')!;
+    expect([...select.options].map((option) => option.textContent)).toEqual(['Select…', 'No', 'Other…']);
+    expect([...card(root, 'choice').querySelectorAll('option')].map((option) => option.textContent))
+      .toEqual(['Select…', 'No']);
+    select.selectedIndex = 1;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    select = card(root, 'mixed').querySelector<HTMLSelectElement>('[data-ha-control="option"]')!;
+    expect([...select.options].map((option) => option.textContent)).toEqual(['Select…', 'No', 'Other…']);
+    select.selectedIndex = 2;
+    expect(select.options[select.selectedIndex]?.dataset.haOther).toBe('true');
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    const current = card(root, 'mixed');
+    select = current.querySelector<HTMLSelectElement>('[data-ha-control="option"]')!;
+    const text = current.querySelector<HTMLTextAreaElement>('[data-ha-control="text"]')!;
+    expect(current.dataset.haOtherSelected).toBe('true');
+    expect(select.selectedOptions[0]?.textContent).toBe('Other…');
+    expect(text.labels?.[0]?.textContent).toBe('Other answer');
+    expect(action(current, 'submit').disabled).toBe(true);
+    text.value = '  Need context  ';
+    text.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(select.selectedOptions[0]?.textContent).toBe('Other…');
+    action(current, 'submit').click();
+    await flushAsyncWork();
+    expect(client.replies).toEqual([{
+      requestId: 'mixed', clientReplyId: 'reply_1', action: 'answer', text: 'Need context',
+    }]);
+    widget.destroy();
+  });
+
   it('renders two independent cards while A has an active question and keeps the transcript and composer intact', async () => {
     const client = new HAClient();
     const { widget, controller } = mountWidget({ client, initialOpen: true });
