@@ -2,14 +2,14 @@
   "widgetEntry": "dist/index.js",
   "sdk": {
     "name": "@cortex-suite/sdk",
-    "version": "1.1.21",
+    "version": "1.1.22",
     "browserEntry": "@cortex-suite/sdk/browser",
-    "source": "npm:@cortex-suite/sdk@1.1.21"
+    "source": "npm:@cortex-suite/sdk@1.1.22"
   },
   "sdkUi": {
     "name": "@cortex-suite/sdk-ui",
-    "version": "0.1.0",
-    "source": "npm:@cortex-suite/sdk-ui@0.1.0"
+    "version": "0.1.1",
+    "source": "npm:@cortex-suite/sdk-ui@0.1.1"
   },
   "sources": {
     "widget": "https://github.com/Cortex-Suite-Team/cortex-chat-widget",
