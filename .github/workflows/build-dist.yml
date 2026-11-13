@@ -25,48 +25,16 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           path: cortex-chat-widget
 
-      - name: Reset chat widget to latest origin/main
-        working-directory: cortex-chat-widget
-        run: |
-          git fetch origin main
-          git checkout main
-          git reset --hard origin/main
-
-      - name: Checkout sdk-ui
-        uses: actions/checkout@v4
-        with:
-          repository: Cortex-Suite-Team/cortex-sdk-ui
-          path: sdk-ui
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: cortex-chat-widget/package-lock.json
 
-      - name: Build sdk-ui
-        working-directory: sdk-ui
-        run: |
-          npm install
-          npm run typecheck
-          npm test
-          npm run build
-
-      - name: Pack sdk-ui build artifact
-        working-directory: sdk-ui
-        run: |
-          mkdir -p ../sdk-ui-artifact
-          npm pack --ignore-scripts --pack-destination ../sdk-ui-artifact
-
-      - name: Install dependencies
+      - name: Install published dependencies
         working-directory: cortex-chat-widget
-        run: |
-          npm install \
-            --no-save \
-            --package-lock=false \
-            --ignore-scripts \
-            --no-audit \
-            --no-fund \
-            ../sdk-ui-artifact/cortex-suite-sdk-ui-0.1.0.tgz
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Typecheck
         working-directory: cortex-chat-widget
@@ -78,7 +46,9 @@ jobs:
 
       - name: Verify reproducible dist and package
         working-directory: cortex-chat-widget
-        run: npm run check:reproducible
+        run: |
+          npm run check:reproducible
+          npm run check:isolated-package
 
       - name: Commit built dist
         working-directory: cortex-chat-widget
@@ -98,7 +68,5 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git commit -m "chore: build dist [skip ci]"
-            git reset --hard HEAD
-            git pull --rebase origin main
-            git push origin main
+            git push origin HEAD:main
           fi

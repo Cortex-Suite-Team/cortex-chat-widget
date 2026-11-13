@@ -1,6 +1,6 @@
 {
   "name": "@cortex-suite/chat-widget",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cortex Chat Widget — embeddable end-user chat UI for Cortex Digital Workers",
   "license": "MIT",
   "repository": {
@@ -44,8 +44,8 @@
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
   },
   "dependencies": {
-    "@cortex-suite/sdk": "1.1.21",
-    "@cortex-suite/sdk-ui": "0.1.0"
+    "@cortex-suite/sdk": "1.1.22",
+    "@cortex-suite/sdk-ui": "0.1.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",

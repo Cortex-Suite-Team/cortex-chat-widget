@@ -30,17 +30,10 @@ npm install @cortex-suite/chat-widget
 
 ### Human Assistance capability gate (S22)
 
-The separate Human Assistance cards require the native SDK responder API from
-`Cortex-Suite-Team/cortex-sdk` at `6b523a2c705225d9ffa22f845a1dbfc7198de4d6`
-and `createHumanAssistanceController` from `Cortex-Suite-Team/cortex-sdk-ui` at
-`ce1e84c889f95df46075b1b60fef43628ccd3c68`. The currently pinned npm
-versions (`@cortex-suite/sdk@1.1.21` and `@cortex-suite/sdk-ui@0.1.0`) share
-their version numbers with older builds and do not prove those APIs are present.
-Build both accepted commits into local tarballs and install them together before
-building the widget. If either API is absent, the widget shows no HA cards and
-does not create a local responder. Ordinary chat remains available. Publishing
-those dependency builds and validating the real deployed widget are separate
-release gates.
+Release `0.1.1` pins `@cortex-suite/sdk@1.1.22` and `@cortex-suite/sdk-ui@0.1.1`,
+including the native HA responder and `createHumanAssistanceController` APIs.
+HA transport and UI behavior are qualified with the versioned client packages;
+validating a real deployed Runtime remains a separate integration gate.
 
 ## Embedded Example
 
@@ -169,7 +162,7 @@ This package is not the Control Plane operator cockpit.
 
 Run development commands from the repository root. Do not rely on machine-specific checkout paths.
 
-The published package uses the exact versioned dependency `@cortex-suite/sdk-ui@0.1.0`.
+The published package uses the exact versioned dependency `@cortex-suite/sdk-ui@0.1.1`.
 After that version is available from the configured npm registry, use the standard workflow:
 
 ```bash
@@ -178,10 +171,10 @@ npm run build
 python -m http.server 8080
 ```
 
-Before release, set `CORTEX_SDK_UI_TARBALL` to a packed `sdk-ui` artifact and install it without
-changing `package.json`:
+Before registry publication, explicitly set `CORTEX_SDK_TARBALL` and
+`CORTEX_SDK_UI_TARBALL` to qualified local artifacts and install them without changing `package.json`:
 
 ```bash
-npm install --no-save "$CORTEX_SDK_UI_TARBALL"
+npm install --no-save --package-lock=false "$CORTEX_SDK_TARBALL" "$CORTEX_SDK_UI_TARBALL"
 npm run build
 ```
